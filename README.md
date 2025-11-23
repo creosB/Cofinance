@@ -6,6 +6,8 @@
 ![Gemini](https://img.shields.io/badge/AI-Gemini%202.5-8E75B2)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
+ ![Cofinance](screenshots/Cofinance.png)
+
 > **The Autonomous Investment Committee that lives in your browser.**
 
 ---
