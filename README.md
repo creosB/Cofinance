@@ -2,6 +2,7 @@
 
 ![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)
 ![Python](https://img.shields.io/badge/Python-3.9%2B-blue)
+![Phidata](https://img.shields.io/badge/Agent-Phidata-orange)
 ![Gemini](https://img.shields.io/badge/AI-Gemini%202.5-8E75B2)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
@@ -82,7 +83,7 @@ Unlike standard LLM chats that forget you instantly, Cofinance uses an **SQLite 
 
 This project demonstrates mastery of **Agentic AI** concepts:
 
-* **Multi-Agent Orchestration:** Implemented via using a Team Lead/Worker pattern.
+* **Multi-Agent Orchestration:** Implemented via phidata using a Team Lead/Worker pattern.
 * **Tool Use (Function Calling):** Custom Python tools for `yfinance`, `duckduckgo_search`, and `sqlite3`.
 * **Structured Output:** Enforces strict "Strategy -\> Data -\> News -\> Verdict" response formats using System Prompt Engineering.
 * **Observability:** Full visibility into agent thought processes via Streamlit expanders.
@@ -113,7 +114,7 @@ This project demonstrates mastery of **Agentic AI** concepts:
 1. **Clone the repo**
 
    ```bash
-   git clone [https://github.com/creosb/Cofinance-analyst.git](https://github.com/yourusername/Cofinance-analyst.git)
+   git clone [https://github.com/creosb/Cofinance-analyst.git](https://github.com/cresoB/Cofinance.git)
    cd Cofinance-analyst
    ```
 2. **Create a Virtual Environment** (Windows)
@@ -164,6 +165,7 @@ Cofinance-analyst/
 ## 🏆 Hackathon Submission Details
 
 * **Track:** Finance Agent / Multi-Agent Systems
+* **Framework:** Phidata
 * **Model:** Google Gemini 2.5 Flash - Qwen 3 4b - gpt oss 20b
 
 > *Built with ❤️ by Creos*
