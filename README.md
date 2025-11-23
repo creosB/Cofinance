@@ -169,5 +169,3 @@ Cofinance-analyst/
 > *Built with ❤️ by Creos*
 
 ```
-
-```
