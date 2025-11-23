@@ -16,6 +16,7 @@ from utils.llm_utils import fetch_llm_studio_models
 def render_sidebar():
     """Renders the sidebar with provider settings, memory, and controls."""
     with st.sidebar:
+        st.logo("screenshots/Favicons/favicon-310x310.png")
         st.markdown("### ⚙️ LLM Provider")
         if 'llm_provider' not in st.session_state:
             st.session_state.llm_provider = "LLM Studio"

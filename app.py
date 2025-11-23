@@ -25,7 +25,7 @@ import re
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="Cofinance Analyst",
-    page_icon="📈",
+    page_icon="screenshots/Favicons/favicon-32x32.png",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -74,7 +74,7 @@ def get_model_config(provider: str):
 # 3. MAIN APP LOGIC
 # -----------------------------------------------------------------------------
 def main():
-    st.title("💼 Cofinance Analyst")
+    st.title("Cofinance Analyst")
     st.caption("AI-Powered Investment Research Platform")
 
     # Render Sidebar and get API Key
