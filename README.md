@@ -102,6 +102,11 @@ This project demonstrates mastery of **Agentic AI** concepts:
 | Watchlist  | ![Watchlist](screenshots/watchlist.png)  |
 | Compare    | ![Compare](screenshots/compare.png)      |
 
+
+## Video
+
+[![Watch the video](https://img.youtube.com/vi/FKFkU2BG5cY/0.jpg)](https://youtu.be/FKFkU2BG5cY)
+
 ---
 
 ## 🚀 Quick Start
