@@ -97,6 +97,7 @@ This project demonstrates mastery of **Agentic AI** concepts:
 
 | Feature    | Screenshot                             |
 | ---------- | -------------------------------------- |
+| Summary    | ![Summary](screenshots/summary.png)    |
 | Deep Think | ![Deep Think](screenshots/deepthink.png) |
 | Response   | ![Response](screenshots/response.png)    |
 | Watchlist  | ![Watchlist](screenshots/watchlist.png)  |
