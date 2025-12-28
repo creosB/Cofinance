@@ -4,7 +4,6 @@
 ![Python](https://img.shields.io/badge/Python-3.9%2B-blue)
 ![Phidata](https://img.shields.io/badge/Agent-Phidata-orange)
 ![Gemini](https://img.shields.io/badge/AI-Gemini%202.5-8E75B2)
-![License](https://img.shields.io/badge/License-MIT-green)
 
  ![Cofinance](screenshots/Cofinance.png)
 
@@ -103,6 +102,11 @@ This project demonstrates mastery of **Agentic AI** concepts:
 | Watchlist  | ![Watchlist](screenshots/watchlist.png)  |
 | Compare    | ![Compare](screenshots/compare.png)      |
 
+
+## Video
+
+[![Watch the video](https://img.youtube.com/vi/FKFkU2BG5cY/0.jpg)](https://youtu.be/FKFkU2BG5cY)
+
 ---
 
 ## 🚀 Quick Start
@@ -173,3 +177,19 @@ Cofinance-analyst/
 
 > *Built with ❤️ by Creos*
 
+
+# License
+
+---
+
+## Please contact me first to share or make changes anywhere.
+***
+This work is licensed under a
+[Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License][cc-by-nc-sa].
+
+[![CC BY-NC-SA 4.0][cc-by-nc-sa-image]][cc-by-nc-sa]
+
+[cc-by-nc-sa]: http://creativecommons.org/licenses/by-nc-sa/4.0/
+[cc-by-nc-sa-image]: https://licensebuttons.net/l/by-nc-sa/4.0/88x31.png
+[cc-by-nc-sa-shield]: https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg
+***
