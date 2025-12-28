@@ -1,0 +1,14 @@
+# Database files
+*.db
+
+# Python cache
+__pycache__/
+
+# Compiled Python files
+*.pyc
+*.pyo
+
+# Other common ignores
+*.log
+.env
+.DS_Store
