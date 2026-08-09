@@ -9,6 +9,9 @@
 
 > **The Autonomous Investment Committee that lives in your browser.**
 
+Note: Cofinance Analyst is an archived hackathon project and is no longer actively maintained. It stays up as a reference implementation for multi-agent orchestration with Phidata.
+For actively maintained work, see AI Side Panel (12k+ installs, ChatGPT/Gemini/Claude in your browser side panel), and my other works → artistscompany.net
+
 ---
 
 ## 💡 The Pitch
