@@ -1,0 +1,6 @@
+{
+  "ticker_extraction": 0.95,
+  "tool_call_json": 0.90,
+  "materiality": 0.80,
+  "number_faithfulness": 1.00
+}
