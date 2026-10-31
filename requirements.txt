@@ -12,3 +12,5 @@ numpy==1.26.3
 faiss-cpu==1.13.0
 sentence-transformers==5.1.2
 pytest==7.4.2
+# Cofinance v2 core (System-1 router/judge). core/ itself is stdlib-only; this is needed for the live model.
+gliner2[local]==2.1.0
