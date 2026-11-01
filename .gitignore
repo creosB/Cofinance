@@ -15,3 +15,6 @@ __pycache__/
 
 # Local model eval output (measured results stay private)
 reports/
+
+# Clock 1 SQLite store (incl. WAL sidecar files)
+data/
