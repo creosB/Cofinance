@@ -12,3 +12,6 @@ __pycache__/
 *.log
 .env
 .DS_Store
+
+# Local model eval output (measured results stay private)
+reports/
