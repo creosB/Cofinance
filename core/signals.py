@@ -83,9 +83,11 @@ class SignalGate:
         self.last_alert = last_alert if last_alert is not None else {}
         self.clock = clock
 
-    def process(self, items: Iterable[Item]) -> List[Outcome]:
+    def process(self, items: Iterable[Item], alerts_already: int = 0) -> List[Outcome]:
+        """`alerts_already`: alerts already sent in the caller's cap window (Clock 1 persists it in SQLite),
+        so a crash-and-restart cannot hand out a fresh alert budget. Defaults to a per-call cap."""
         out: List[Outcome] = []
-        judged = alerts = 0
+        judged, alerts = 0, max(0, int(alerts_already))
         now = self.clock()
         for it in items:
             if it.published_at and now - it.published_at > self.cfg.max_age_s:
