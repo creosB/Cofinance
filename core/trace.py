@@ -276,7 +276,9 @@ def run_traced_clock1(tickers, fetch, classifier, trace: TraceRecorder, *, cfg=N
                 shadow_hits.append(bool(hit))
                 shadow = {"would_be_urgent": bool(hit), "rule": hit.rule if hit else None, "matched": hit.matched if hit else None,
                           "material": outcome.judgment.material if outcome.judgment else None,
-                          "note": "Shadow only. The gate action above is unchanged."} if outcome.judgment else None
+                          "live": cfg.gate.urgency_source == "rules",
+                          "note": ("Live: rule urgency decided this action." if cfg.gate.urgency_source == "rules"
+                                   else "Shadow only. The gate action above is unchanged.")} if outcome.judgment else None
                 # Gate evaluation follows inference; attach to the outer decision for that exact item.
                 candidates = [node for node in trace.data["spans"] if node["kind"] == "decision"
                               and (node.get("inputs") or {}).get("item_key") == outcome.item.key]

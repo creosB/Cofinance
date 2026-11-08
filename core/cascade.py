@@ -1,6 +1,6 @@
 """Cascade judge: a cheap System-1 screens every item, a stronger one adjudicates the hard cases.
 
-  primary (GLiNER2.5-Decide, 340M, CPU)  -> every item
+  primary (GLiNER2.5-Decide, 486M, CPU)  -> every item
   adjudicator (MiniCPM5-2B-Jev or d1-2B)  -> only the gray zone and ALERT candidates
 
 Rules (thresholds come from GateConfig so the cascade and SignalGate cannot drift apart):
@@ -12,7 +12,9 @@ Rules (thresholds come from GateConfig so the cascade and SignalGate cannot drif
                                                bullish vs bearish disagreement -> direction "unclear"
   * primary error                           -> raises -> SignalGate DEFERRED (retry)
   * adjudicator error                       -> primary judgment with urgent capped below the alert line:
-                                               the item can still DIGEST, it can never ALERT on one model.
+                                               the item can still DIGEST, it can never ALERT on one model
+                                               (alert_allowed=False, enforced by SignalGate in both modes).
+  * gate.urgency_source == "rules"          -> no model alert candidates; material >= gray_low is adjudicated.
 """
 from __future__ import annotations
 
@@ -34,8 +36,13 @@ class CascadeClassifier:
 
     def judge(self, item: Item) -> Judgment:
         p = self.primary.judge(item)
-        alert_candidate = p.material >= self.gate.alert_p and p.urgent >= self.gate.alert_urgent_p
-        gray = self.gray_low <= p.material < self.gate.alert_p
+        if self.gate.urgency_source == "rules":
+            # Rules own urgency, so the model's urgent score says nothing about alerting:
+            # everything at or above gray_low (which covers every possible rule alert) is adjudicated.
+            alert_candidate, gray = False, p.material >= self.gray_low
+        else:
+            alert_candidate = p.material >= self.gate.alert_p and p.urgent >= self.gate.alert_urgent_p
+            gray = self.gray_low <= p.material < self.gate.alert_p
         if not (alert_candidate or gray):
             self.routes["primary_only"] += 1
             return p
@@ -43,7 +50,7 @@ class CascadeClassifier:
             a = self.adjudicator.judge(item)
         except Exception:
             self.routes["adjudicator_down"] += 1
-            return replace(p, urgent=min(p.urgent, max(0.0, self.gate.alert_urgent_p - 1e-3)))
+            return replace(p, urgent=min(p.urgent, max(0.0, self.gate.alert_urgent_p - 1e-3)), alert_allowed=False)
         if not alert_candidate:
             self.routes["adjudicated"] += 1
             return a

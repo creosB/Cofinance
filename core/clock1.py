@@ -33,7 +33,8 @@ Fetch = Callable[[str], FetchResult]
 
 @dataclass
 class Clock1Config:
-    gate: GateConfig = field(default_factory=GateConfig)
+    # Live news: rules decide urgency (see GateConfig.urgency_source). Model mode stays available for comparison.
+    gate: GateConfig = field(default_factory=lambda: GateConfig(urgency_source="rules"))
     alert_window_s: float = 3600.0      # gate.max_alerts applies per rolling window of this length
     quarantine: bool = True
     speculation: bool = True            # prediction-market style items: IGNORE "speculation:...", never judged

@@ -74,5 +74,72 @@ class TestGate(unittest.TestCase):
         o = g.process([evil])[0]
         self.assertEqual(o.action, Action.IGNORE)   # gate has no tools/side effects to hijack
 
+class TestRuleUrgency(unittest.TestCase):
+    """urgency_source='rules': named rules decide urgency; the model's urgent score is ignored."""
+    RESULTS = "Apple reports fourth quarter results"
+    HALT = "NVIDIA halts production of H20 chips"
+    CALL = "Apple sets conference call to discuss financial results"
+    IPAD = "Apple introduces new iPad mini"
+
+    def gate(self, clf, **cfg):
+        self.t = [1000.0]
+        return SignalGate(clf, GateConfig(urgency_source="rules", **cfg), clock=lambda: self.t[0])
+
+    def test_rule_hit_alerts_at_digest_level_material(self):
+        g = self.gate(Fake(default=MID))           # material 0.6, model urgent 0.1
+        o = g.process([item(self.RESULTS, "AAPL")])[0]
+        self.assertEqual((o.action, o.reason), (Action.ALERT, "material_and_rule_urgent:results"))
+
+    def test_model_urgency_is_ignored_without_a_rule(self):
+        g = self.gate(Fake(default=HOT))           # model says urgent 0.9, no rule fires
+        o = g.process([item(self.IPAD, "AAPL")])[0]
+        self.assertEqual((o.action, o.reason), (Action.DIGEST, "material_not_urgent"))
+
+    def test_scheduling_notice_is_not_urgent(self):
+        o = self.gate(Fake(default=MID)).process([item(self.CALL, "AAPL")])[0]
+        self.assertEqual(o.action, Action.DIGEST)
+
+    def test_low_material_rule_hit_still_digests(self):
+        o = self.gate(Fake(default=LOW)).process([item(self.HALT, "NVDA")])[0]
+        self.assertEqual((o.action, o.reason), (Action.DIGEST, "rule_urgent_low_material:production_stop"))
+        o = self.gate(Fake(default=LOW)).process([item(self.IPAD, "AAPL")])[0]
+        self.assertEqual(o.action, Action.IGNORE)
+
+    def test_cooldown_and_cap_still_apply(self):
+        g = self.gate(Fake(default=MID), max_alerts=1)
+        outs = g.process([item(self.RESULTS, "AAPL"), item(self.HALT, "NVDA")])
+        self.assertEqual([o.action for o in outs], [Action.ALERT, Action.DIGEST])
+        self.assertEqual(outs[1].reason, "alert_downgraded:run_cap")
+        g = self.gate(Fake(default=MID))
+        g.process([item(self.RESULTS, "AAPL")])
+        self.t[0] += 60
+        o = g.process([item(self.RESULTS + " again", "AAPL")])[0]
+        self.assertEqual(o.reason, "alert_downgraded:ticker_cooldown")
+
+    def test_classifier_failure_still_never_alerts(self):
+        o = self.gate(Fake(default=MID, boom=[self.RESULTS])).process([item(self.RESULTS, "AAPL")])[0]
+        self.assertEqual(o.action, Action.DEFERRED)
+
+    def test_rule_alert_needs_the_adjudicator_when_cascaded(self):
+        from core.cascade import CascadeClassifier
+        class Down:
+            def judge(self, item):
+                raise TimeoutError("2B down")
+        g = self.gate(None)
+        g.classifier = down = CascadeClassifier(Fake(default=MID), Down(), g.cfg)
+        o = g.process([item(self.RESULTS, "AAPL")])[0]
+        self.assertEqual((o.action, o.reason), (Action.DIGEST, "alert_downgraded:one_model_only"))
+        self.assertEqual(down.routes["adjudicator_down"], 1)
+        g = self.gate(None)
+        g.classifier = up = CascadeClassifier(Fake(default=LOW), Fake(default=MID), g.cfg, gray_low=0.05)
+        o = g.process([item(self.RESULTS, "AAPL")])[0]
+        self.assertEqual(o.action, Action.ALERT)        # the adjudicator's material decides
+        self.assertEqual(up.routes["adjudicated"], 1)
+
+    def test_live_clock1_uses_rules_and_default_gate_stays_model(self):
+        from core.clock1 import Clock1Config
+        self.assertEqual(Clock1Config().gate.urgency_source, "rules")
+        self.assertEqual(GateConfig().urgency_source, "model")
+
 if __name__ == "__main__":
     unittest.main()

@@ -108,7 +108,7 @@ class TestOperationalCollection(unittest.TestCase):
             self.assertIn("official company feeds", coverage_note(health, ["NVDA"]))
             self.assertIn("No approved news source covers BTC", coverage_note(health, ["NVDA", "BTC"]))
 
-    def test_shadow_rule_urgency_is_recorded_but_never_acted_on(self):
+    def test_rule_urgency_decides_live_and_stays_recorded(self):
         def results_fetch(name, timeout=15.0):
             return nvidia_feed(title="NVIDIA reports third quarter results") if name == "nvidia_newsroom" else apple_feed()
         with tempfile.TemporaryDirectory() as root:
@@ -119,11 +119,13 @@ class TestOperationalCollection(unittest.TestCase):
                                             GlinerDecideClassifier(SignalBackend()), trace, store=store)
             finally:
                 store.close()
-            self.assertNotIn("alert", summary.actions)
+            self.assertEqual(summary.actions.get("alert"), 1)
             gates = {s["outputs"]["title"]: s["outputs"] for s in trace.data["spans"] if s["name"].startswith("Signal gate:")}
             shadow = gates["NVIDIA reports third quarter results"]["shadow_rule_urgency"]
-            self.assertEqual((shadow["would_be_urgent"], shadow["rule"]), (True, "results"))
-            self.assertEqual(gates["NVIDIA reports third quarter results"]["action"], "digest")
+            self.assertEqual((shadow["would_be_urgent"], shadow["rule"], shadow["live"]), (True, "results", True))
+            self.assertEqual(gates["NVIDIA reports third quarter results"]["action"], "alert")
+            self.assertEqual(gates["NVIDIA reports third quarter results"]["reason"], "material_and_rule_urgent:results")
+            self.assertEqual(gates["Apple updates a product"]["action"], "digest")
             self.assertFalse(gates["Apple updates a product"]["shadow_rule_urgency"]["would_be_urgent"])
             self.assertEqual(trace.data["summary"]["shadow_rule_urgency"]["would_be_urgent"], 1)
 

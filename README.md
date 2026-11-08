@@ -76,7 +76,7 @@ See [TODO.md](TODO.md) for the full list. The main gaps:
 
 - **Labels and calibration.** The 131 labelled headlines in `data/news_corpus_20261108` were labelled by an AI model,
   not a person, and are recorded as such; only 18 of the 20 required traps exist. Calibrated thresholds failed the
-  held-out check and were not adopted. Rule-based urgency runs in shadow mode only; its real test needs a fresh corpus on or after 2026-11-15.
+  held-out check and were not adopted. Live news urgency now comes from named rules (`core/urgency.py`), because the model urgency head ranked backwards and the old alert line could never fire; the rules' held-out test still needs a fresh corpus on or after 2026-11-15.
 - **Coverage.** Fundamentals are incomplete. News comes from the Apple and NVIDIA official feeds; there are no
   Bitcoin or regulatory sources and no scheduler yet (each needs approval). Reddit and StockTwits were tried through
   last30days and fail without a login, so they are not used.
