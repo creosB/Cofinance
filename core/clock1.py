@@ -3,6 +3,7 @@
   python -m core.clock1 --replay fixtures/news_replay.json --db data/news.db
   python -m core.clock1 --last30days <path>/skills/last30days/scripts/last30days.py --preflight
   python -m core.clock1 --last30days <path>/skills/last30days/scripts/last30days.py --tickers NVDA,TSLA
+  python -m core.clock1 --feeds                      # Apple and NVIDIA official newsroom feeds only
 
 Guarantees (tested in tests/test_clock1.py):
   * one run is one SQLite transaction: a crash commits nothing, so nothing is half-alerted;
@@ -24,7 +25,7 @@ from typing import Any, Callable, Dict, Iterable, List
 
 from .collector import FetchResult, Last30DaysCollector, ReplayCollector, epoch
 from .news_store import NewsStore
-from .pregate import quarantine_reason, title_key
+from .pregate import quarantine_reason, speculation_reason, title_key
 from .signals import Action, Classifier, GateConfig, Outcome, SignalGate
 
 Fetch = Callable[[str], FetchResult]
@@ -35,6 +36,7 @@ class Clock1Config:
     gate: GateConfig = field(default_factory=GateConfig)
     alert_window_s: float = 3600.0      # gate.max_alerts applies per rolling window of this length
     quarantine: bool = True
+    speculation: bool = True            # prediction-market style items: IGNORE "speculation:...", never judged
 
 
 @dataclass
@@ -42,6 +44,7 @@ class RunSummary:
     started_at: float
     fetched: int = 0
     quarantined: int = 0
+    speculation: int = 0
     duplicate_titles: int = 0
     alerts_in_window_before: int = 0
     actions: Dict[str, int] = field(default_factory=dict)
@@ -89,6 +92,12 @@ def run_once(tickers: Iterable[str], fetch: Fetch, classifier: Classifier, store
                     pre.append(Outcome(it, Action.IGNORE, f"quarantined:{why}"))
                     s.quarantined += 1
                     continue
+                spec = speculation_reason(it) if cfg.speculation else None
+                if spec:
+                    store.seen.add(it.key)
+                    pre.append(Outcome(it, Action.IGNORE, f"speculation:{spec}"))
+                    s.speculation += 1
+                    continue
                 tk = title_key(it)
                 if tk in batch_titles or tk in store.seen:
                     pre.append(Outcome(it, Action.IGNORE, "duplicate_title"))
@@ -117,6 +126,7 @@ def main(argv: List[str] | None = None) -> int:
     src = ap.add_mutually_exclusive_group(required=True)
     src.add_argument("--replay", help="cofinance-replay/1 JSON file")
     src.add_argument("--last30days", help="path to skills/last30days/scripts/last30days.py")
+    src.add_argument("--feeds", action="store_true", help="registered official company feeds (core.feeds.SOURCES)")
     ap.add_argument("--tickers", default="", help="comma-separated (replay defaults to every recorded ticker)")
     ap.add_argument("--db", default="data/news.db")
     ap.add_argument("--judge", default="gliner", help="gliner | systemone=URL | cascade:gliner+systemone=URL")
@@ -133,6 +143,11 @@ def main(argv: List[str] | None = None) -> int:
             return 0
         if not tickers:
             ap.error("--tickers is required with --last30days")
+        fixed = epoch(a.now) if a.now else None
+    elif a.feeds:
+        from .news_service import FeedFetcher, feed_tickers
+        fetch = FeedFetcher()
+        tickers = tickers or feed_tickers()
         fixed = epoch(a.now) if a.now else None
     else:
         fetch = ReplayCollector(a.replay)

@@ -89,7 +89,7 @@ class TestMultiAgentOrchestrator(unittest.TestCase):
         self.assertEqual(res.routed.tickers, ["NVDA", "TSLA"])
         self.assertEqual(res.risk_mode, "fundamental_equity")
         self.assertEqual(res.delegated_agents, ["Data Analyst", "News Researcher"])
-        self.assertEqual(tools.watchlist, ["NVDA", "TSLA"])
+        self.assertEqual(tools.watchlist, [])  # research is not permission to track assets
         self.assertEqual(tools.charts, ["chart://NVDA", "chart://TSLA"])
         self.assertTrue(res.faithful_synthesis)
         # Verify all 3 agents ran with their own isolated system prompts

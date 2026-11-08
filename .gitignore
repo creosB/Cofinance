@@ -18,3 +18,10 @@ reports/
 
 # Clock 1 SQLite store (incl. WAL sidecar files)
 data/
+
+# Project-local dashboard dependencies and build output
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
+frontend/*.tsbuildinfo
