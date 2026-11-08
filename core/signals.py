@@ -40,6 +40,9 @@ class Judgment:
     urgent: float                   # P(needs attention before the next scheduled digest)
     direction: str = "unclear"      # bullish | bearish | neutral | unclear
     direction_p: float = 0.0
+    # False when only one model judged an item that needed two (cascade adjudicator down). Checked in BOTH
+    # urgency modes, so rule urgency cannot bypass the "never alert on one model" invariant.
+    alert_allowed: bool = True
 
 
 class Classifier(Protocol):
@@ -58,6 +61,11 @@ class GateConfig:
     digest_p: float = 0.50
     alert_p: float = 0.85
     alert_urgent_p: float = 0.70
+    # "model": alert needs material >= alert_p and the model's urgent >= alert_urgent_p (original design).
+    # "rules": core.urgency decides urgency (live news default since 2026-11-08). Calibration on 131 labelled
+    # headlines: the GLiNER urgency head is inverted (AUC 0.37) and material never reaches 0.85, so model mode
+    # could never alert. In rules mode a rule hit alerts at digest-level material, and still digests below it.
+    urgency_source: str = "model"
     ticker_cooldown_s: float = 3600.0
     max_judgments: int = 200
     max_alerts: int = 5
@@ -113,15 +121,32 @@ class SignalGate:
 
     def _decide(self, it: Item, j: Judgment, now: float, alerts_so_far: int) -> Outcome:
         c = self.cfg
+        if c.urgency_source == "rules":
+            from .urgency import urgency
+            hit = urgency(it.title, it.text, it.source)
+            if j.material < c.digest_p:
+                if hit:  # an urgent story is never dropped because the material score is compressed
+                    return Outcome(it, Action.DIGEST, f"rule_urgent_low_material:{hit.rule}", j)
+                return Outcome(it, Action.IGNORE, "below_digest_threshold", j)
+            if not hit:
+                return Outcome(it, Action.DIGEST, "material_not_urgent", j)
+            return self._alert(it, j, now, alerts_so_far, f"material_and_rule_urgent:{hit.rule}")
         if j.material < c.digest_p:
             return Outcome(it, Action.IGNORE, "below_digest_threshold", j)
         wants_alert = j.material >= c.alert_p and j.urgent >= c.alert_urgent_p
         if not wants_alert:
             return Outcome(it, Action.DIGEST, "material_not_urgent", j)
+        return self._alert(it, j, now, alerts_so_far, "material_and_urgent")
+
+    def _alert(self, it: Item, j: Judgment, now: float, alerts_so_far: int, reason: str) -> Outcome:
+        """Cooldown and run cap apply in both modes."""
+        c = self.cfg
         tkr = it.ticker.upper()
+        if not j.alert_allowed:
+            return Outcome(it, Action.DIGEST, "alert_downgraded:one_model_only", j)
         if now - self.last_alert.get(tkr, -1e18) < c.ticker_cooldown_s:
             return Outcome(it, Action.DIGEST, "alert_downgraded:ticker_cooldown", j)
         if alerts_so_far >= c.max_alerts:
             return Outcome(it, Action.DIGEST, "alert_downgraded:run_cap", j)
         self.last_alert[tkr] = now
-        return Outcome(it, Action.ALERT, "material_and_urgent", j)
+        return Outcome(it, Action.ALERT, reason, j)

@@ -11,6 +11,9 @@ from core.news_store import NewsStore
 from core.pregate import quarantine_reason, speculation_reason, title_key
 from core.signals import Action, GateConfig, Item, Judgment
 
+# The replay fixture's KeywordJudge scores urgency itself, so these invariants run in model-urgency mode.
+MODEL_MODE = Clock1Config(gate=GateConfig(urgency_source="model"))
+
 FIXTURE = os.path.join(os.path.dirname(__file__), os.pardir, "fixtures", "news_replay.json")
 URGENT = ("halted", "halts", "acquired", "resigns", "sec opens", "fda declines", "antitrust")
 MATERIAL = URGENT + ("buyback", "contract", "loses its largest", "dividend", "raises", "recalls", "outage")
@@ -138,8 +141,8 @@ class TestClock1(unittest.TestCase):
         self.assertEqual(sum(len(rep(t).items) for t in rep.tickers), 49)              # the empty title is dropped
         st, judge = store(), KeywordJudge()
         clock = lambda: rep.recorded_at
-        s1 = run_once(rep.tickers, rep, judge, st, clock=clock)
-        s2 = run_once(rep.tickers, rep, judge, st, clock=clock)                 # full replay again
+        s1 = run_once(rep.tickers, rep, judge, st, cfg=MODEL_MODE, clock=clock)
+        s2 = run_once(rep.tickers, rep, judge, st, cfg=MODEL_MODE, clock=clock)  # full replay again
         alerts = s1.alerts + s2.alerts
         self.assertEqual(len(alerts), 4)
         self.assertEqual(sorted(a["ticker"] for a in alerts), ["ACME", "GLBX", "INTK", "UMBR"])   # one per ticker
@@ -195,7 +198,7 @@ class TestClock1(unittest.TestCase):
         self.assertNotIn("alert", s.actions)
         self.assertNotIn("digest", s.actions)
         self.assertGreater(s.actions["deferred"], 0)
-        s2 = run_once(rep.tickers, rep, KeywordJudge(), st, clock=lambda: rep.recorded_at)    # judge is back
+        s2 = run_once(rep.tickers, rep, KeywordJudge(), st, cfg=MODEL_MODE, clock=lambda: rep.recorded_at)  # judge is back
         self.assertEqual(len(s2.alerts), 4)                                    # deferred items were retried
         cascade = CascadeClassifier(KeywordJudge(), Down(), GateConfig())       # 2B adjudicator down
         s3 = run_once(rep.tickers, rep, cascade, store(), clock=lambda: rep.recorded_at)

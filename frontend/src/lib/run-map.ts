@@ -60,6 +60,7 @@ export function shadowDetail(gates:Span[]){
  const shadows=gates.map(g=>object(object(g.outputs).shadow_rule_urgency)).filter(o=>Object.keys(o).length)
  if(!shadows.length)return ''
  const urgent=shadows.filter(o=>o.would_be_urgent===true).length
+ if(shadows.some(o=>o.live===true))return gates.length+' gate check'+(gates.length===1?'':'s')+' / urgency rules: '+urgent+' urgent'
  return gates.length+' gate check'+(gates.length===1?'':'s')+' / shadow rules: '+urgent+' would be urgent, no action changed'
 }
 export function operationalStorage(run:Run){return run.mode==='live'&&run.spans.some(n=>n.kind==='run'&&n.name==='Clock 1 collection'&&text(object(n.inputs).persistence)==='local news store')}
@@ -74,7 +75,7 @@ export function backgroundStages(run:Run):MapStage[]{
  stage('sources','Source batch','Collector','Reads recorded or fetched source items. Source timestamps keep their actual meaning.',s.filter(n=>n.name==='Read source batch'),run),
  stage('pregate','Quarantine & dedupe','Python pre-gate','Drops detected instruction-like text before judging. Title and URL rules prevent repeated judgments.',s.filter(n=>n.name==='Pre-gate quarantine'||text(object(n.outputs).reason).startsWith('duplicate')),run),
  stage('judge','Decision model','GLiNER2.5-Decide / observed backend','Scores materiality, urgency, and direction. Scores are not calibrated probabilities.',s.filter(n=>n.kind==='decision'||n.kind==='model'),run),
- stage('signals','Ignore, digest, alert','Python SignalGate','Applies recorded thresholds, age, cooldown, and cap rules. Model errors defer instead of alerting. Rule urgency runs in shadow: recorded, never acted on.',s.filter(n=>n.name.startsWith('Signal gate:')),run,shadowDetail(s.filter(n=>n.name.startsWith('Signal gate:')))),
+ stage('signals','Ignore, digest, alert','Python SignalGate','Applies recorded thresholds, age, cooldown, and cap rules. Model errors defer instead of alerting. Urgency comes from named rules (results, big market moves, production stops, trade blocks), because the model urgency head ranked backwards on labelled headlines.',s.filter(n=>n.name.startsWith('Signal gate:')),run,shadowDetail(s.filter(n=>n.name.startsWith('Signal gate:')))),
  operationalStorage(run)?stage('storage','Stored signals','Local news store','Digest and alert rows are written to the local news store with a seven-day expiry. Stored alerts are rows; no notification is sent.',s.filter(n=>n.kind==='run'),run,storedDetail(run)):
  stage('storage','Diagnostic result','No operational notifications','Diagnostic replay uses a fresh in-memory store. It is not an operational news collection or a sent notification.',s.filter(n=>n.kind==='run'),run,run.mode==='replay'?'Replay result, isolated from operational news storage':run.mode==='fixture'?'Fixture result, not live evidence':'Inspect persistence details in the run input'),
  ]

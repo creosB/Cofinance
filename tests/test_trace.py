@@ -146,8 +146,10 @@ class TestDecisionTrace(unittest.TestCase):
         class Judge:
             def judge(self, item):
                 return Judgment(.95, .9, "bullish", .8)
+        from core.clock1 import Clock1Config
         trace = TraceRecorder("Diagnostic", mode="replay")
-        result = run_traced_clock1(["ACME"], lambda ticker: FetchResult([self.ITEM]), Judge(), trace, clock=lambda: 1900000000)
+        result = run_traced_clock1(["ACME"], lambda ticker: FetchResult([self.ITEM]), Judge(), trace,
+                                   cfg=Clock1Config(gate=GateConfig(urgency_source="model")), clock=lambda: 1900000000)
         self.assertEqual(len(result.alerts), 1)  # stored ONLY in fresh in-memory SQLite
         gate = next(n for n in trace.data["spans"] if n["kind"] == "gate")
         self.assertEqual(gate["outputs"]["reason"], "material_and_urgent")
