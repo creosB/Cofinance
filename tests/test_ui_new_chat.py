@@ -6,8 +6,11 @@ from ui.layout import render_sidebar
 
 
 def test_new_chat_button_sets_session(monkeypatch):
-    # Ensure no sessions to reduce side effects
-    monkeypatch.setattr('utils.db.get_all_sessions', lambda: [])
+    # Patch the references actually used by the UI. No legacy database or local
+    # inference service should be touched by a button-state unit test.
+    monkeypatch.setattr('ui.layout.get_all_sessions', lambda: [])
+    monkeypatch.setattr('ui.layout.get_watchlist', lambda: [])
+    monkeypatch.setattr('ui.layout.fetch_llm_studio_models', lambda: ['fixture/local-model'])
 
     # Populate session_state with dummy values
     st.session_state.session_id = 'old-session'

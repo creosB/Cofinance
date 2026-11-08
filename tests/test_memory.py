@@ -1,7 +1,8 @@
 from utils.memory import MemoryStore
 
 
-def test_memory_store_roundtrip():
+def test_memory_store_roundtrip(tmp_path, monkeypatch):
+    monkeypatch.setattr('utils.memory.AGENT_DB', str(tmp_path / 'memory-test.db'))
     store = MemoryStore()
     sid = "test-session"
     store.save_message(sid, "user", "Analyze NVDA vs AMD")

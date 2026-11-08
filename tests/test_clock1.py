@@ -8,7 +8,7 @@ from core.clock1 import Clock1Config, run_once
 from core.collector import (CollectorError, FetchResult, Last30DaysCollector, ReplayCollector, child_env, epoch,
                             parse_agent_export)
 from core.news_store import NewsStore
-from core.pregate import quarantine_reason, title_key
+from core.pregate import quarantine_reason, speculation_reason, title_key
 from core.signals import Action, GateConfig, Item, Judgment
 
 FIXTURE = os.path.join(os.path.dirname(__file__), os.pardir, "fixtures", "news_replay.json")
@@ -108,6 +108,24 @@ class TestPreGate(unittest.TestCase):
         for t in good:
             self.assertIsNone(quarantine_reason(Item("X", "s", "u", t)), t)
 
+    def test_speculation_is_flagged_and_reported_questions_are_not(self):
+        spec = [("polymarket", "Will ACME raise full-year guidance before December?", ""),
+                ("hn", "Will NVDA close above $200 on Friday?", ""),
+                ("hn", "Could Bitcoin reach $150,000 by year-end?", ""),
+                ("rss", "Apple and the iPhone cycle", "Polymarket traders price a 62% chance of a new low."),
+                ("KALSHI", "Fed decision market", "")]
+        real = [("hn", "Can Apple's iPhone revive sales? Analysts weigh in", ""),
+                ("hn", "Will Nvidia's China ban hit earnings?", ""),  # an open question, no resolution line: still judged
+                ("hn", "Will ACME raise guidance?", ""),
+                ("apple_newsroom", "Apple reports fourth quarter results", ""),
+                ("hn", "Did Satoshi Get Bitcoin Wrong? Claude's NSA Discovery Sparks Debate", ""),
+                ("rss", "Polymarket raises $200M in a new funding round", "The company did not comment."),  # news about the firm
+                ("rss", "Will Apple ship by March? CEO says the date holds", "")]  # something reported after the question
+        for source, title, text in spec:
+            self.assertIsNotNone(speculation_reason(Item("X", source, "u", title, text)), title)
+        for source, title, text in real:
+            self.assertIsNone(speculation_reason(Item("X", source, "u", title, text)), title)
+
     def test_title_key_ignores_punctuation_and_case(self):
         a, b = Item("acme", "s", "u1", "ACME halted!"), Item("ACME", "s", "u2", "acme  halted")
         self.assertEqual(title_key(a), title_key(b))
@@ -163,6 +181,9 @@ class TestClock1(unittest.TestCase):
         s = run_once(rep.tickers, rep, judge, st, clock=lambda: rep.recorded_at)
         self.assertEqual(s.quarantined, 5)
         self.assertFalse([t for t in judge.seen_titles if quarantine_reason(Item("X", "", "", t))])
+        self.assertGreaterEqual(s.speculation, 1)  # the recorded Polymarket question
+        self.assertNotIn("Will ACME raise full-year guidance before December?", judge.seen_titles)
+        self.assertGreaterEqual(s.reasons.get("speculation:prediction_market", 0), 1)
         self.assertTrue(all("ignore" not in a["title"].lower() and "system" not in a["title"].lower() for a in s.alerts))
         stored = [o.item.title for t in rep.tickers for o in st.get_gated_signals(t, limit=50)]
         self.assertFalse([t for t in stored if quarantine_reason(Item("X", "", "", t))])

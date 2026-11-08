@@ -1,4 +1,4 @@
-"""GLiNER2.5-Decide local System-1 adapter (`fastino/GLiNER2.5-Decide`, 340M encoder).
+"""GLiNER2.5-Decide local System-1 adapter (`fastino/GLiNER2.5-Decide`; 486,444,053 parameters measured on the pinned cache).
 
 Why this fits Cofinance v2:
   * Runs 100% locally on CPU or GPU via `pip install "gliner2[local]"`.
@@ -11,6 +11,8 @@ downloading model weights. Pass any object implementing `ExtractorBackend` (or u
 `GlinerDecideAdapter.from_pretrained()`).
 """
 from __future__ import annotations
+
+import re
 
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Protocol, Sequence, Set, Tuple
@@ -210,6 +212,13 @@ class GlinerQueryRouter:
                 if mapped and mapped in self.universe and mapped not in seen:
                     tickers.append(mapped)
                     seen.add(mapped)
+
+        # Deterministic backstop: a registered company name written as a whole word always resolves, even when
+        # the NER pass returns no span (observed 2026-11-08: "What is the latest Apple news?" gave no entities).
+        for alias, mapped in self.aliases.items():
+            if mapped in self.universe and mapped not in seen and re.search(r"(?<![A-Za-z0-9])" + re.escape(alias) + r"(?![A-Za-z0-9])", query, re.IGNORECASE):
+                tickers.append(mapped)
+                seen.add(mapped)
 
         return RoutedQuery(
             intent=intent,
