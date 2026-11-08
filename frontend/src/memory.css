@@ -1,0 +1,21 @@
+/* Conversation memory panel. Same tokens as the rest: 6px radius, 14px minimum text, no new colours. */
+.memory-dialog{max-width:620px!important;gap:16px!important;padding:22px!important}
+.memory-dialog button{font-size:14px!important}
+.memory-list{display:grid;max-height:340px;overflow:auto;border:1px solid var(--border);border-radius:6px}
+.memory-row{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:10px;align-items:start;padding:11px 12px;border-bottom:1px solid var(--card);min-height:56px}
+.memory-row:last-child{border-bottom:0}
+.memory-row>svg{margin-top:4px;color:var(--quiet)}
+.memory-row strong{display:block;font-weight:400;line-height:1.5;overflow-wrap:anywhere}
+.memory-row small{display:block;margin-top:4px;font-size:14px;color:var(--muted-foreground);line-height:1.5;overflow-wrap:anywhere}
+.memory-row>button{height:28px;color:var(--muted-foreground);font-weight:400!important}
+.memory-row>button:hover{color:var(--foreground)}
+.memory-row[data-state=forgotten]{opacity:.62}
+.memory-row[data-state=forgotten] strong{text-decoration:line-through;text-decoration-color:var(--quiet)}
+.memory-row[data-state=delete_pending] small{color:var(--warning)}
+.memory-empty{color:var(--muted-foreground);padding:18px;text-align:center;font-size:14px;line-height:1.6}
+.memory-note{display:flex;gap:8px}.memory-note input{flex:1;min-width:0}.memory-note button{flex-shrink:0}
+.memory-help{color:var(--quiet);font-size:14px;line-height:1.6;margin:0}
+.memory-message{margin:0;font-size:14px;color:var(--muted-foreground);line-height:1.5}.memory-message[data-bad=true]{color:var(--destructive)}
+.memory-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--quiet);font-size:14px}
+.memory-confirm{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--foreground)}
+@media(max-width:700px){.memory-dialog [data-slot=dialog-close]{min-width:44px;min-height:44px}.memory-row>button,.memory-note button,.memory-confirm button,.memory-foot>button{min-height:44px}.memory-note{flex-direction:column}.memory-note input{min-height:44px}}
