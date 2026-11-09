@@ -13,6 +13,15 @@ Python owns routing policy, fetching, validation, persistence, and explicit user
 writes. Models classify or narrate; they do not receive tools or write authority.
 No hosted inference. No fabricated prices, progress, reasoning, or accuracy claims.
 
+## Current priorities (2026-11-09)
+
+- CI is intentionally deferred by Baris. No workflow or CI setup is part of this iteration.
+- [x] Fail closed on malformed classifier judgments (NaN, infinity, out-of-range probabilities, invalid direction/alert flag). Invalid output is deferred and remains retryable, never marked seen or alerted.
+- [x] Replace the blanket risk-negation exemption: incidental "not" and "not only X but also Y" cannot authorize an invented risk. A narrow full no-risk statement remains allowed. Regression tests: tests/test_guard_boundaries.py.
+- [x] Frozen historical experiment completed (2026-11-09): 125 non-overlapping sampled asset-windows across AAPL/NVDA/MSFT/BTC/ETH, outcomes through Nov 6, no skipped forecasts/errors/abstentions. LFM3 predicted UP every time: accuracy 20.0% / 53.3% / 51.2% for 1/3/6 months, exactly always-UP; momentum 65.0% / 60.0% / 53.6%. No predictive edge demonstrated. This is a price-only benchmark arm, NOT the production research pipeline. Code, frozen protocol, result and leakage limits: docs/benchmarks/HISTORICAL.md. LFM3 stays the research narrator.
+- [x] Genuine public-data chat/execution screenshots added to README and docs/screenshots; isolated conversation, real GLiNER/Yahoo, explicitly tool-only. No private chats or fake successful inference.
+- [ ] Next benchmark: separately frozen full-research replay with time-valid news/fundamentals and forward-recorded forecasts. Never fill old cases with today's facts or retune on this measured period.
+
 ## Current truth
 
 - [x] Headless GLiNER routing, specialist orchestration, signal gates, and event bus exist.
