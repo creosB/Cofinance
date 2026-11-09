@@ -20,7 +20,9 @@ No hosted inference. No fabricated prices, progress, reasoning, or accuracy clai
 - [x] Replace the blanket risk-negation exemption: incidental "not" and "not only X but also Y" cannot authorize an invented risk. A narrow full no-risk statement remains allowed. Regression tests: tests/test_guard_boundaries.py.
 - [x] Frozen historical experiment completed (2026-11-09): 125 non-overlapping sampled asset-windows across AAPL/NVDA/MSFT/BTC/ETH, outcomes through Nov 6, no skipped forecasts/errors/abstentions. LFM3 predicted UP every time: accuracy 20.0% / 53.3% / 51.2% for 1/3/6 months, exactly always-UP; momentum 65.0% / 60.0% / 53.6%. No predictive edge demonstrated. This is a price-only benchmark arm, NOT the production research pipeline. Code, frozen protocol, result and leakage limits: docs/benchmarks/HISTORICAL.md. LFM3 stays the research narrator.
 - [x] Genuine public-data chat/execution screenshots added to README and docs/screenshots; isolated conversation, real GLiNER/Yahoo, explicitly tool-only. No private chats or fake successful inference.
-- [ ] Next benchmark: separately frozen full-research replay with time-valid news/fundamentals and forward-recorded forecasts. Never fill old cases with today's facts or retune on this measured period.
+- [x] Forward benchmark started 2026-11-09 (qualify/forward.py, docs/benchmarks/FORWARD.md). Batch 1 sealed 06:45 UTC before entry: LFM3 news and price arms both UP on all five assets again; momentum DOWN on 4/5; news rule UP on NVDA only. Hash-chained ledger in ignored data/forward_benchmark, public labels in docs/benchmarks/forward-ledger.jsonl. tests/test_forward.py (6).
+- [ ] Weekly: Monday before 17:30 Istanbul collect news, record, commit forward-ledger.jsonl; score after Friday. No claim before 26 matured batches.
+- [ ] Still open: timestamp-safe full-research replay with time-valid news/fundamentals (needs a dated news source, approval). Never fill old cases with today's facts or retune on the measured historical period.
 
 ## Current truth
 
