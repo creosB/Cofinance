@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import enum
 import hashlib
+import math
 import re
 import time
 from dataclasses import dataclass, field
@@ -110,6 +111,13 @@ class SignalGate:
             judged += 1
             try:
                 j = self.classifier.judge(it)
+                # NaN makes every '< threshold' comparison false, so rules mode could ALERT on NaN.
+                # Treat malformed model output like a failed call; leave the item retryable.
+                if not isinstance(j, Judgment) or any(
+                    isinstance(p, bool) or not isinstance(p, (int, float)) or not math.isfinite(p) or not 0 <= p <= 1
+                    for p in (j.material, j.urgent, j.direction_p)
+                ) or j.direction not in {'bullish', 'bearish', 'neutral', 'unclear'} or type(j.alert_allowed) is not bool:
+                    raise ValueError('Invalid classifier judgment')
             except Exception as exc:                                   # fail closed, never ALERT
                 out.append(Outcome(it, Action.DEFERRED, f"classifier_error:{type(exc).__name__}"))
                 continue
