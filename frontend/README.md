@@ -34,7 +34,9 @@ python -S -E -B -m ui.workbench --port 8876
 - Execution: switch between Run map and Step list. Select a node or observation
   to inspect input, emitted labels or text, number validation, and accepted output.
 - Models: narrator selection, download/resume, integrity verification, qualification,
-  load/unload, the two-clock system guide, and actual model-call inventory.
+  load/unload, the two-clock system guide, and actual model-call inventory. A read-only smoke-comparison
+  disclosure records LFM3/MiniCPM measurements and their limits. LFM3 remains the chosen narrator;
+  candidate scores do not change selection or make alternatives selectable.
 - Dataset: source/date provenance and human-review readiness, without invented labels.
 
 Maps show actual recorded activity. Missing and not-dispatched components are distinct

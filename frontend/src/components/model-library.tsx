@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { ChatController, ModelState } from '@/lib/use-chat'
+import { NarratorComparison } from './narrator-comparison'
 
 const bytes=(n:number)=>n>=1024**3?(n/1024**3).toFixed(2)+' GiB':(n/1024**2).toFixed(1)+' MiB'
 const working=(m:ModelState)=>['downloading','verifying','loading','qualifying'].includes(m.phase)
@@ -34,5 +35,6 @@ export function ModelLibrary({chat}:{chat:ChatController}){
    </div>
    {m.qualification&&<div className="qualification-summary"><strong>{m.qualification.passed?<Check size={15}/>:<FlaskConical size={15}/>}Smoke qualification {m.qualification.passed?'passed':'failed'}</strong><span>{m.qualification.n} synthetic cases. Not a finance-accuracy benchmark.</span><details><summary>Gate results and provenance</summary><ul>{Object.entries(m.qualification.gates).map(([name,g])=><li key={name}>{name.replaceAll('_',' ')}: {g.passed?'passed':'failed'} ({g.got===null?'not measured':Math.round(g.got*100)+'%'}; required {Math.round(g.required*100)}%)</li>)}</ul><p>Model revision: <code>{m.revision}</code></p><p>License: {m.license}. {m.license_note}</p><a href={m.source} target="_blank" rel="noreferrer noopener">Official model source</a></details></div>}
   </div>
+  <NarratorComparison/>
  </section>
 }

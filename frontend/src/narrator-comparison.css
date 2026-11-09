@@ -1,0 +1,16 @@
+.narrator-comparison{margin-top:24px;padding-top:20px;border-top:1px solid var(--border);font-size:14px;min-width:0}
+.narrator-comparison h3{font-size:15px;font-weight:500;margin-bottom:8px;color:var(--foreground)}
+.narrator-comparison p{color:var(--muted-foreground);line-height:1.65;max-width:75ch;margin:8px 0 12px}
+.narrator-comparison summary{cursor:pointer;min-height:44px;padding:12px 0;color:var(--foreground)}
+.narrator-comparison summary:focus-visible,.narrator-table-scroll:focus-visible{outline:2px solid var(--ring);outline-offset:3px;border-radius:4px}
+.narrator-table-scroll{overflow-x:auto;max-width:100%;margin:16px 0}
+.narrator-comparison table{width:100%;border-collapse:collapse;font-size:14px;text-align:left}
+.narrator-comparison caption{text-align:left;caption-side:bottom;padding:12px 0;color:var(--muted-foreground);line-height:1.6}
+.narrator-comparison th,.narrator-comparison td{padding:12px 16px 12px 0;border-bottom:1px solid var(--border);vertical-align:top;font-weight:400}
+.narrator-comparison thead th{color:var(--muted-foreground)}
+.narrator-comparison tbody th{font-weight:500;min-width:130px}
+.narrator-comparison tbody th span{display:block;font-weight:400;color:var(--muted-foreground);margin-top:4px}
+.narrator-comparison td{font-variant-numeric:tabular-nums;white-space:nowrap}
+.narrator-comparison th:last-child,.narrator-comparison td:last-child{padding-right:0;text-align:right}
+.narrator-speed-notes{padding-left:20px;margin:12px 0;color:var(--muted-foreground);line-height:1.7}
+@media(max-width:700px){.narrator-comparison th,.narrator-comparison td{padding-right:8px}.narrator-comparison tbody th{min-width:110px}}
