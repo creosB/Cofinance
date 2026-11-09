@@ -123,6 +123,15 @@ Inputs use only past prices, with asset names and dates hidden from the model. F
 
 LFM3 remains the chosen **research narrator**, not an adopted trading signal. The useful next test is a separately frozen full-research replay with timestamped news and prospective forecasts, not tweaking this prompt until the old prices look good.
 
+### Forward benchmark (started 2026-11-09)
+
+> [!WARNING]
+> **Experimental, in progress.** No result yet and no conclusion before 26 matured weekly batches (about six months). Recorded forecasts are measurements, not trading signals or financial advice.
+
+Every week, five arms forecast the same five assets and are sealed into a hash-chained ledger **before** the entry price exists: LFM3 with ticker + accepted news, LFM3 price-only (the historical prompt, now truly out of sample), a deterministic news-direction rule, momentum and always-UP. Labels and the ledger hash are committed to [forward-ledger.jsonl](docs/benchmarks/forward-ledger.jsonl) before the US open, so GitHub's timestamp independently shows they came first. The protocol is frozen; a changed prompt or rule needs a new run from zero. News coverage is Apple and NVIDIA only for now.
+
+[Protocol and weekly routine](docs/benchmarks/FORWARD.md)
+
 ## Safety and local data
 
 - **No hosted inference.** Model calls stay local; market providers and approved news/download sources still require network access.
