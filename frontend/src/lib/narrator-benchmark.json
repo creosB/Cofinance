@@ -1,0 +1,89 @@
+{
+  "recordedOn": "2026-11-09",
+  "retainedNarratorId": "lfm3-1.7b-q4km",
+  "decision": "Keep LFM3 1.7B as the quality-first narrator. No selection change.",
+  "suggestion": "MiniCPM5-1B is a faster, smaller candidate in this smoke test, not a demonstrated quality upgrade.",
+  "method": {
+    "runtime": "llama.cpp b12110",
+    "hardware": "AMD Ryzen 5 3600X, approximately 16 GB RAM",
+    "cpuOnly": true,
+    "threads": 6,
+    "quantization": "Q4_K_M",
+    "temperature": 0,
+    "contextTokens": 4096,
+    "maxOutputTokens": 256,
+    "thinking": false,
+    "uniqueNarratorCases": 7,
+    "repeats": 2,
+    "allCasesPerArm": 46,
+    "speedDefinition": "Output tokens divided by total request time across all cases, including prompt processing.",
+    "limitations": "Small synthetic smoke suite, not a finance-quality ranking. Timings may be affected by dashboard activity.",
+    "casesSha256": "0eb5fcb53186701d4b8c6dcf0646acbfa8e46b3bf883eb6977b2357f12b007d8",
+    "gatesSha256": "9e062ec2f5999b25fbbb5414dca5268780187a5df46fcf219ca6b1b831b37eeb"
+  },
+  "models": [
+    {
+      "id": "lfm3-1.7b-q4km",
+      "name": "LFM3 1.7B",
+      "passedGate": true,
+      "scores": {
+        "narration": {
+          "passed": 8,
+          "total": 8
+        },
+        "number_faithfulness": {
+          "passed": 6,
+          "total": 6
+        }
+      },
+      "narrationMedianMs": 3837,
+      "effectiveTokensPerSecond": 9.5,
+      "sizeBytes": 1099627808,
+      "revision": "cd0c74c575b5c416f3011b5b4c298077f26ca8c2",
+      "modelSha256": "3793e1e6e2266919d6e015287221b41100175a98eddaba92e111aed3b05c93c4",
+      "reportSha256": "8127e25bca972e653d8e9b4e35130f5368d2956d5ec19aca5db99b26601626ae"
+    },
+    {
+      "id": "minicpm5-1b",
+      "name": "MiniCPM5-1B",
+      "passedGate": true,
+      "scores": {
+        "narration": {
+          "passed": 8,
+          "total": 8
+        },
+        "number_faithfulness": {
+          "passed": 6,
+          "total": 6
+        }
+      },
+      "narrationMedianMs": 2770,
+      "effectiveTokensPerSecond": 13.9,
+      "sizeBytes": 688065920,
+      "revision": "3d55fac80935ae6456986ad2384b5cbcc4d6c948",
+      "modelSha256": "81b64d05a23b17b34c475f42b3e72fbde62d4b92cc34541f7a8031d0752deafa",
+      "reportSha256": "38671c35acda0cc3f9ed2f8cd8c511a55f0f4cb23bbd418149fffecb650ca1fd"
+    },
+    {
+      "id": "minicpm5-2b",
+      "name": "MiniCPM5-2B",
+      "passedGate": true,
+      "scores": {
+        "narration": {
+          "passed": 8,
+          "total": 8
+        },
+        "number_faithfulness": {
+          "passed": 6,
+          "total": 6
+        }
+      },
+      "narrationMedianMs": 4393,
+      "effectiveTokensPerSecond": 5.4,
+      "sizeBytes": 1561318368,
+      "revision": "2079a22f3beaa4e306449978533478fe0522f4b3",
+      "modelSha256": "ec2d5801640099e97d8d7e8003ad4d81f336e757811f03a26173dddf386602fd",
+      "reportSha256": "76f75ccbdbeb800d1ee10a29065c2a02c3a7246947726bfc1043e9f3cb362e47"
+    }
+  ]
+}

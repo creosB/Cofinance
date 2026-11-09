@@ -1,7 +1,7 @@
 # Cofinance v2: goal and delivery checklist
 
-Local working plan, reviewed 2026-11-08. Not approved for public posting, commits,
-pushes, branches, PR changes, deployment, or disclosure of local evidence.
+Working plan, reviewed 2026-11-09. Baris approved part-by-part commits, pushes and merges on 2026-11-08.
+Deployment and disclosure of private local evidence are not authorized. Only non-sensitive measured summaries belong in the repo.
 
 ## Product goal
 
@@ -39,6 +39,9 @@ feature or finance claim is validated. Local logs and traces remain in ignored d
 - [ ] Remove stale documentation claims and keep capability labels tied to measured evidence.
 
 ### 2. Qualification: partial, not calibrated
+
+- [x] Narrator comparison, 2026-11-09: LFM3 1.7B, MiniCPM5-1B and MiniCPM5-2B (Q4_K_M, llama.cpp b12110, 2 repeats) all passed the 7-unique-case narrator gate. Scores and limits are recorded in README.md and the Models disclosure; no selection changed. Baris explicitly retained LFM3 for quality, not the fastest smoke-suite candidate.
+- [ ] Repair judge bake-off integration failures: MiniCPM5-2B-Jev hit the request timeout on 91/91 train rows; d1-2B failed before inference on an incompatible Transformers import. These are NOT valid model-quality scores; no judge or cascade adoption decision follows from them.
 
 - [x] Collect a real, source-preserving candidate corpus and blank human-label workflow.
 - [x] Run pinned local narrator smoke gates before allowing selection.
