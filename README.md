@@ -4,7 +4,7 @@ A local finance-research workspace for stocks and crypto. Chat with specialist a
 
 **Current version: v2, in development.** React dashboard, Python policy, local inference. Not production-ready, not an automated trading system, and not financial advice.
 
-[Start](#start) · [How-it-works](#how-it-works) · [Models-and-measurements](#models-and-measurements) · [Development](#development) · [Open-work](#open-work)
+[Start](#start) · [How it works](#how-it-works) · [Models](#models-and-measurements) · [Historical benchmark (experimental)](#historical-benchmark) · [Development](#development) · [Open work](#open-work)
 
 ## Preview
 
@@ -101,6 +101,9 @@ The 91-row training split has AI-generated labels, not human ground truth. Its h
 No judge replacement has been adopted. Downloaded model files are pinned and checksum-verified; that is not the same as a working, qualified model.
 
 ## Historical benchmark
+
+> [!WARNING]
+> **Experimental result.** One small retrospective run (125 asset-windows over 25 weekly windows, May-Nov 2026) of a price-only, benchmark-only LFM3 forecast arm. It is not the production research pipeline, not a trading signal and not financial advice. Do not use these numbers to make investment decisions. Historical prices may be revised and model training contamination cannot be ruled out.
 
 **No predictive edge demonstrated in the first price-only experiment.** LFM3 predicted UP in all 125 cases, exactly matching the always-UP baseline. A simple trailing-momentum rule did better overall. The current production research pipeline does not issue scored forecasts; this is a benchmark-only LFM3 forecast arm, not a validation of the full app.
 
