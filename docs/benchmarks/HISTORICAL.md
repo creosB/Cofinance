@@ -1,5 +1,8 @@
 # Historical forecast experiment
 
+> [!WARNING]
+> **Experimental result.** A single small retrospective run of a price-only, benchmark-only forecast arm. Not the production research pipeline, not a trading signal and not financial advice. Do not use these numbers to make investment decisions.
+
 ## What this does, and does not, test
 
 Cofinance's live workflow produces guarded research summaries, not a price forecast or a trading order. This experiment asks a narrower question: **does the retained LFM3 narrator extract useful next-week direction from past prices, compared with trivial rules?**
