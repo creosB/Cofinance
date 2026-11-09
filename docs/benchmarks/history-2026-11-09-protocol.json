@@ -1,0 +1,44 @@
+{
+  "format": "cofinance-historical/1",
+  "frozen_at": "2026-11-09T06:01:59.864874+00:00",
+  "assets": [
+    "AAPL",
+    "NVDA",
+    "MSFT",
+    "BTC-USD",
+    "ETH-USD"
+  ],
+  "anchor": "2026-11-09",
+  "cutoff_exclusive": "2026-11-07",
+  "horizon": "next session open through fifth following US-market session close",
+  "sampling": "every fifth SPY session, no overlapping holdings; crypto aligned to the US session calendar",
+  "model_scope": "LFM3 benchmark-only forecast prompt, NOT the production research pipeline",
+  "inputs": "completed past OHLC-derived features only; no asset/date names, future rows, current fundamentals, news or memory",
+  "decoding": {
+    "temperature": 0,
+    "thinking": false,
+    "max_tokens": 16
+  },
+  "system": "You are a benchmark-only directional forecaster. This is anonymized historical price data, not a live asset. Using only the supplied past observations, predict whether the exit close will be above or below the next session opening price, five US-market sessions after the observation. Reply with exactly UP, DOWN, or ABSTAIN. Do not give explanations, numbers or hidden reasoning.",
+  "features_sha256": "92c3016f62564f4de7978e38d0cada66b23da4b840cb08f038ec010689646db1",
+  "outcomes_sha256": "54ebda5e73df8919470d3f6ea68e795b2641ec51524fc87cfa867f74bc615d48",
+  "source_sha256": {
+    "AAPL": "10c65f9d0f28ea2544ff23391d1abc8bbe142b6cc25b0f5aee5b89247c76a53e",
+    "NVDA": "c16fdb81fc77a03dd540e159e99f982f8578bd5cf1362649fd53f20cd2894eb6",
+    "MSFT": "8e4262fc0a4cf34938a6afcde626b1714e1a4c6066fb8192f9d892ced0dc55f6",
+    "BTC-USD": "2d6a58253cb903c1e8994527e9488e78575efb8cf1f590302dd9a2b57b8be5ac",
+    "ETH-USD": "12fc0a3474706a2a0fb5951376923a0e0ea58a906b8ff28aedce044f66aea923",
+    "SPY": "d874610eaeabe7ba88c580efb4626b2aaa9470e933fdfc91a9cd7d330719b077"
+  },
+  "n": 125,
+  "excluded": [],
+  "fee_bps_per_side": 10,
+  "limitations": [
+    "Retrospective data downloaded now, possibly revised or split-adjusted, not an immutable point-in-time feed.",
+    "Unknown model training cutoff: anonymization reduces, but does not prove absence of memorization.",
+    "Handpicked fixed universe, survivorship/selection bias; small dependent panel, no statistical significance claim.",
+    "Price-only experimental forecasts cannot validate the full news/fundamental research product.",
+    "No price targets or probability forecasts: direction accuracy is not price-error or calibration accuracy.",
+    "No optimization or future holdout tuning. Nested 1/3/6-month windows are not independent tests."
+  ]
+}

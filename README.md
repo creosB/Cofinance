@@ -100,6 +100,26 @@ The 91-row training split has AI-generated labels, not human ground truth. Its h
 
 No judge replacement has been adopted. Downloaded model files are pinned and checksum-verified; that is not the same as a working, qualified model.
 
+## Historical benchmark
+
+**No predictive edge demonstrated in the first price-only experiment.** LFM3 predicted UP in all 125 cases, exactly matching the always-UP baseline. A simple trailing-momentum rule did better overall. The current production research pipeline does not issue scored forecasts; this is a benchmark-only LFM3 forecast arm, not a validation of the full app.
+
+Next-five-US-session direction, with entry at the next session open. Fixed assets: AAPL, NVDA, MSFT, BTC and ETH. Completed outcomes through 2026-11-06:
+
+| Historical slice | Sampled asset-windows | LFM3 accuracy | Always-UP | Momentum over 20 sessions |
+| --- | --- | --- | --- | --- |
+| Last 1 month | 20 | 20.0% | 20.0% | 65.0% |
+| Last 3 months | 60 | 53.3% | 53.3% | 60.0% |
+| Last 6 months | 125 | 51.2% | 51.2% | 53.6% |
+
+All 125 inputs were processed: no request errors, abstentions or dropped predictions. The six-month sample is 25 time windows across five assets, not 125 independent market periods. The three slices overlap. LFM3's balanced accuracy is 50% in every slice.
+
+Inputs use only past prices, with asset names and dates hidden from the model. Forecasts were sealed before evaluation; future prices and current news/fundamentals never enter the predictor. Historical data may still be retrospectively revised, and the model's training cutoff is unknown, so this is **not proof of contamination-free out-of-sample performance**. No price targets or full-news historical archive were tested. No model/prompt was tuned on these scores.
+
+[Method and reproduction](docs/benchmarks/HISTORICAL.md) · [Measured report](docs/benchmarks/history-2026-11-09.json) · [Frozen protocol](docs/benchmarks/history-2026-11-09-protocol.json)
+
+LFM3 remains the chosen **research narrator**, not an adopted trading signal. The useful next test is a separately frozen full-research replay with timestamped news and prospective forecasts, not tweaking this prompt until the old prices look good.
+
 ## Safety and local data
 
 - **No hosted inference.** Model calls stay local; market providers and approved news/download sources still require network access.

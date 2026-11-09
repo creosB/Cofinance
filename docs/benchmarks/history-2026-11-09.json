@@ -1,0 +1,379 @@
+{
+  "protocol_sha256": "68efa555eeb2f6c87740fbc456fedf00db98ca496df5ee536c25645799c4d45c",
+  "prediction_seal": {
+    "predictions_sha256": "a254420587853761f6db299c6ef67a82bb006b4f67acaa3ac0ed52d414165c49",
+    "n": 125,
+    "finished_at": "2026-11-09T06:07:11.717530+00:00"
+  },
+  "model": {
+    "id": "lfm3-1.7b-q4km",
+    "model_sha256": "3793e1e6e2266919d6e015287221b41100175a98eddaba92e111aed3b05c93c4",
+    "runtime": "b12110",
+    "threads": 6,
+    "cpu_only": true
+  },
+  "scope": "LFM3 benchmark-only forecast prompt, NOT the production research pipeline",
+  "windows_months": {
+    "1": {
+      "from": "2026-10-09",
+      "through": "2026-11-06",
+      "arms": {
+        "lfm3": {
+          "n": 20,
+          "directional_accuracy_all": 0.2,
+          "coverage": 1.0,
+          "directional_accuracy_covered": 0.2,
+          "balanced_accuracy": 0.5,
+          "errors": 0,
+          "abstentions": 0,
+          "illustrative_long_cash_net_return": -0.09170362431098567,
+          "illustrative_weekly_max_drawdown": 0.09170362431098567,
+          "up_actual": 4,
+          "down_actual": 16
+        },
+        "always_up": {
+          "n": 20,
+          "directional_accuracy_all": 0.2,
+          "coverage": 1.0,
+          "directional_accuracy_covered": 0.2,
+          "balanced_accuracy": 0.5,
+          "errors": 0,
+          "abstentions": 0,
+          "illustrative_long_cash_net_return": -0.09170362431098567,
+          "illustrative_weekly_max_drawdown": 0.09170362431098567,
+          "up_actual": 4,
+          "down_actual": 16
+        },
+        "momentum20": {
+          "n": 20,
+          "directional_accuracy_all": 0.65,
+          "coverage": 1.0,
+          "directional_accuracy_covered": 0.65,
+          "balanced_accuracy": 0.78125,
+          "errors": 0,
+          "abstentions": 0,
+          "illustrative_long_cash_net_return": -0.021493913981878054,
+          "illustrative_weekly_max_drawdown": 0.022994373841003224,
+          "up_actual": 4,
+          "down_actual": 16
+        }
+      },
+      "by_asset": {
+        "AAPL": {
+          "n": 4,
+          "directional_accuracy_all": 0.75,
+          "coverage": 1.0,
+          "directional_accuracy_covered": 0.75,
+          "balanced_accuracy": 0.5,
+          "errors": 0,
+          "abstentions": 0,
+          "illustrative_long_cash_net_return": 0.029162808000900098,
+          "illustrative_weekly_max_drawdown": 0.0028727810786214336,
+          "up_actual": 3,
+          "down_actual": 1
+        },
+        "NVDA": {
+          "n": 4,
+          "directional_accuracy_all": 0.0,
+          "coverage": 1.0,
+          "directional_accuracy_covered": 0.0,
+          "balanced_accuracy": null,
+          "errors": 0,
+          "abstentions": 0,
+          "illustrative_long_cash_net_return": -0.2242294298084745,
+          "illustrative_weekly_max_drawdown": 0.2242294298084745,
+          "up_actual": 0,
+          "down_actual": 4
+        },
+        "MSFT": {
+          "n": 4,
+          "directional_accuracy_all": 0.25,
+          "coverage": 1.0,
+          "directional_accuracy_covered": 0.25,
+          "balanced_accuracy": 0.5,
+          "errors": 0,
+          "abstentions": 0,
+          "illustrative_long_cash_net_return": -0.029388721852888544,
+          "illustrative_weekly_max_drawdown": 0.03952333657583729,
+          "up_actual": 1,
+          "down_actual": 3
+        },
+        "BTC-USD": {
+          "n": 4,
+          "directional_accuracy_all": 0.0,
+          "coverage": 1.0,
+          "directional_accuracy_covered": 0.0,
+          "balanced_accuracy": null,
+          "errors": 0,
+          "abstentions": 0,
+          "illustrative_long_cash_net_return": -0.10809491764527146,
+          "illustrative_weekly_max_drawdown": 0.10809491764527146,
+          "up_actual": 0,
+          "down_actual": 4
+        },
+        "ETH-USD": {
+          "n": 4,
+          "directional_accuracy_all": 0.0,
+          "coverage": 1.0,
+          "directional_accuracy_covered": 0.0,
+          "balanced_accuracy": null,
+          "errors": 0,
+          "abstentions": 0,
+          "illustrative_long_cash_net_return": -0.11233420869133093,
+          "illustrative_weekly_max_drawdown": 0.11233420869133093,
+          "up_actual": 0,
+          "down_actual": 4
+        }
+      }
+    },
+    "3": {
+      "from": "2026-08-09",
+      "through": "2026-11-06",
+      "arms": {
+        "lfm3": {
+          "n": 60,
+          "directional_accuracy_all": 0.5333333333333333,
+          "coverage": 1.0,
+          "directional_accuracy_covered": 0.5333333333333333,
+          "balanced_accuracy": 0.5,
+          "errors": 0,
+          "abstentions": 0,
+          "illustrative_long_cash_net_return": 0.02816628088751094,
+          "illustrative_weekly_max_drawdown": 0.11627157581350012,
+          "up_actual": 32,
+          "down_actual": 28
+        },
+        "always_up": {
+          "n": 60,
+          "directional_accuracy_all": 0.5333333333333333,
+          "coverage": 1.0,
+          "directional_accuracy_covered": 0.5333333333333333,
+          "balanced_accuracy": 0.5,
+          "errors": 0,
+          "abstentions": 0,
+          "illustrative_long_cash_net_return": 0.02816628088751094,
+          "illustrative_weekly_max_drawdown": 0.11627157581350012,
+          "up_actual": 32,
+          "down_actual": 28
+        },
+        "momentum20": {
+          "n": 60,
+          "directional_accuracy_all": 0.6,
+          "coverage": 1.0,
+          "directional_accuracy_covered": 0.6,
+          "balanced_accuracy": 0.5848214285714286,
+          "errors": 0,
+          "abstentions": 0,
+          "illustrative_long_cash_net_return": 0.052875957189810974,
+          "illustrative_weekly_max_drawdown": 0.05137194914287835,
+          "up_actual": 32,
+          "down_actual": 28
+        }
+      },
+      "by_asset": {
+        "AAPL": {
+          "n": 12,
+          "directional_accuracy_all": 0.8333333333333334,
+          "coverage": 1.0,
+          "directional_accuracy_covered": 0.8333333333333334,
+          "balanced_accuracy": 0.5,
+          "errors": 0,
+          "abstentions": 0,
+          "illustrative_long_cash_net_return": 0.10286027675716469,
+          "illustrative_weekly_max_drawdown": 0.021585448470956115,
+          "up_actual": 10,
+          "down_actual": 2
+        },
+        "NVDA": {
+          "n": 12,
+          "directional_accuracy_all": 0.4166666666666667,
+          "coverage": 1.0,
+          "directional_accuracy_covered": 0.4166666666666667,
+          "balanced_accuracy": 0.5,
+          "errors": 0,
+          "abstentions": 0,
+          "illustrative_long_cash_net_return": -0.24023465335339356,
+          "illustrative_weekly_max_drawdown": 0.24811250515513572,
+          "up_actual": 5,
+          "down_actual": 7
+        },
+        "MSFT": {
+          "n": 12,
+          "directional_accuracy_all": 0.5,
+          "coverage": 1.0,
+          "directional_accuracy_covered": 0.5,
+          "balanced_accuracy": 0.5,
+          "errors": 0,
+          "abstentions": 0,
+          "illustrative_long_cash_net_return": 0.040218341670161584,
+          "illustrative_weekly_max_drawdown": 0.03952333657583729,
+          "up_actual": 6,
+          "down_actual": 6
+        },
+        "BTC-USD": {
+          "n": 12,
+          "directional_accuracy_all": 0.5,
+          "coverage": 1.0,
+          "directional_accuracy_covered": 0.5,
+          "balanced_accuracy": 0.5,
+          "errors": 0,
+          "abstentions": 0,
+          "illustrative_long_cash_net_return": 0.11259777091501832,
+          "illustrative_weekly_max_drawdown": 0.15163227629038367,
+          "up_actual": 6,
+          "down_actual": 6
+        },
+        "ETH-USD": {
+          "n": 12,
+          "directional_accuracy_all": 0.4166666666666667,
+          "coverage": 1.0,
+          "directional_accuracy_covered": 0.4166666666666667,
+          "balanced_accuracy": 0.5,
+          "errors": 0,
+          "abstentions": 0,
+          "illustrative_long_cash_net_return": 0.13284230132519803,
+          "illustrative_weekly_max_drawdown": 0.1997151741565405,
+          "up_actual": 5,
+          "down_actual": 7
+        }
+      }
+    },
+    "6": {
+      "from": "2026-05-09",
+      "through": "2026-11-06",
+      "arms": {
+        "lfm3": {
+          "n": 125,
+          "directional_accuracy_all": 0.512,
+          "coverage": 1.0,
+          "directional_accuracy_covered": 0.512,
+          "balanced_accuracy": 0.5,
+          "errors": 0,
+          "abstentions": 0,
+          "illustrative_long_cash_net_return": 0.006739428029171268,
+          "illustrative_weekly_max_drawdown": 0.15622393379982014,
+          "up_actual": 64,
+          "down_actual": 61
+        },
+        "always_up": {
+          "n": 125,
+          "directional_accuracy_all": 0.512,
+          "coverage": 1.0,
+          "directional_accuracy_covered": 0.512,
+          "balanced_accuracy": 0.5,
+          "errors": 0,
+          "abstentions": 0,
+          "illustrative_long_cash_net_return": 0.006739428029171268,
+          "illustrative_weekly_max_drawdown": 0.15622393379982014,
+          "up_actual": 64,
+          "down_actual": 61
+        },
+        "momentum20": {
+          "n": 125,
+          "directional_accuracy_all": 0.536,
+          "coverage": 1.0,
+          "directional_accuracy_covered": 0.536,
+          "balanced_accuracy": 0.5334272540983607,
+          "errors": 0,
+          "abstentions": 0,
+          "illustrative_long_cash_net_return": 0.05739058457902857,
+          "illustrative_weekly_max_drawdown": 0.05485839661855807,
+          "up_actual": 64,
+          "down_actual": 61
+        }
+      },
+      "by_asset": {
+        "AAPL": {
+          "n": 25,
+          "directional_accuracy_all": 0.76,
+          "coverage": 1.0,
+          "directional_accuracy_covered": 0.76,
+          "balanced_accuracy": 0.5,
+          "errors": 0,
+          "abstentions": 0,
+          "illustrative_long_cash_net_return": 0.266187324250178,
+          "illustrative_weekly_max_drawdown": 0.07830705262693571,
+          "up_actual": 19,
+          "down_actual": 6
+        },
+        "NVDA": {
+          "n": 25,
+          "directional_accuracy_all": 0.52,
+          "coverage": 1.0,
+          "directional_accuracy_covered": 0.52,
+          "balanced_accuracy": 0.5,
+          "errors": 0,
+          "abstentions": 0,
+          "illustrative_long_cash_net_return": -0.20986974819897108,
+          "illustrative_weekly_max_drawdown": 0.24811250515513572,
+          "up_actual": 13,
+          "down_actual": 12
+        },
+        "MSFT": {
+          "n": 25,
+          "directional_accuracy_all": 0.48,
+          "coverage": 1.0,
+          "directional_accuracy_covered": 0.48,
+          "balanced_accuracy": 0.5,
+          "errors": 0,
+          "abstentions": 0,
+          "illustrative_long_cash_net_return": 0.24966661992333417,
+          "illustrative_weekly_max_drawdown": 0.15366477889771035,
+          "up_actual": 12,
+          "down_actual": 13
+        },
+        "BTC-USD": {
+          "n": 25,
+          "directional_accuracy_all": 0.4,
+          "coverage": 1.0,
+          "directional_accuracy_covered": 0.4,
+          "balanced_accuracy": 0.5,
+          "errors": 0,
+          "abstentions": 0,
+          "illustrative_long_cash_net_return": -0.15880468831836136,
+          "illustrative_weekly_max_drawdown": 0.27585129696202815,
+          "up_actual": 10,
+          "down_actual": 15
+        },
+        "ETH-USD": {
+          "n": 25,
+          "directional_accuracy_all": 0.4,
+          "coverage": 1.0,
+          "directional_accuracy_covered": 0.4,
+          "balanced_accuracy": 0.5,
+          "errors": 0,
+          "abstentions": 0,
+          "illustrative_long_cash_net_return": -0.1109471897914408,
+          "illustrative_weekly_max_drawdown": 0.3217008688265727,
+          "up_actual": 10,
+          "down_actual": 15
+        }
+      }
+    }
+  },
+  "limitations": [
+    "Retrospective data downloaded now, possibly revised or split-adjusted, not an immutable point-in-time feed.",
+    "Unknown model training cutoff: anonymization reduces, but does not prove absence of memorization.",
+    "Handpicked fixed universe, survivorship/selection bias; small dependent panel, no statistical significance claim.",
+    "Price-only experimental forecasts cannot validate the full news/fundamental research product.",
+    "No price targets or probability forecasts: direction accuracy is not price-error or calibration accuracy.",
+    "No optimization or future holdout tuning. Nested 1/3/6-month windows are not independent tests."
+  ],
+  "decision": "Exploratory result only. No live model, prompt, trading or selection change authorized by this score.",
+  "prediction_distribution": {
+    "UP": 125
+  },
+  "coverage_account": {
+    "source_symbols": 6,
+    "forecast_assets": 5,
+    "generated_cases": 125,
+    "scored_cases": 125,
+    "missing_predictions": 0,
+    "request_errors": 0,
+    "abstentions": 0,
+    "collection": "complete for fixed universe and dates",
+    "processing": "complete"
+  },
+  "source_run_report_sha256": "c6c563fd9c43f699a19a5c196702d99fe120964d996127d5d33274da4d9810e7",
+  "conclusion": "No predictive edge demonstrated: LFM3 chose UP in all 125 cases, exactly matching always-UP. The full research pipeline was not benchmarked."
+}
