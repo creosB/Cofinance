@@ -16,7 +16,11 @@ from typing import Any, Dict, List, Mapping
 
 RISK_WORDS = re.compile(r"\b(risks?|concerns?|headwinds?|threats?|uncertain\w*|downside|vulnerab\w*|caution\w*|"
                         r"challenges?|pressures?|weakness\w*|exposure)\b", re.I)
-NEGATED = re.compile(r"\b(no|not|none|without|cannot|n't|do not|does not)\b", re.I)
+# Only an entire, explicit no-risk statement is exempt. An incidental 'not' used to let invented
+# risks through ('not only drawdown but also supply-chain disruption', 'not without execution risk').
+NO_RISK = re.compile(r"\s*(?:the )?(?:reports?|data|evidence|sources?)\s+"
+                     r"(?:do not|does not|cannot|can't)\s+(?:identify|name|show|establish|support|list|highlight)\s+"
+                     r"(?:(?:any|a|one|specific|additional)\s+)*risks?\s*[.,]?\s*", re.I)
 # Sentences and contrast clauses. Not colons: "Main risk: X" must stay one clause.
 CLAUSE = re.compile(r"\.(?=\s|$)|[;!?]|\s[\u2014\u2013-]\s|\u2014|,\s(?=(?:but|while|although|though|whereas|yet)\b)", re.I)
 # Content words of a headline that can anchor a risk about it ("the iPhone production stop").
@@ -99,7 +103,13 @@ def unsupported_risks(candidate: str, cues: List[Mapping[str, Any]]) -> List[str
     out: List[str] = []
     for clause in CLAUSE.split((candidate or "").replace("\u2011", "-").replace("\u2019", "'")):
         hit = RISK_WORDS.search(clause)
-        if not hit or NEGATED.search(clause):
+        if not hit or NO_RISK.fullmatch(clause):
+            continue
+        # Split 'not only X but also Y' so an allowed X cannot authorize invented Y.
+        clause = re.sub(r'\bnot only\s+', '', clause, flags=re.I)
+        clause = re.sub(r'\s+but(?:\s+also)?\s+', ' and ', clause, flags=re.I)
+        hit = RISK_WORDS.search(clause)
+        if not hit:
             continue
         tail, head = clause[hit.end():], clause[:hit.start()]
         content = lambda t: [w for w in re.findall(r"[a-z]+", t.lower()) if w not in _FILLER]
