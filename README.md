@@ -1,311 +1,139 @@
-# Cofinance v2: local finance research workspace
+# Cofinance
 
-> **Status, 2026-11-08:** a working local slice, not a calibrated or complete finance product.
-> The honest checklist of what is done and what is not lives in [TODO.md](TODO.md); dashboard and API
-> details are in [frontend/README.md](frontend/README.md). The original v1 Streamlit project is kept
-> further down as an archive and is not what runs today.
+A local finance-research workspace for stocks and crypto. Chat with specialist agents, inspect their evidence and decisions, and keep conversation memory on your PC.
 
-Chat about stocks and crypto on your own PC. Python decides what to fetch, validates every number and
-owns every side effect. Models only **classify** (route a question, judge a headline) or **narrate**
-(word an answer from facts the tools returned). Nothing leaves the machine for inference: **no hosted LLMs.**
+**Current version: v2, in development.** React dashboard, Python policy, local inference. Not production-ready, not an automated trading system, and not financial advice.
 
-**Rules the code enforces**
+[Start](#start) · [How-it-works](#how-it-works) · [Models-and-measurements](#models-and-measurements) · [Development](#development) · [Open-work](#open-work)
 
-- A number reaches an answer only if a tool output contains it. A rejected narration is replaced by the
-  tools' own words, and the run map shows that fallback.
-- A wording check rejects names and claim words the narrator was never shown.
-- Research cannot write your watchlist. Only the explicit *Track* button does.
-- Everything recorded is inspectable: each answer links to a run map of routing, tools, agents, guards and
-  the accepted output. Missing and not-dispatched components are shown as such, never as success.
+## Start
 
-## Run it (Windows)
+### On an already configured Windows PC
 
-Double-click `run-dashboard.cmd`, then open <http://127.0.0.1:8878> in a regular browser. After a
-frontend build, Node is not needed: `python -E -B -m ui.dashboard --port 8878`. The server listens on
-loopback only. It needs the locally installed inference packages (do not use `python -S`).
+1. Double-click `run-dashboard.cmd` in the repository root.
+2. Open <http://127.0.0.1:8878> in a regular browser. Keep the terminal open.
+3. In **Models**, verify/qualify the narrator and select **LFM3 1.7B**. Tool-only reports remain available.
+4. Collect news explicitly, then chat about an asset. Open the answer's run map to inspect sources, routing, model calls, guard checks and fallbacks.
 
-## How an answer is made
+The launcher builds the React frontend and starts the Python service. Node.js is needed for the build; Python and the local inference packages must already be installed. Do not start a second server if the address is already in use.
 
-Two clocks that never share a code path:
+After a frontend build, serving does not need Node:
 
-1. **News (Clock 1), started by a person, no scheduler:** official Apple and NVIDIA feeds -> pre-gate
-   (quarantine, dedupe) -> GLiNER judge -> signal gate (ignore / digest / alert) -> `data/news.db`.
-2. **Chat (Clock 2):** GLiNER router (intent + assets) -> Data Analyst and News Researcher -> team lead
-   -> number guard + wording check -> accepted answer, or the deterministic fallback.
+```text
+python -E -B -m ui.dashboard --port 8878
+```
 
-The specialists and the team lead can share one narrator through separate calls. Spidermonkey/Jev inspired
-the gating pattern; no such service runs.
+This is not a fresh-install recipe. `requirements.txt` still mixes v1 and v2 dependencies, and the pinned GLiNER cache and optional Hy-Memory environment need separate setup. No Gemini, OpenRouter or other hosted-model key is needed for v2. See [dashboard setup and API details](frontend/README.md).
 
-## Local models
+## How it works
 
-| Model | Job | Notes |
+Python owns dispatch, data fetching, validation, persistence and explicit writes. Models classify or narrate; they have no tool or write authority.
+
+```text
+News (Clock 1, manual collection)
+  Official feeds -> pre-gate -> GLiNER judge -> Python signal gate -> local news store
+
+Chat (Clock 2)
+  Question -> GLiNER router -> Data Analyst / News Researcher -> Market Team Lead
+           -> evidence guards -> accepted answer or deterministic fallback
+```
+
+- **Research:** provider-backed market snapshots, fundamentals, price charts and accepted news. Chat reads collected news; it does not silently refresh it.
+- **Visibility:** inspect actual model calls, dispatch decisions, tool outputs, retries and validation. A missing step is not shown as successful. No hidden chain-of-thought is exposed or invented.
+- **Conversations:** persistent history, cancellation, same-asset follow-ups and explicit asset tracking. Research never silently adds to the watchlist.
+- **Memory:** hybrid keyword + Hy-Memory lite by default, with keyword fallback. Notes and recalled turns are context only, never financial evidence. Override with `COFINANCE_MEMORY=keyword`, `hymemory` or `hybrid`.
+- **Controls:** remember a note, forget one item or a conversation's memory, delete a conversation, or clear all conversations. Forget keeps chat history; delete removes history and traces too. Watchlist, collected news and models are kept.
+
+Detailed memory semantics and failure handling: [remember/forget design](docs/designs/remember_forget_draft.md).
+
+## Models and measurements
+
+### Active stack
+
+| Component | Role | Runtime policy |
 | --- | --- | --- |
-| `fastino/GLiNER2.5-Decide` (486,444,053 parameters) | route questions, judge headlines | pinned revision, offline from the local cache |
-| LFM3 1.7B Q4_K_M on llama.cpp (CPU) | optional narrator | pinned hashes, must pass qualification; your choice is restored after a restart but **never loads until a run needs it** |
-| Hy-Memory lite + Qwen3-Embedding-0.6B (Apache-2.0) | optional semantic memory | isolated venv, loopback only, tiktoken blocked, network trap showed zero outbound calls |
+| `fastino/GLiNER2.5-Decide` (486,444,053 parameters) | Route questions and classify headlines | Pinned local cache; no generated answers |
+| **LFM3 1.7B, Q4_K_M** | Narrate specialist reports and team-lead answers | Selected narrator; pinned llama.cpp CPU runtime, qualification required |
+| Hy-Memory lite + Qwen3-Embedding-0.6B | Semantic conversation recall | Optional local worker; keyword fallback |
 
-Downloads are explicit, resumable and hash-checked. Passing the small smoke suite does not establish
-financial accuracy.
+The agent roles use separate calls to the shared narrator, not separate downloaded models. Spidermonkey/Jev inspired the gating pattern; no hosted Spidermonkey service runs.
 
-## Conversation memory
+**Decision, 2026-11-09: keep LFM3.** It remains the chosen quality-first narrator. MiniCPM5-1B is a smaller, faster option for future consideration, not a demonstrated quality upgrade. The comparison below does not change selection or add unqualified alternatives to the picker.
 
-- **Default: hybrid.** Keyword search (SQLite FTS5) and Hy-Memory embeddings, fused by rank; if the semantic
-  side is missing or fails, keyword answers and the trace says so. Override with
-  `COFINANCE_MEMORY=keyword`, `hymemory` or `hybrid`.
-- **Context only.** Recalled text helps the narrator follow a conversation. It is never evidence and its
-  numbers never enter the number guard. Recall never crosses conversations and only uses turns about the same assets.
-- **You are in control** (the brain button in the chat top bar, and *Forget from memory* under each answer):
-  remember a short note (500 characters, about an asset named in the note or already in the conversation, 50 per conversation), forget one item, or forget a
-  whole conversation. A forgotten item is blocked on every path first and its copies are deleted second, so even a
-  failed delete can never bring it back. The answer stays in the chat history; the trace stays as the audit record.
-  Notes reach the narrator in a separate block marked untrusted: not evidence and not instructions.
-- **Delete a conversation** (trash icon on a row in *Conversations*, confirm inline) or **Clear all** (list icon in the
-  panel header, confirm in a dialog). Unlike forget, this is permanent: memory is forgotten first (same tombstone and
-  sweep path), then the tombstones lose their text, then messages, runs and the run traces are deleted. SQLite
-  `secure_delete` zeroes the freed pages, so the text is not left readable in the database files. Refused while a run
-  in that conversation, or its memory write, is still in flight. Watchlist, collected news and models are kept. A vector
-  delete that fails stays pending and retries; the conversation is gone either way.
-- **Evidence level.** Hybrid beat keyword 22/24 vs 17/24 on a synthetic follow-up set written by the people who
-  built the backends (paraphrase-heavy, so biased toward embeddings); that is thin. Real chats now record what keyword
-  alone would have recalled, and `data/_memory_shadow_report.py` decides after 30 real follow-ups under a rule fixed in advance.
-- Design and review record: [docs/designs/remember_forget_draft.md](docs/designs/remember_forget_draft.md).
+### Narrator smoke comparison
 
-## What is not done
+Measured locally on Nov 8-9, 2026. All models passed the existing narration and number-faithfulness smoke gates.
 
-See [TODO.md](TODO.md) for the full list. The main gaps:
+| Narrator (Q4_K_M) | Narration | Numbers | Narration median | Effective output tokens/s | Model file |
+| --- | --- | --- | --- | --- | --- |
+| **LFM3 1.7B (retained)** | 8/8 | 6/6 | 3.837 s | 9.5 | 1.100 GB |
+| MiniCPM5-1B (candidate only) | 8/8 | 6/6 | 2.770 s | 13.9 | 0.688 GB |
+| MiniCPM5-2B (candidate only) | 8/8 | 6/6 | 4.393 s | 5.4 | 1.561 GB |
 
-- **Labels and calibration.** The 131 labelled headlines in `data/news_corpus_20261108` were labelled by an AI model,
-  not a person, and are recorded as such; only 18 of the 20 required traps exist. Calibrated thresholds failed the
-  held-out check and were not adopted. Live news urgency now comes from named rules (`core/urgency.py`), because the model urgency head ranked backwards and the old alert line could never fire; the rules' held-out test still needs a fresh corpus on or after 2026-11-15.
-- **Coverage.** Fundamentals are incomplete. News comes from the Apple and NVIDIA official feeds; there are no
-  Bitcoin or regulatory sources and no scheduler yet (each needs approval). Reddit and StockTwits were tried through
-  last30days and fail without a login, so they are not used.
-- **Verification limits.** The wording check misses paraphrase that introduces no new name or claim word. GLiNER's
-  direction label is uncalibrated. Numeric matching is not full factual verification.
+Method: Ryzen 5 3600X, approximately 16 GB RAM, CPU-only, 6 threads, llama.cpp `b12110`, 4,096-token context, temperature 0, thinking off, 256-token output cap. Each arm ran all 23 synthetic cases twice (46 calls). Narrator gates cover only 4 narration + 3 number cases, repeated twice: **7 unique cases, not 14 independent examples**. Other categories test jobs these narrators do not own.
 
-## Checks
+Effective tokens/s includes prompt processing and is aggregated across all cases, not raw decoding speed. Timings are indicative, not a controlled performance benchmark; dashboard activity may have affected the MiniCPM runs. GB is decimal file size, not RAM usage. This smoke set cannot establish comparative financial accuracy or overall model quality.
 
-```text
-python -m unittest discover -s tests -t .          # backend; some live tests are skipped by default
-cd frontend && npm test && npm run build           # frontend tests, type-check, production build
-```
+[Recorded scores, hashes and revisions](frontend/src/lib/narrator-benchmark.json). Full local reports stay under ignored `data/bakeoff_20261108/`.
 
-Opt-in live checks: `COFINANCE_HYMEMORY_TESTS=1` (real Hy-Memory round trip and delete) and
-`COFINANCE_BROWSER_TESTS=1` (Chrome/Playwright). Real-model runs are separate from fixtures and cannot be replaced by them.
+### Decision-model experiment status
 
-## Layout
+The 91-row training split has AI-generated labels, not human ground truth. Its held-out split was already used by calibration, so no new held-out result is claimed.
+
+| Arm | Observed outcome | Meaning |
+| --- | --- | --- |
+| GLiNER alone | 72.5% materiality accuracy; macro-F1 0.667; AUC 0.790; 0 request errors | Provisional training baseline, not production accuracy |
+| MiniCPM5-2B-Jev | 91/91 requests timed out under the current request budget | Integration/runtime failure; no valid quality comparison |
+| d1-2B | Load failed due to an incompatible Transformers import | Blocked before inference; no quality score |
+
+No judge replacement has been adopted. Downloaded model files are pinned and checksum-verified; that is not the same as a working, qualified model.
+
+## Safety and local data
+
+- **No hosted inference.** Model calls stay local; market providers and approved news/download sources still require network access.
+- **Guarded output, not perfect verification.** Number/scale, wording, direction and supported-risk checks reject unsupported candidate text. At most one team-lead retry runs before fallback. Value matching and lexical checks do not prove every financial claim.
+- **Explicit side effects.** Watchlist edits, collections, model downloads and conversation controls are user actions. The API binds to loopback and checks host, origin and request tokens.
+- **Private local state.** `data/` contains databases, traces, models and corpora and is git-ignored. Memory stays within a conversation and the relevant assets. Deletion uses tombstones, vector sweeps and SQLite `secure_delete`; a failed vector delete stays pending for retry. This is not a guarantee of forensic erasure from backups or the device.
+
+## Development
 
 ```text
-core/        routing, orchestration, guards, tools, chat service, memory (ledger, keyword, Hy-Memory), local models
-qualify/     corpus, label store, calibration, qualification scorers
-ui/          loopback dashboard server and read-only workbench
-frontend/    React + TypeScript + Vite + Tailwind v4 dashboard
-tests/       backend tests
-docs/designs/  design drafts and their review records
-data/        local state, models, traces, corpora (git-ignored)
+python -m unittest discover -s tests -t .
+cd frontend
+npm ci --ignore-scripts
+npm test
+npm run build
 ```
 
-No commit, push, branch, PR or deployment is made by the tooling in this repo without explicit approval.
+The full backend suite needs the installed inference packages; live checks are opt-in. `COFINANCE_HYMEMORY_TESTS=1` enables real Hy-Memory checks and `COFINANCE_BROWSER_TESTS=1` enables installed-Chrome/Playwright checks. Fixtures do not replace real-model validation.
 
----
+For frontend development, run the Python server, then `npm run dev` in `frontend/`. Vite uses loopback port 5173 and proxies the local API. See [frontend/README.md](frontend/README.md) for security boundaries and browser checks.
 
-# 📈 Cofinance Analyst (archived v1)
+## Open work
 
-Everything below describes the archived v1 Streamlit project. It is kept as a reference and is not the current implementation.
+The source of truth is [TODO.md](TODO.md), not a claim that v2 is finished. Main remaining gaps:
 
-![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)
-![Python](https://img.shields.io/badge/Python-3.9%2B-blue)
-![Phidata](https://img.shields.io/badge/Agent-Phidata-orange)
-![Gemini](https://img.shields.io/badge/AI-Gemini%202.5-8E75B2)
+- Human-reviewed labels, two additional real traps, reliable calibration and a fresh rule-urgency test on or after **2026-11-15**. Current rules are live, but not yet validated on that fresh corpus.
+- Repair the Jev timeout and d1 compatibility blockers before comparing optional judges or cascades.
+- Broader narrator quality evaluation, and claim provenance beyond matching values, words and signs.
+- More primary news coverage (Bitcoin/regulatory) and a bounded ongoing scheduler. Both need approval.
+- Reproducible fresh installation, CI, backup/recovery and production-readiness checks.
 
- ![Cofinance](screenshots/Cofinance.png)
+## Repository map
 
-> **The Autonomous Investment Committee that lives in your browser.**
+| Path | Purpose |
+| --- | --- |
+| `core/` | V2 routing, agents, tools, guards, services, memory and local models |
+| `qualify/` | Corpus, label workflow, calibration and qualification |
+| `frontend/` | React + TypeScript + Vite dashboard |
+| `ui/` | Loopback server and read-only workbench |
+| `tests/` | Backend regression tests |
+| `docs/designs/` | Design notes and review records |
+| `data/` | Private local state and evidence (git-ignored) |
+| `app.py`, `agents/`, `tools/`, `storage/` | Historical v1 Streamlit implementation |
 
-Note: Cofinance Analyst is an archived hackathon project and is no longer actively maintained. It stays up as a reference implementation for multi-agent orchestration with Phidata.
-For actively maintained work, see AI Side Panel (12k+ installs, ChatGPT/Gemini/Claude in your browser side panel), and my other works → artistscompany.net
+## History and license
 
----
+[README.old.md](README.old.md) preserves the entire previous README, including the v1 pitch, screenshots, setup and historical claims. It is an archive, not current v2 guidance. The old application and its databases are preserved, not migrated.
 
-## 💡 The Pitch
-
-### The Problem
-
-Retail investors are drowning in noise. To analyze a single asset, you need to switch between **TradingView** for charts, **Yahoo Finance** for fundamentals, and **Twitter/News** for sentiment. It's a fragmented, cognitive nightmare that leads to bad decisions.
-
-### The Solution
-
-**Cofinance Analyst** is not just a chatbot—it's an **Agentic Orchestrator**. It unifies the entire financial research workflow into a single conversation. By coordinating a team of specialized AI agents, it delivers institutional-grade analysis, interactive visuals, and real-time data without you ever leaving the chat.
-
-### The Value
-
-* **Context-Aware Intelligence:** Automatically switches strategies based on asset class (e.g., analyzing **P/E** for Stocks vs. **Volatility** for Crypto).
-* **Zero Hallucination Risk:** Agents are physically incapable of guessing data; they *must* use Python tools to fetch real-time prices and news.
-* **Visual Alpha:** Generates interactive Plotly charts on the fly, bridging the gap between text and technical analysis.
-
----
-
-## 🤖 Architecture
-
-Cofinance uses a **Hub-and-Spoke** architecture where a central "Manager Agent" directs specialized workers.
-
-```mermaid
-sequenceDiagram
-    participant U as 👤 User
-    participant M as 🧠 Manager Agent
-    participant D as 📉 Data Analyst
-    participant N as 📰 News Researcher
-  
-    U->>M: "Should I buy Bitcoin?"
-    Note over M: 💭 Strategy: Detected Crypto.<br/>Activating Risk Guardian Mode.
-  
-    par Parallel Execution
-        M->>D: Get Price & Volatility
-        D->>D: yFinance API
-        M->>N: Get Sentiment & FUD
-        N->>N: DuckDuckGo Search
-    end
-  
-    D-->>M: Price: $95k, Volatility: High
-    N-->>M: Sentiment: Extreme Greed
-  
-    Note over M: ⚖️ Synthesis: Price is up,<br/>but risk is too high.
-  
-    M->>U: "Bitcoin is up, but overextended. Wait for pullback."
-```
-
-## ✨ Key Features
-
-### 1\. Hybrid Asset Intelligence 🧠
-
-The system is smart enough to treat assets differently:
-
-* **Stocks (AAPL, NVDA):** Focuses on Earnings, Revenue, and P/E Ratios.
-* **Crypto (BTC, SOL):** Switches to **Risk Management Mode**, analyzing Fear & Greed Index, Distance from ATH, and Volatility.
-
-### 2\. Interactive "Living" Charts 📊
-
-No more static images. The Data Agent writes and executes Python code to generate **interactive Plotly charts** that you can zoom, pan, and hover over for exact price points.
-
-### 3\. Persistent Portfolio Memory 💾
-
-Unlike standard LLM chats that forget you instantly, Cofinance uses an **SQLite Database** to maintain your personal "Watchlist" across sessions.
-
-* *Ask:* "How is **my** portfolio doing?"
-* *Action:* Agent queries the DB, checks your specific tickers, and summarizes the news.
-
----
-
-## 🛠️ Technical Implementation
-
-This project demonstrates mastery of **Agentic AI** concepts:
-
-* **Multi-Agent Orchestration:** Implemented via phidata using a Team Lead/Worker pattern.
-* **Tool Use (Function Calling):** Custom Python tools for `yfinance`, `duckduckgo_search`, and `sqlite3`.
-* **Structured Output:** Enforces strict "Strategy -\> Data -\> News -\> Verdict" response formats using System Prompt Engineering.
-* **Observability:** Full visibility into agent thought processes via Streamlit expanders.
-
----
-
-
-## 📸 Screenshots
-
-| Feature    | Screenshot                             |
-| ---------- | -------------------------------------- |
-| Summary    | ![Summary](screenshots/summary.png)    |
-| Deep Think | ![Deep Think](screenshots/deepthink.png) |
-| Response   | ![Response](screenshots/response.png)    |
-| Watchlist  | ![Watchlist](screenshots/watchlist.png)  |
-| Compare    | ![Compare](screenshots/compare.png)      |
-
-
-## Video
-
-[![Watch the video](https://img.youtube.com/vi/FKFkU2BG5cY/0.jpg)](https://youtu.be/FKFkU2BG5cY)
-
----
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-* Python 3.9+
-* A Google Gemini API Key or LLM Studio or OpenRouter API Key
-
-### Installation
-
-1. **Clone the repo**
-
-   ```bash
-   git clone [https://github.com/creosb/Cofinance-analyst.git](https://github.com/cresoB/Cofinance.git)
-   cd Cofinance-analyst
-   ```
-2. **Create a Virtual Environment** (Windows)
-
-   ```pwsh
-   python -m venv .venv
-   .\.venv\Scripts\Activate.ps1
-   ```
-3. **Install Dependencies**
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. **Set Up Keys**export GOOGLE_API_KEY="your_api_key_here"
-5. **Run the App**
-
-   ```bash
-   python -m streamlit run app.py --browser.gatherUsageStats false
-   ```
-
----
-
-## 🧪 Testing
-
-We use `pytest` to ensure our data tools are robust (especially the crypto-fallback logic).
-
-```bash
-pytest -q
-```
-
----
-
-## 📂 Project Structure
-
-```text
-Cofinance-analyst/
-├── agents/             # Agent definitions (Manager, Data, News)
-├── tools/              # Custom Python tools (yfinance, plotly)
-├── storage/            # SQLite database logic
-├── tests/              # Unit tests for tools
-├── app.py              # Main Streamlit application
-├── requirements.txt    # Pinned dependencies
-└── README.md           # Documentation
-```
-
----
-
-## 🏆 Hackathon Submission Details
-
-* **Track:** Finance Agent / Multi-Agent Systems
-* **Framework:** Phidata
-* **Model:** Google Gemini 2.5 Flash - Qwen 3 4b - gpt oss 20b
-
-> *Built with ❤️ by Creos*
-
-
-# License
-
----
-
-## Please contact me first to share or make changes anywhere.
-***
-This work is licensed under a
-[Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License][cc-by-nc-sa].
-
-[![CC BY-NC-SA 4.0][cc-by-nc-sa-image]][cc-by-nc-sa]
-
-[cc-by-nc-sa]: http://creativecommons.org/licenses/by-nc-sa/4.0/
-[cc-by-nc-sa-image]: https://licensebuttons.net/l/by-nc-sa/4.0/88x31.png
-[cc-by-nc-sa-shield]: https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg
-***
+Please contact the author first to share or make changes anywhere. This work retains its existing [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International license](http://creativecommons.org/licenses/by-nc-sa/4.0/). Model and runtime components have their own licenses; see their pinned sources and local license copies.
