@@ -4,7 +4,7 @@ A local finance-research workspace for stocks and crypto. Chat with specialist a
 
 **Current version: v2, in development.** React dashboard, Python policy, local inference. Not production-ready, not an automated trading system, and not financial advice.
 
-[Start](#start) · [How it works](#how-it-works) · [Models](#models-and-measurements) · [Historical benchmark (experimental)](#historical-benchmark) · [Development](#development) · [Open work](#open-work)
+[Start](#start) · [How it works](#how-it-works) · [Models](#models-and-measurements) · [Historical benchmark (experimental)](#historical-benchmark) · [Prediction markets](#prediction-markets-read-only) · [Development](#development) · [Open work](#open-work)
 
 ## Preview
 
@@ -138,6 +138,25 @@ To iterate fast without fooling ourselves, the lab reuses the same target on 2,8
 Every week, five arms forecast the same five assets and are sealed into a hash-chained ledger **before** the entry price exists: LFM3 with ticker + accepted news, LFM3 price-only (the historical prompt, now truly out of sample), a deterministic news-direction rule, momentum and always-UP. Labels and the ledger hash are committed to [forward-ledger.jsonl](docs/benchmarks/forward-ledger.jsonl) before the US open, so GitHub's timestamp independently shows they came first. The protocol is frozen; a changed prompt or rule needs a new run from zero. News coverage is Apple and NVIDIA only for now.
 
 [Protocol and weekly routine](docs/benchmarks/FORWARD.md)
+
+## Prediction markets (read-only)
+
+> [!WARNING]
+> **Experimental result.** A retrospective measurement of recorded Polymarket prices (markets closed Nov 2025 to Oct 2026). Crowd odds are crowd opinion, not facts, not a Cofinance forecast and not financial advice. **Cofinance never trades**: no orders, keys or wallets.
+
+Chat can show a small **Crowd odds** card for BTC, ETH and some stocks: live Polymarket prices picked and formatted by Python, never narrated by a model and never used as evidence. Lookups are keyless GETs to Polymarket's public APIs only (median 0.17 s, 0 errors in a 12-lookup check). Disable with `COFINANCE_CROWD_ODDS=off`.
+
+Before showing the odds, we checked how well past prices came true on 2,000 sampled markets (from 48,232 eligible, volume at least $50k):
+
+| Horizon before close | Markets | Brier | Brier skill vs base rate |
+| --- | --- | --- | --- |
+| 1 day | 1,049 | 0.176 | 0.28 |
+| 7 days | 525 | 0.168 | 0.28 |
+| 30 days | 119 | 0.094 | 0.38 |
+
+The crowd was reasonably calibrated at 1 and 7 days. Cheap longshots won about as often as priced, so buying them (the old bot's Strategy B) shows **no measured edge**, before spreads and fees. Two odd buckets (no winners among 70 sub-20-cent markets a month out; 20 to 30 cent outcomes winning 38% a day out) are hypotheses for a fresh sample, not findings.
+
+[Method, buckets and caveats](docs/benchmarks/POLYMARKET.md) · [Published calibration table](docs/benchmarks/polymarket-calibration.json)
 
 ## Safety and local data
 

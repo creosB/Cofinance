@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { ModelPicker } from './model-library'
 import { AnswerProcess, TraceActivity } from './run-map'
 import { PriceChart } from './price-chart'
+import { CrowdOdds } from './crowd-odds'
 import { ago, evidenceUrl, statusLabel } from '@/lib/domain'
 import { canForget, contextLine, itemFor } from '@/lib/memory'
 import { MemoryPanel } from './memory-panel'
@@ -70,6 +71,7 @@ function Answer({message,inspect,chat}:{message:Message;inspect:(id:string,spanI
   {structured&&p.reports?.news&&<p className="msg-body news-summary">{p.reports.news}</p>}
   {legacy&&legacyNews&&<p className="msg-body news-summary">{legacyNews}</p>}
   {(p.charts||[]).map(chart=><PriceChart key={chart.ticker} data={chart}/>)}
+  {p.crowd_odds&&<CrowdOdds odds={p.crowd_odds}/>}
   {!!p.evidence?.length&&<div className="sources" aria-label="Sources">{p.evidence.map((s,i)=>{const href=evidenceUrl(s.url),meta=[s.source,s.as_of==='Unknown'?'time unknown':when(s.as_of)].filter(Boolean).join(', ');return href?<a key={href+i} href={href} target="_blank" rel="noreferrer noopener"><span className="source-name">{s.title}</span><span className="source-meta">{meta}</span><ArrowUpRight size={14} aria-hidden="true"/></a>:<p key={i}><span className="source-name">{s.title}</span><span className="source-meta">link unavailable</span></p>})}</div>}
   {p.coverage_note&&<div className="coverage"><Newspaper size={14} aria-hidden="true"/><span>{p.coverage_note}</span>{news&&!news.health.collected&&news.phase!=='running'&&<Button variant="ghost" size="sm" disabled={chat.busy||!!chat.workspace?.active_job} onClick={()=>{void chat.collectNews().catch(()=>{})}}>Collect news</Button>}{news?.phase==='running'&&<span className="quiet">Collecting news now</span>}</div>}
   {memoryLine(p.memory)&&<div className="coverage" title={(p.memory?.recalled||[]).map(r=>'Recalled: '+r.question).join('\n')||undefined}><History size={14} aria-hidden="true"/><span>{memoryLine(p.memory)}</span></div>}
