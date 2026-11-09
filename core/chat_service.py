@@ -71,8 +71,16 @@ class LiveTrace(TraceRecorder):
 
 
 class ChatService:
-    def __init__(self,repo,root=None,models=None,market_factory=MarketTools,router_factory=None,news_backend_factory=None,feed_fetch=None):
+    def __init__(self,repo,root=None,models=None,market_factory=MarketTools,router_factory=None,news_backend_factory=None,feed_fetch=None,
+                 crowd_odds=None):
         self.repo=Path(repo);self.root=Path(root or self.repo/'data')
+        # Crowd odds (Polymarket, read-only, approved by Baris 2026-11-10). Live only with the live market tools, so a test
+        # with fake tools never touches the network unless it passes its own lookup. COFINANCE_CROWD_ODDS=off disables it.
+        if crowd_odds is None and market_factory is MarketTools and os.environ.get('COFINANCE_CROWD_ODDS','on').strip().lower()!='off':
+            from .crowd_odds import load_calibration,lookup
+            calibration=load_calibration(self.repo/'docs'/'benchmarks'/'polymarket-calibration.json')
+            crowd_odds=lambda tickers:lookup(tickers,calibration=calibration)
+        self.crowd_odds=crowd_odds
         self.store=ChatStore(self.root/'chat_v2.db');self.store.recover()
         self.models=models or LocalModels(self.root/'local_models',self.repo)
         self.market_factory=market_factory;self.router_factory=router_factory
@@ -260,8 +268,16 @@ class ChatService:
             check()
             answer=result.final_synthesis or 'No accepted evidence is available for this request.'
             if routed.intent=='watchlist_add':answer+=' Use the Add to watchlist button to confirm tracking.'
+            odds=None
+            if self.crowd_odds:
+                # Deterministic and outside the narrator: these values are shown as recorded, never narrated or guarded.
+                try:odds=trace.call('Look up crowd odds','tool',lambda:self.crowd_odds(tickers),actor='Prediction markets',
+                                    inputs={'tickers':tickers,'source':'Polymarket public API, read-only','trading':False})
+                except Exception:odds=None  # an aid, never a blocker
+                check()
             health=news_health(self.root/'news.db')
             payload={'kind':'research','mode':job['model'],'tickers':tickers,'charts':list(tools.charts.values()),
+                     'crowd_odds':odds if odds and (odds.get('markets') or odds.get('errors')) else None,
                      'snapshots':tools.snapshots,'evidence':tools.evidence+news.evidence,
                      'faithful_synthesis':result.faithful_synthesis,'risk_mode':result.risk_mode,
                      'coverage_note':coverage_note(health,tickers),
