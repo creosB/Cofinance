@@ -6,6 +6,18 @@ A local finance-research workspace for stocks and crypto. Chat with specialist a
 
 [Start](#start) · [How-it-works](#how-it-works) · [Models-and-measurements](#models-and-measurements) · [Development](#development) · [Open-work](#open-work)
 
+## Preview
+
+Actual local UI, captured 2026-11-09 with a purpose-created public NVDA conversation. No private chats or notes are shown. This run uses real cached GLiNER routing and Yahoo market tools, with **tool-only narration** (not an LFM3 forecast).
+
+![Cofinance chat with provider-backed NVDA data and a price chart](docs/screenshots/chat.png)
+
+Chat, source-backed figures and the locally rendered chart.
+
+![Cofinance execution map showing the recorded routing, tool and guard path](docs/screenshots/execution.png)
+
+The same run's execution map. Unused narrator steps remain explicitly unused, not simulated as successful calls.
+
 ## Start
 
 ### On an already configured Windows PC
@@ -117,7 +129,7 @@ The source of truth is [TODO.md](TODO.md), not a claim that v2 is finished. Main
 - Repair the Jev timeout and d1 compatibility blockers before comparing optional judges or cascades.
 - Broader narrator quality evaluation, and claim provenance beyond matching values, words and signs.
 - More primary news coverage (Bitcoin/regulatory) and a bounded ongoing scheduler. Both need approval.
-- Reproducible fresh installation, CI, backup/recovery and production-readiness checks.
+- Reproducible fresh installation, backup/recovery and production-readiness checks. CI is deliberately out of scope at Baris's request.
 
 ## Repository map
 
