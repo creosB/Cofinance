@@ -202,6 +202,27 @@ def evaluate(root):
     dump(root/'report.json',report);return report
 
 
+def publish(root,out):
+    """Compact, public calibration table for the chat cards and docs: counts, rates and intervals only."""
+    r=json.loads((root/'report.json').read_text(encoding='utf-8'));p=json.loads((root/'protocol.json').read_text(encoding='utf-8'))
+    if r['protocol_sha256']!=digest((root/'protocol.json').read_bytes()):raise ValueError('Report does not match the frozen protocol')
+    r4=lambda x:round(x,4) if isinstance(x,float) else x
+    horizons,summary,by_category,by_half={},{},{},{}
+    for name,h in r['horizons'].items():
+        a=h['all']
+        if not a['n']:continue
+        horizons[name]=[{'lo':float(b['bucket'].split('-')[0]),'hi':float(b['bucket'].split('-')[1]),'n':b['n'],'events':b['events'],
+            'mean_price':r4(b['mean_price']),'yes_rate':r4(b['yes_rate']),'ci95':[r4(x) for x in b['yes_rate_ci95']]} for b in a['calibration']]
+        summary[name]={k:r4(a[k]) for k in ('n','events','brier','brier_base_rate_reference','brier_skill','log_loss','yes_base_rate')}
+        by_category[name]={c:{'n':s['n'],'brier':r4(s['brier'])} for c,s in h['by_category'].items() if s['n']}
+        by_half[name]={k:{'n':s['n'],'brier':r4(s['brier'])} for k,s in h['by_half'].items() if s['n']}
+    data={'format':'cofinance-pm-calibration/1','study':'Polymarket calibration, markets closed Nov 2025 to Oct 2026, measured '+p['frozen_at'][:10],
+          'warning':WARNING,'protocol_sha256':r['protocol_sha256'],'eligible_markets':p['eligible'],'sampled_markets':p['sample_size'],
+          'sampled_days':len(p['sampled_end_days']),'min_volume_usd':p['min_volume_usd'],'scored_outcome':p['scored_outcome'],
+          'coverage':r['coverage'],'summary':summary,'by_category':by_category,'by_half':by_half,'horizons':horizons,'notes':p['notes']}
+    Path(out).parent.mkdir(parents=True,exist_ok=True);dump(Path(out),data);return data
+
+
 def table(report):
     out=[f"coverage {report['coverage']}"]
     for name,h in report['horizons'].items():
@@ -217,7 +238,8 @@ def table(report):
 
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('action',choices=['collect','history','evaluate'])
+    ap=argparse.ArgumentParser();ap.add_argument('action',choices=['collect','history','evaluate','publish'])
+    ap.add_argument('--out',type=Path,default=Path('docs/benchmarks/polymarket-calibration.json'))
     ap.add_argument('--root',type=Path,required=True);ap.add_argument('--shard',type=int,default=0)
     ap.add_argument('--shards',type=int,default=1);a=ap.parse_args()
     if a.action=='collect':print(json.dumps(collect(a.root),indent=2))
@@ -225,5 +247,6 @@ def main():
         history(a.root,shard=a.shard,shards=a.shards)
         name='history_status.json' if a.shards==1 else f'history_status.{a.shard}.json'
         print((a.root/name).read_text())
+    elif a.action=='publish':d=publish(a.root,a.out);print(json.dumps(d['summary'],indent=2))
     else:print(table(evaluate(a.root)))
 if __name__=='__main__':main()

@@ -68,5 +68,9 @@ class TestLab(unittest.TestCase):
             self.assertEqual(rep['horizons']['7d']['all']['n'],40)   # 8-day-old point is exactly 1 day stale at 7d: kept
             self.assertAlmostEqual(rep['horizons']['7d']['all']['brier'],.09)
             self.assertEqual(rep['horizons']['1d']['all']['n'],0)    # the near-close point is after the 1d snapshot: never used
+            pub=pm_lab.publish(root,root/'pub.json')
+            self.assertEqual(set(pub['horizons']),{'7d'})  # empty horizons (1d, 30d have no usable point) are not published
+            self.assertEqual(sum(b['n'] for b in pub['horizons']['7d']),40)
+            self.assertNotIn('question',json.dumps(pub))  # counts and rates only, no market text
 
 if __name__=='__main__':unittest.main()
