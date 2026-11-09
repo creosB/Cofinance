@@ -123,6 +123,13 @@ Inputs use only past prices, with asset names and dates hidden from the model. F
 
 LFM3 remains the chosen **research narrator**, not an adopted trading signal. The useful next test is a separately frozen full-research replay with timestamped news and prospective forecasts, not tweaking this prompt until the old prices look good.
 
+### Strategy lab (12 years, time-split)
+
+> [!WARNING]
+> **Experimental result.** Retrospective prices, five assets, simple rules and small models. Not a trading signal or financial advice.
+
+To iterate fast without fooling ourselves, the lab reuses the same target on 2,826 cases from 2014 to 2026, split by time into dev (tune freely), validation and a locked test split whose every opening is logged. **First run: nothing passes the frozen gate.** On dev, always-UP had the best accuracy (54.9%); momentum, trend, logistic regression and gradient boosting did not beat it significantly on dev or validation. The one useful signal is risk, not direction: dual momentum cut dev drawdown from 59% to 20%. The test split has not been opened. [Lab setup and results](docs/benchmarks/LAB.md)
+
 ### Forward benchmark (started 2026-11-09)
 
 > [!WARNING]

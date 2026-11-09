@@ -1,0 +1,315 @@
+{
+  "format": "cofinance-lab/1",
+  "warning": "Experimental lab result. Not a trading signal or financial advice.",
+  "cases_sha256": "d51ff059bd397db110f428c7646159b579bde1dcecffd67b9a988db90c6f1cd4",
+  "code_sha256": "1938c2d33f098853e994ca505cb0b7890b65e1f54655c403f8ae90a810131b55",
+  "gate": {
+    "balanced_accuracy_min": 0.55,
+    "beat_best_baseline_by": 0.03,
+    "p_value_max": 0.05,
+    "must_pass": [
+      "validation",
+      "test"
+    ]
+  },
+  "splits": {
+    "dev_2018_2023": {
+      "from": "2018-01-03",
+      "through": "2023-12-26",
+      "arms": {
+        "always_up": {
+          "n": 1500,
+          "accuracy_all": 0.5493333333333333,
+          "coverage": 1.0,
+          "accuracy_covered": 0.5493333333333333,
+          "balanced_accuracy": 0.5,
+          "p_value_covered_gt_50": 7.282823479085547e-05,
+          "up_rate": 0.5493333333333333,
+          "illustrative_long_cash_net_return": 1.4809123743739039,
+          "illustrative_weekly_max_drawdown": 0.5884941585419916,
+          "p_value_vs_best_baseline": 0.5106896031389099
+        },
+        "momentum5": {
+          "n": 1500,
+          "accuracy_all": 0.5046666666666667,
+          "coverage": 1.0,
+          "accuracy_covered": 0.5046666666666667,
+          "balanced_accuracy": 0.4994650140747975,
+          "p_value_covered_gt_50": 0.3685704270588456,
+          "up_rate": 0.5493333333333333,
+          "illustrative_long_cash_net_return": 0.7093731216368597,
+          "illustrative_weekly_max_drawdown": 0.3840577537272686,
+          "p_value_vs_best_baseline": 0.99976331757911
+        },
+        "momentum20": {
+          "n": 1500,
+          "accuracy_all": 0.5306666666666666,
+          "coverage": 1.0,
+          "accuracy_covered": 0.5306666666666666,
+          "balanced_accuracy": 0.5211373298098466,
+          "p_value_covered_gt_50": 0.009381645121665944,
+          "up_rate": 0.5493333333333333,
+          "illustrative_long_cash_net_return": 2.129372565408175,
+          "illustrative_weekly_max_drawdown": 0.3496067618971723,
+          "p_value_vs_best_baseline": 0.9303012621259281
+        },
+        "momentum60": {
+          "n": 1500,
+          "accuracy_all": 0.5233333333333333,
+          "coverage": 1.0,
+          "accuracy_covered": 0.5233333333333333,
+          "balanced_accuracy": 0.5107428046188316,
+          "p_value_covered_gt_50": 0.03739193683812913,
+          "up_rate": 0.5493333333333333,
+          "illustrative_long_cash_net_return": 1.500962469978926,
+          "illustrative_weekly_max_drawdown": 0.42598652739459375,
+          "p_value_vs_best_baseline": 0.9796913557264783
+        },
+        "reversal5": {
+          "n": 1500,
+          "accuracy_all": 0.49533333333333335,
+          "coverage": 1.0,
+          "accuracy_covered": 0.49533333333333335,
+          "balanced_accuracy": 0.5005349859252025,
+          "p_value_covered_gt_50": 0.6507255440314574,
+          "up_rate": 0.5493333333333333,
+          "illustrative_long_cash_net_return": 0.5544103613220224,
+          "illustrative_weekly_max_drawdown": 0.4133312971731221,
+          "p_value_vs_best_baseline": 0.9999877249306869
+        },
+        "trend_ma50": {
+          "n": 1500,
+          "accuracy_all": 0.5306666666666666,
+          "coverage": 1.0,
+          "accuracy_covered": 0.5306666666666666,
+          "balanced_accuracy": 0.5195431435629345,
+          "p_value_covered_gt_50": 0.009381645121665944,
+          "up_rate": 0.5493333333333333,
+          "illustrative_long_cash_net_return": 1.9481520306438491,
+          "illustrative_weekly_max_drawdown": 0.3294575029069583,
+          "p_value_vs_best_baseline": 0.9303012621259281
+        },
+        "trend_ma50_long_cash": {
+          "n": 1500,
+          "accuracy_all": 0.3473333333333333,
+          "coverage": 0.6146666666666667,
+          "accuracy_covered": 0.5650759219088937,
+          "balanced_accuracy": 0.3161407766990291,
+          "p_value_covered_gt_50": 4.35140365671394e-05,
+          "up_rate": 0.5493333333333333,
+          "illustrative_long_cash_net_return": 1.9481520306438491,
+          "illustrative_weekly_max_drawdown": 0.3294575029069583,
+          "p_value_vs_best_baseline": 1.0
+        },
+        "dual_momentum": {
+          "n": 1500,
+          "accuracy_all": 0.38066666666666665,
+          "coverage": 0.7073333333333334,
+          "accuracy_covered": 0.5381715362865221,
+          "balanced_accuracy": 0.3678692480036767,
+          "p_value_covered_gt_50": 0.0070052359496483385,
+          "up_rate": 0.5493333333333333,
+          "illustrative_long_cash_net_return": 2.8561370848127656,
+          "illustrative_weekly_max_drawdown": 0.19880006344625634,
+          "p_value_vs_best_baseline": 1.0
+        },
+        "market_trend": {
+          "n": 1500,
+          "accuracy_all": 0.5266666666666666,
+          "coverage": 1.0,
+          "accuracy_covered": 0.5266666666666666,
+          "balanced_accuracy": 0.5109869592692595,
+          "p_value_covered_gt_50": 0.020668705364791817,
+          "up_rate": 0.5493333333333333,
+          "illustrative_long_cash_net_return": 1.4798743829692311,
+          "illustrative_weekly_max_drawdown": 0.5371949536136056,
+          "p_value_vs_best_baseline": 0.9631646040660949
+        },
+        "logreg": {
+          "n": 1500,
+          "accuracy_all": 0.5466666666666666,
+          "coverage": 1.0,
+          "accuracy_covered": 0.5466666666666666,
+          "balanced_accuracy": 0.5030196185442638,
+          "p_value_covered_gt_50": 0.000164490578841222,
+          "up_rate": 0.5493333333333333,
+          "illustrative_long_cash_net_return": 0.6194593070057184,
+          "illustrative_weekly_max_drawdown": 0.6024277616962407,
+          "p_value_vs_best_baseline": 0.5926290426446699
+        },
+        "gbm": {
+          "n": 1500,
+          "accuracy_all": 0.51,
+          "coverage": 1.0,
+          "accuracy_covered": 0.51,
+          "balanced_accuracy": 0.4838606595047969,
+          "p_value_covered_gt_50": 0.2270013992013142,
+          "up_rate": 0.5493333333333333,
+          "illustrative_long_cash_net_return": 0.00041740147962165963,
+          "illustrative_weekly_max_drawdown": 0.5778585414971981,
+          "p_value_vs_best_baseline": 0.9989713867802008
+        }
+      },
+      "gate_pass": {
+        "momentum5": false,
+        "momentum60": false,
+        "reversal5": false,
+        "trend_ma50": false,
+        "trend_ma50_long_cash": false,
+        "dual_momentum": false,
+        "market_trend": false,
+        "logreg": false,
+        "gbm": false
+      }
+    },
+    "validation": {
+      "from": "2024-01-04",
+      "through": "2025-04-29",
+      "arms": {
+        "always_up": {
+          "n": 330,
+          "accuracy_all": 0.5424242424242425,
+          "coverage": 1.0,
+          "accuracy_covered": 0.5424242424242425,
+          "balanced_accuracy": 0.5,
+          "p_value_covered_gt_50": 0.0685398093774053,
+          "up_rate": 0.5424242424242425,
+          "illustrative_long_cash_net_return": 0.3102574587263278,
+          "illustrative_weekly_max_drawdown": 0.27112372312222865,
+          "p_value_vs_best_baseline": 0.5226450520210504
+        },
+        "momentum5": {
+          "n": 330,
+          "accuracy_all": 0.5212121212121212,
+          "coverage": 1.0,
+          "accuracy_covered": 0.5212121212121212,
+          "balanced_accuracy": 0.5204096834264432,
+          "p_value_covered_gt_50": 0.23713849301989842,
+          "up_rate": 0.5424242424242425,
+          "illustrative_long_cash_net_return": 0.16724652546453922,
+          "illustrative_weekly_max_drawdown": 0.15635509917880752,
+          "p_value_vs_best_baseline": 0.7964867127225057
+        },
+        "momentum20": {
+          "n": 330,
+          "accuracy_all": 0.5242424242424243,
+          "coverage": 1.0,
+          "accuracy_covered": 0.5242424242424243,
+          "balanced_accuracy": 0.5242830540037244,
+          "p_value_covered_gt_50": 0.2044997480315298,
+          "up_rate": 0.5424242424242425,
+          "illustrative_long_cash_net_return": 0.2236592738888863,
+          "illustrative_weekly_max_drawdown": 0.11961837984964707,
+          "p_value_vs_best_baseline": 0.7638947240013734
+        },
+        "momentum60": {
+          "n": 330,
+          "accuracy_all": 0.5303030303030303,
+          "coverage": 1.0,
+          "accuracy_covered": 0.5303030303030303,
+          "balanced_accuracy": 0.519608938547486,
+          "p_value_covered_gt_50": 0.14779450966192947,
+          "up_rate": 0.5424242424242425,
+          "illustrative_long_cash_net_return": 0.33727167609713327,
+          "illustrative_weekly_max_drawdown": 0.17258631663789425,
+          "p_value_vs_best_baseline": 0.6908671325904523
+        },
+        "reversal5": {
+          "n": 330,
+          "accuracy_all": 0.47575757575757577,
+          "coverage": 1.0,
+          "accuracy_covered": 0.47575757575757577,
+          "balanced_accuracy": 0.47959031657355683,
+          "p_value_covered_gt_50": 0.8253090479694091,
+          "up_rate": 0.5424242424242425,
+          "illustrative_long_cash_net_return": 0.1325333672780522,
+          "illustrative_weekly_max_drawdown": 0.15608777587944378,
+          "p_value_vs_best_baseline": 0.9934550806881848
+        },
+        "trend_ma50": {
+          "n": 330,
+          "accuracy_all": 0.49696969696969695,
+          "coverage": 1.0,
+          "accuracy_covered": 0.49696969696969695,
+          "balanced_accuracy": 0.4932029795158287,
+          "p_value_covered_gt_50": 0.5655688661761111,
+          "up_rate": 0.5424242424242425,
+          "illustrative_long_cash_net_return": 0.22061307890315685,
+          "illustrative_weekly_max_drawdown": 0.14924670433999376,
+          "p_value_vs_best_baseline": 0.956413065908424
+        },
+        "trend_ma50_long_cash": {
+          "n": 330,
+          "accuracy_all": 0.3,
+          "coverage": 0.5606060606060606,
+          "accuracy_covered": 0.5351351351351351,
+          "balanced_accuracy": 0.276536312849162,
+          "p_value_covered_gt_50": 0.18884339290923974,
+          "up_rate": 0.5424242424242425,
+          "illustrative_long_cash_net_return": 0.22061307890315685,
+          "illustrative_weekly_max_drawdown": 0.14924670433999376,
+          "p_value_vs_best_baseline": 1.0
+        },
+        "dual_momentum": {
+          "n": 330,
+          "accuracy_all": 0.3878787878787879,
+          "coverage": 0.7181818181818181,
+          "accuracy_covered": 0.540084388185654,
+          "balanced_accuracy": 0.3818435754189944,
+          "p_value_covered_gt_50": 0.12112635144331944,
+          "up_rate": 0.5424242424242425,
+          "illustrative_long_cash_net_return": 0.1876861850989997,
+          "illustrative_weekly_max_drawdown": 0.1138040846647963,
+          "p_value_vs_best_baseline": 0.9999999935253377
+        },
+        "market_trend": {
+          "n": 330,
+          "accuracy_all": 0.5636363636363636,
+          "coverage": 1.0,
+          "accuracy_covered": 0.5636363636363636,
+          "balanced_accuracy": 0.5497951582867784,
+          "p_value_covered_gt_50": 0.011931723124449418,
+          "up_rate": 0.5424242424242425,
+          "illustrative_long_cash_net_return": 0.4910850139175471,
+          "illustrative_weekly_max_drawdown": 0.13949146898868003,
+          "p_value_vs_best_baseline": 0.23657302913484166
+        },
+        "logreg": {
+          "n": 330,
+          "accuracy_all": 0.5333333333333333,
+          "coverage": 1.0,
+          "accuracy_covered": 0.5333333333333333,
+          "balanced_accuracy": 0.49702048417132216,
+          "p_value_covered_gt_50": 0.12381825246472133,
+          "up_rate": 0.5424242424242425,
+          "illustrative_long_cash_net_return": 0.31923638226147677,
+          "illustrative_weekly_max_drawdown": 0.25941361460475476,
+          "p_value_vs_best_baseline": 0.6509842031614854
+        },
+        "gbm": {
+          "n": 330,
+          "accuracy_all": 0.5212121212121212,
+          "coverage": 1.0,
+          "accuracy_covered": 0.5212121212121212,
+          "balanced_accuracy": 0.4934078212290503,
+          "p_value_covered_gt_50": 0.23713849301989842,
+          "up_rate": 0.5424242424242425,
+          "illustrative_long_cash_net_return": 0.3135585082608725,
+          "illustrative_weekly_max_drawdown": 0.19689969107260907,
+          "p_value_vs_best_baseline": 0.7964867127225057
+        }
+      },
+      "gate_pass": {
+        "momentum5": false,
+        "momentum60": false,
+        "reversal5": false,
+        "trend_ma50": false,
+        "trend_ma50_long_cash": false,
+        "dual_momentum": false,
+        "market_trend": false,
+        "logreg": false,
+        "gbm": false
+      }
+    }
+  }
+}
