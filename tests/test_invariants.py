@@ -123,6 +123,15 @@ class TestFrozenEvidence(unittest.TestCase):
         self.assertEqual(missing, [], 'Every benchmark write-up starts with a > [!WARNING] Experimental callout, so no '
                          'reader mistakes a measurement for advice.')
 
+    def test_linked_evidence_exists(self):
+        missing = []
+        for doc in [ROOT / 'README.md', *(ROOT / 'docs').rglob('*.md')]:
+            for target in re.findall(r'\]\(([^)#\s]+\.(?:json|jsonl|md|png))\)', doc.read_text(encoding='utf-8')):
+                if not target.startswith('http') and not (doc.parent / target).exists():
+                    missing.append(f'{doc.relative_to(ROOT)} -> {target}')
+        self.assertEqual(missing, [], 'A doc cites a result file that is not in the repo. Publish the compact report '
+                         'next to the write-up, or fix the link; claims must point at evidence a reader can open.')
+
     def test_private_state_is_ignored(self):
         ignored = set((ROOT / '.gitignore').read_text(encoding='utf-8').split())
         self.assertTrue({'data/', '.env', '.fabrika/'} <= ignored, 'data/ holds databases, traces, models and corpora; '
