@@ -7,7 +7,7 @@ import threading
 import unittest
 from pathlib import Path
 
-from core.trace import TraceRecorder
+from core.run_trace import TraceRecorder
 from ui.dashboard import DIST, create_server
 
 

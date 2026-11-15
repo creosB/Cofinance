@@ -24,7 +24,7 @@ from .memory import HybridMemory, LocalKeywordMemory, MemoryHit, context_from
 from .memory_items import ACTIVE as ITEM_ACTIVE, FORGOTTEN as ITEM_FORGOTTEN, NOTE_LIMIT, PENDING as ITEM_PENDING, MemoryLedger
 from .orchestrator import DataAnalystAgent, NewsResearcherAgent, TeamLeadOrchestrator
 from .signals import Item, Outcome, Judgment, Action
-from .trace import TraceRecorder, run_traced_team
+from .run_trace import TraceRecorder, run_traced_team
 
 GLINER_REVISION="9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90"
 UNIVERSE=set(DEFAULT_ALIASES.values())|{"SPY","QQQ","NFLX","INTC","COIN","PLTR","SOFI","F","BABA","RIVN","ADBE","ORCL","AVAX","ADA","DOGE","XRP","BNB","DOT","LINK"}
@@ -216,7 +216,7 @@ class ChatService:
                 self.models.load()
             router=self.router(job['query'],trace,cancel)
             # Always validate routing output and require explicit context when none exists.
-            from .trace import TracedExtractor
+            from .run_trace import TracedExtractor
             if isinstance(router,GlinerQueryRouter):
                 router=GlinerQueryRouter(TracedExtractor(router.backend,trace,'fastino/GLiNER2.5-Decide','Routing executive'),router.universe,router.aliases)
             routed=trace.call('Route conversational request','route',lambda:router.route(job['query']),actor='Routing executive',inputs={'query':job['query']})
@@ -747,7 +747,7 @@ class ChatService:
         from .gliner_decide import GlinerDecideClassifier
         from .news_service import FeedFetcher
         from .news_store import NewsStore
-        from .trace import run_traced_clock1
+        from .run_trace import run_traced_clock1
         def check():
             if cancel.is_set():raise Cancelled('News collection stopped.')
         store=None

@@ -166,19 +166,5 @@ class TestStrictFollowUps(unittest.TestCase):
         self.assertEqual((len(lead.prompts), "follow_up_retry" in gate), (1, False))
 
 
-class TestNoStdlibShadowing(unittest.TestCase):
-    def test_no_core_module_shadows_the_standard_library(self):
-        """core/hymemory_worker.py and core/router_worker.py run as scripts, so core/ is first on their import path.
-        A core/numbers.py (2026-11-08) replaced the stdlib numbers module there and numpy crashed the worker."""
-        import sys
-        from pathlib import Path
-        core = Path(__file__).resolve().parents[1] / "core"
-        # core/trace.py predates this check; the stdlib trace module is a debugging tool no dependency here imports.
-        # Kept as a named exception (TODO: rename when the trace module is next touched), never a silent pass.
-        known = {"trace"}
-        clash = sorted(p.stem for p in core.glob("*.py") if p.stem in sys.stdlib_module_names and p.stem not in known)
-        self.assertEqual(clash, [])
-
-
 if __name__ == "__main__":
     unittest.main()

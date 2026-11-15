@@ -4,7 +4,7 @@ import threading
 import unittest
 from pathlib import Path
 
-from core.trace import TraceRecorder,run_traced_team,run_traced_clock1
+from core.run_trace import TraceRecorder,run_traced_team,run_traced_clock1
 from core.orchestrator import DataAnalystAgent,NewsResearcherAgent,TeamLeadOrchestrator
 from core.gliner_decide import GlinerQueryRouter
 from core.signals import Item,Judgment

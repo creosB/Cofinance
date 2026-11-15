@@ -2,7 +2,7 @@
 
 Linear-inspired native CSS, not an official Linear component package.
 Preserves v1. No external assets, credentials, model calls, writes or remote binding.
-Trace producers: core.trace.run_traced_team / core.trace.run_traced_clock1.
+Trace producers: core.run_trace.run_traced_team / core.run_trace.run_traced_clock1.
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-from core.trace import TRACE_FORMAT, safe
+from core.run_trace import TRACE_FORMAT, safe
 
 ROOT = Path(__file__).resolve().parents[1]
 MAX_TRACE_BYTES = 16 * 1024 * 1024
