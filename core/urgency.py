@@ -2,8 +2,10 @@
 
 Why: on the 2026-11-08 corpus the urgency head ranked worse than random against labels (train AUC 0.37), and
 materiality scores never exceed ~0.66, so the current alert line could not fire. These rules flag event types that
-usually need attention within about a day. Status: candidate only. Written after reading the 2026-11-08 headlines,
-so its fit there is optimistic; it is NOT wired into SignalGate until it passes a fresh held-out corpus.
+usually need attention within about a day. Status: live in Clock 1 since 2026-11-08. A fresh held-out test on
+2026-11-16 FAILED (0 of 10 urgent caught): every miss was a leadership exit, an investigation or a major outage.
+v2 adds those three rules, written from the 11/08 train split plus the 11/16 corpus (both now dev data), so its fit
+there is optimistic. It needs a new fresh corpus (on or after 2026-11-23) before any pass claim.
 
 Input is the headline, plus the summary for official issuer feeds. HN text is a reader comment and is ignored.
 Every hit returns the rule name and the matched words, so a trace can show exactly why something was urgent.
@@ -28,11 +30,24 @@ RULES: Tuple[Tuple[str, str], ...] = (
     # Product or production stopped.
     ("production_stop", r"\b(?:ends?|ending|halts?|halting|suspends?|wind(?:s|ing)? down|stops?|discontinu\w+)\b.{0,30}\bproduction\b"
                         r"|\bpull(?:s|ing)? the plug\b|\brecalls? \d[\d,]* (?:vehicles|cars|units)\b"),
+    # Top leadership leaving or being pushed out (v2, 2026-11-16).
+    ("leadership_exit", r"\b(?:ceo|chief executive|cfo|chief financial officer|chair(?:man|woman)?)\b.{0,40}"
+                        r"\b(?:resign\w*|steps? down|stepping down|ousted|fired|departs?|departure|transition)\b"
+                        r"|\b(?:resign\w*|steps? down|stepping down|ousted|fired|replaced)\b.{0,30}\b(?:as )?(?:\w+ )?(?:ceo|chief executive|cfo)\b"
+                        r"|\b(?:oust|ousts|ousting)\b"),
+    # Board, regulator or criminal investigation opened, or outside counsel retained (v2).
+    ("investigation", r"\b(?:launch\w*|open\w*|initiat\w*|begins?|faces?|under|announces?)\b.{0,40}"
+                      r"\b(?:independent |internal |federal |criminal |sec |doj |antitrust )?(?:investigation|probe)\b"
+                      r"|\bretain\w*\b.{0,60}\b(?:u\.?s\.? attorney|outside counsel|law firm)\b"),
+    # Service outage that is broad or long (v2).
+    ("major_outage", r"\b(?:global|worldwide|nationwide|widespread|massive|major)\b.{0,20}\boutages?\b"
+                     r"|\bstill down after \d+ hours\b|\bstruggl\w* to restore\b"),
     # Trade or regulatory blocks with direct revenue effect.
     ("trade_block", r"\b(?:withholds?|withholding|blocks?|bans?|denies|rejects?|halts?)\b.{0,30}\b(?:import|export)s?\b.{0,20}\b(?:approval|licen[cs]es?)?"
                     r"|\b(?:import|export) (?:ban|curbs?|controls?)\b"),
 )
-NOT_URGENT = re.compile(r"\b(?:sets?|schedules?) (?:a )?conference call\b|\bto discuss (?:its )?financial results\b", re.I)
+NOT_URGENT = re.compile(r"\b(?:sets?|schedules?) (?:a )?conference call\b|\bto discuss (?:its )?financial results\b"
+                        r"|\bpost-?mortem\b|\blast year'?s\b|\b\d+ years ago\b", re.I)
 OFFICIAL = {"apple_newsroom", "nvidia_newsroom"}
 _COMPILED = tuple((name, re.compile(pattern, re.I)) for name, pattern in RULES)
 

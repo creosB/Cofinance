@@ -13,6 +13,14 @@ URGENT = [
     ('Toyota recalls 1,200,000 vehicles over airbag defect', 'production_stop'),
     ('China bans Micron chip imports for critical infrastructure', 'trade_block'),
     ('US blocks Nvidia exports to the Middle East pending licence review', 'trade_block'),
+    ('Boeing CEO steps down amid safety crisis', 'leadership_exit'),
+    ('Intel chief executive ousted by board after turnaround stalls', 'leadership_exit'),
+    ('Starbucks announces CEO transition effective immediately', 'leadership_exit'),
+    ('Activist investor moves to oust Disney chairman', 'leadership_exit'),
+    ('SEC opens investigation into Super Micro accounting', 'investigation'),
+    ('Board retains outside counsel to review executive conduct', 'investigation'),
+    ('AWS suffers widespread outage across US East', 'major_outage'),
+    ('Google Cloud still down after 9 hours', 'major_outage'),
 ]
 NOT_URGENT = [
     'NVIDIA Sets Conference Call for Third-Quarter Financial Results',
@@ -22,6 +30,12 @@ NOT_URGENT = [
     'Production designer leaves Apple TV series',
     'Why market cap is a misleading metric',
     'Tesla Roadster demo hits 60 mph in under a second',
+    'Former Apple CEO John Sculley shares leadership lessons',
+    'How CEO succession planning works at large companies',
+    'Ask HN: Is the Slack outage just me?',
+    'The investigation of a 1990s Unix bug',
+    "Postmortem of last year's major outage at Fastly",
+    'Ex-Google CFO joins startup board',
 ]
 
 
