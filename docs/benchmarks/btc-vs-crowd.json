@@ -1,0 +1,286 @@
+{
+  "format": "cofinance-btc-crowd/1",
+  "warning": "Experimental. Read-only comparison with recorded crowd prices. Not a trading signal or financial advice.",
+  "protocol_sha256": "3922721c9efe229d5f5ac08d671368fadea20bf79620743163ba5bc887ac4ad3",
+  "code_sha256": "804e96ff06d48481357ec2fde558e1baa4abc9c27a57ff31c0593a89c693c5d3",
+  "claim_rule": "An arm beats the crowd only if, at 24h on contested markets, the 95% date-clustered bootstrap interval of (arm Brier minus crowd Brier) is entirely below zero AND the point difference is below zero in both halves.",
+  "coverage": {
+    "markets": 3779,
+    "with_history": 3779,
+    "history_errors": 0
+  },
+  "spot_proxy_check": {
+    "markets": 3691,
+    "yahoo_matches_settlement": 0.9978325657003522,
+    "within_0.2pct_of_threshold": 62
+  },
+  "horizons": {
+    "24h": {
+      "missing": {
+        "no_crowd_price": 32,
+        "no_spot_or_vol": 385
+      },
+      "all": {
+        "n": 3362,
+        "days": 316,
+        "yes_rate": 0.4785841760856633,
+        "crowd": {
+          "brier": 0.03703611934860202,
+          "log_loss": 0.12276001460689095
+        },
+        "model": {
+          "brier": 0.03802677315296781,
+          "log_loss": 0.12707175047334965,
+          "brier_minus_crowd": 0.0009906538043657903,
+          "ci95_brier_minus_crowd": [
+            0.00025059139411054665,
+            0.0017502850293675916
+          ]
+        },
+        "blend": {
+          "brier": 0.03727488152465159,
+          "log_loss": 0.1235074913499371,
+          "brier_minus_crowd": 0.0002387621760495673,
+          "ci95_brier_minus_crowd": [
+            -0.0001227311579115166,
+            0.0006112955706338122
+          ]
+        },
+        "disagree_over_10pts": {
+          "n": 90,
+          "model_closer": 25
+        }
+      },
+      "contested": {
+        "n": 856,
+        "days": 309,
+        "yes_rate": 0.47897196261682246,
+        "crowd": {
+          "brier": 0.13403913697429906,
+          "log_loss": 0.41942873059375835
+        },
+        "model": {
+          "brier": 0.13784905348116622,
+          "log_loss": 0.432858362777841,
+          "brier_minus_crowd": 0.003809916506867156,
+          "ci95_brier_minus_crowd": [
+            0.0008002484685857854,
+            0.006865037181327612
+          ]
+        },
+        "blend": {
+          "brier": 0.1349776984495958,
+          "log_loss": 0.423810583630878,
+          "brier_minus_crowd": 0.0009385614752967508,
+          "ci95_brier_minus_crowd": [
+            -0.0005587351448563196,
+            0.002481253514858267
+          ]
+        },
+        "disagree_over_10pts": {
+          "n": 90,
+          "model_closer": 25
+        }
+      },
+      "by_half_contested": {
+        "first": {
+          "n": 392,
+          "days": 125,
+          "yes_rate": 0.4489795918367347,
+          "crowd": {
+            "brier": 0.13061655357142857,
+            "log_loss": 0.41051929178980945
+          },
+          "model": {
+            "brier": 0.1346529340247768,
+            "log_loss": 0.42290624350725725,
+            "brier_minus_crowd": 0.004036380453348226,
+            "ci95_brier_minus_crowd": [
+              0.0003728579310835552,
+              0.007882374798481459
+            ]
+          },
+          "blend": {
+            "brier": 0.1317778055661733,
+            "log_loss": 0.41506834666848463,
+            "brier_minus_crowd": 0.001161251994744733,
+            "ci95_brier_minus_crowd": [
+              -0.0006357728916685185,
+              0.003022808323622369
+            ]
+          },
+          "disagree_over_10pts": {
+            "n": 33,
+            "model_closer": 6
+          }
+        },
+        "second": {
+          "n": 464,
+          "days": 184,
+          "yes_rate": 0.5043103448275862,
+          "crowd": {
+            "brier": 0.13693062984913792,
+            "log_loss": 0.42695567027295656
+          },
+          "model": {
+            "brier": 0.1405492233667366,
+            "log_loss": 0.4412661876788514,
+            "brier_minus_crowd": 0.0036185935175986617,
+            "ci95_brier_minus_crowd": [
+              -0.0006478768712910131,
+              0.007904022635801821
+            ]
+          },
+          "blend": {
+            "brier": 0.1376810562304183,
+            "log_loss": 0.4311962665818655,
+            "brier_minus_crowd": 0.0007504263812803669,
+            "ci95_brier_minus_crowd": [
+              -0.0013425387756813626,
+              0.0028686359458206865
+            ]
+          },
+          "disagree_over_10pts": {
+            "n": 57,
+            "model_closer": 19
+          }
+        }
+      }
+    },
+    "6h": {
+      "missing": {
+        "no_spot_or_vol": 374
+      },
+      "all": {
+        "n": 3405,
+        "days": 318,
+        "yes_rate": 0.4828193832599119,
+        "crowd": {
+          "brier": 0.02456878443465492,
+          "log_loss": 0.08134607380867935
+        },
+        "model": {
+          "brier": 0.024557430791858438,
+          "log_loss": 0.08458587309191501,
+          "brier_minus_crowd": -1.1353642796481378e-05,
+          "ci95_brier_minus_crowd": [
+            -0.0007482575516035618,
+            0.0007011450370937141
+          ]
+        },
+        "blend": {
+          "brier": 0.024351393216905742,
+          "log_loss": 0.08114952049661078,
+          "brier_minus_crowd": -0.00021739121774917713,
+          "ci95_brier_minus_crowd": [
+            -0.0005945358656067515,
+            0.0001406939077113795
+          ]
+        },
+        "disagree_over_10pts": {
+          "n": 78,
+          "model_closer": 39
+        }
+      },
+      "contested": {
+        "n": 470,
+        "days": 299,
+        "yes_rate": 0.5,
+        "crowd": {
+          "brier": 0.15552307872340426,
+          "log_loss": 0.47434140949231446
+        },
+        "model": {
+          "brier": 0.15493561695859992,
+          "log_loss": 0.4809242219730157,
+          "brier_minus_crowd": -0.0005874617648043423,
+          "ci95_brier_minus_crowd": [
+            -0.00583215353377013,
+            0.004651378910808121
+          ]
+        },
+        "blend": {
+          "brier": 0.1537886122319925,
+          "log_loss": 0.4725063178315744,
+          "brier_minus_crowd": -0.0017344664914117625,
+          "ci95_brier_minus_crowd": [
+            -0.004373322332197295,
+            0.0008915980518702135
+          ]
+        },
+        "disagree_over_10pts": {
+          "n": 78,
+          "model_closer": 39
+        }
+      },
+      "by_half_contested": {
+        "first": {
+          "n": 218,
+          "days": 122,
+          "yes_rate": 0.481651376146789,
+          "crowd": {
+            "brier": 0.1498279116972477,
+            "log_loss": 0.4551384596764758
+          },
+          "model": {
+            "brier": 0.14853981476350953,
+            "log_loss": 0.45917548116670787,
+            "brier_minus_crowd": -0.0012880969337381865,
+            "ci95_brier_minus_crowd": [
+              -0.008713883650931573,
+              0.006076436790540843
+            ]
+          },
+          "blend": {
+            "brier": 0.14810990823866024,
+            "log_loss": 0.4529680104081326,
+            "brier_minus_crowd": -0.0017180034585874693,
+            "ci95_brier_minus_crowd": [
+              -0.005439603956261344,
+              0.0018655461039738112
+            ]
+          },
+          "disagree_over_10pts": {
+            "n": 23,
+            "model_closer": 10
+          }
+        },
+        "second": {
+          "n": 252,
+          "days": 177,
+          "yes_rate": 0.5158730158730159,
+          "crowd": {
+            "brier": 0.1604498501984127,
+            "log_loss": 0.49095348512665105
+          },
+          "model": {
+            "brier": 0.16046849346070194,
+            "log_loss": 0.4997386088610121,
+            "brier_minus_crowd": 1.8643262289230744e-05,
+            "ci95_brier_minus_crowd": [
+              -0.0075777384363165026,
+              0.007652834968055074
+            ]
+          },
+          "blend": {
+            "brier": 0.158701141877018,
+            "log_loss": 0.4894085044121709,
+            "brier_minus_crowd": -0.0017487083213947041,
+            "ci95_brier_minus_crowd": [
+              -0.005624330272019288,
+              0.00212735251157435
+            ]
+          },
+          "disagree_over_10pts": {
+            "n": 55,
+            "model_closer": 29
+          }
+        }
+      }
+    }
+  },
+  "claims": {
+    "model_beats_crowd": false,
+    "blend_beats_crowd": false
+  }
+}

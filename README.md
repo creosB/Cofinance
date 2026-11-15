@@ -158,6 +158,8 @@ The crowd was reasonably calibrated at 1 and 7 days. Cheap longshots won about a
 
 [Method, buckets and caveats](docs/benchmarks/POLYMARKET.md) · [Published calibration table](docs/benchmarks/polymarket-calibration.json)
 
+**Bitcoin: our model vs the crowd (experimental).** On 3,779 resolved "Bitcoin above $X" daily markets, a plain volatility model was measurably worse than the crowd a day before settlement (contested Brier 0.1378 vs 0.1340, interval excludes zero), and a 50/50 blend did not help. Six hours out they were indistinguishable. So the crowd price is the better reference; Cofinance does not show its own threshold odds. [Method and checks](docs/benchmarks/BTC_VS_CROWD.md)
+
 ## Safety and local data
 
 - **No hosted inference.** Model calls stay local; market providers and approved news/download sources still require network access.
