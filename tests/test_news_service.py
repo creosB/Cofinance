@@ -16,7 +16,7 @@ from core.market import MarketTools
 from core.news_service import FeedFetcher, coverage_note, feed_tickers, news_health
 from core.news_store import NewsStore
 from core.orchestrator import DataAnalystAgent, EventBus, market_fact_lines
-from core.trace import TraceRecorder, run_traced_clock1
+from core.run_trace import TraceRecorder, run_traced_clock1
 from core.gliner_decide import GlinerDecideClassifier, GlinerQueryRouter
 from tests.test_chat import FakeMarket
 from tests.test_orchestrator import StubGliner

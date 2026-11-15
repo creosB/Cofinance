@@ -5,7 +5,7 @@ import threading
 import unittest
 from pathlib import Path
 
-from core.trace import TraceRecorder
+from core.run_trace import TraceRecorder
 from ui.workbench import PAGE, create_server, list_runs, read_trace
 
 

@@ -19,6 +19,9 @@ reports/
 # Clock 1 SQLite store (incl. WAL sidecar files)
 data/
 
+# Local agent spend ledger written by tooling on this PC
+.fabrika/
+
 # Project-local dashboard dependencies and build output
 frontend/node_modules/
 frontend/dist/
