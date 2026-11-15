@@ -5,6 +5,10 @@
   python dev.py run --bg NAME -- python -m qualify.btc_crowd evaluate --root data/x
                                 any long job, detached, log in data/_logs/NAME.log
   python dev.py status          last result of every log in data/_logs (suite pass/fail, age, last line)
+  python dev.py news [--bg]     one Clock 1 collection over the official feeds (same path as the Collect button)
+  python dev.py forward record|score [--bg]
+                                weekly forward benchmark; record publishes docs/benchmarks/forward-ledger.jsonl
+  python dev.py dashboard       restart http://127.0.0.1:8878 when it is idle
 """
 from __future__ import annotations
 import argparse
@@ -76,6 +80,77 @@ def status():
         print(f'{p.stem:22s} {age // 60:4d} min ago  {summarize(p.read_text(encoding="utf-8", errors="replace"))}')
 
 
+FORWARD = {'record': ['record', '--root', 'data/forward_benchmark', '--publish', 'docs/benchmarks/forward-ledger.jsonl'],
+           'score': ['score', '--root', 'data/forward_benchmark']}
+
+
+def ignore_console_breaks():
+    """The bridge broadcasts Ctrl+C to the console group on timeout; a sealed record must not die halfway."""
+    import signal
+    for name in ('SIGINT', 'SIGBREAK'):
+        if hasattr(signal, name):
+            signal.signal(getattr(signal, name), signal.SIG_IGN)
+
+
+def forward(action):
+    ignore_console_breaks()
+    sys.argv = ['qualify.forward', *FORWARD[action]]
+    from qualify.forward import main as forward_main
+    forward_main()
+
+
+def collect_news():
+    import json
+    import uuid
+    ignore_console_breaks()
+    from core.chat_service import ChatService
+    svc = ChatService(ROOT)
+    try:
+        svc.collect_news(uuid.uuid4().hex)
+        started = time.time()
+        while svc.news_thread and svc.news_thread.is_alive() and time.time() - started < 900:
+            time.sleep(2)
+        snap = svc.news_snapshot()
+        print(json.dumps({k: snap.get(k) for k in ('phase', 'stage', 'error')}))
+    finally:
+        getattr(svc, 'close', lambda: None)()
+
+
+def dashboard_busy(state):
+    return bool(state and (state.get('active_job') or state['news']['phase'] == 'running' or
+                           state['models']['phase'] in ('downloading', 'verifying', 'qualifying', 'loading')))
+
+
+def dashboard_state(timeout=5):
+    import http.client
+    import json
+    try:
+        c = http.client.HTTPConnection('127.0.0.1', 8878, timeout=timeout)
+        c.request('GET', '/api/state', headers={'Host': '127.0.0.1:8878'})
+        return json.loads(c.getresponse().read())
+    except (OSError, ValueError):
+        return None
+
+
+def restart_dashboard():
+    state = dashboard_state()
+    if dashboard_busy(state):
+        raise SystemExit('Dashboard is busy (run, collection or model operation); not restarting.')
+    out = subprocess.run('netstat -ano', capture_output=True, text=True, shell=True).stdout
+    pids = {l.split()[-1] for l in out.splitlines() if '127.0.0.1:8878' in l and 'LISTENING' in l}
+    for pid in pids:
+        subprocess.run(['taskkill', '/PID', pid, '/T', '/F'], capture_output=True)
+    e = env()
+    e.pop('COFINANCE_MEMORY', None)
+    subprocess.Popen(['cmd.exe', '/k', 'run-dashboard.cmd'], cwd=ROOT, env=e, creationflags=subprocess.CREATE_NEW_CONSOLE)
+    for _ in range(60):
+        time.sleep(1)
+        if dashboard_state(timeout=2) is not None:
+            print('dashboard is up at http://127.0.0.1:8878; old pids', sorted(pids))
+            return
+    raise SystemExit('Dashboard did not answer within 60 s; check its console window.')
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog='dev.py')
     sub = ap.add_subparsers(dest='cmd', required=True)
@@ -87,9 +162,25 @@ def main(argv=None):
     r.add_argument('name')
     r.add_argument('argv', nargs=argparse.REMAINDER)
     sub.add_parser('status')
+    n = sub.add_parser('news')
+    n.add_argument('--bg', action='store_true')
+    f = sub.add_parser('forward')
+    f.add_argument('action', choices=sorted(FORWARD))
+    f.add_argument('--bg', action='store_true')
+    sub.add_parser('dashboard')
     a = ap.parse_args(argv)
     if a.cmd == 'status':
         return status()
+    if a.cmd == 'dashboard':
+        return restart_dashboard()
+    if a.cmd in ('news', 'forward'):
+        name = 'news_collect' if a.cmd == 'news' else f'forward_{a.action}'
+        if a.bg:
+            rest = [] if a.cmd == 'news' else [a.action]
+            start_detached([sys.executable if ' ' not in sys.executable else 'python', 'dev.py', a.cmd, *rest], log_path(name))
+            print(f'{name} started in the background: python dev.py status')
+            return
+        return collect_news() if a.cmd == 'news' else forward(a.action)
     if a.cmd == 'test':
         cmd = [sys.executable, '-m', 'unittest', a.pattern] if a.pattern else SUITE
         if a.bg:

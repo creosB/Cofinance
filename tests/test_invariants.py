@@ -138,6 +138,27 @@ class TestFrozenEvidence(unittest.TestCase):
                         '.env holds secrets; .fabrika/ is a local agent spend ledger. None of them may be committed.')
 
 
+EXCUSE_WORDS = re.compile(r'(?:#|//).*\b(?:hack|workaround|work around|for now|temporary fix|kludge|fixme|xxx)\b', re.I)
+TIMER_CALL = re.compile(r'\b(?:setTimeout|setInterval|requestAnimationFrame|requestIdleCallback)\(')
+TIMER_BUDGET = 12   # 2026-11-16 baseline: polling loops, request timeouts and focus restore. Lower it, never raise it silently.
+
+
+class TestCodeHygiene(unittest.TestCase):
+    def test_no_comments_that_excuse_workarounds(self):
+        code = [p for base in V2_CODE for p in files(base, '.py', '.ts', '.tsx') if '.test.' not in p.name]
+        hits = [f'{p.relative_to(ROOT)}:{i}' for p in code
+                for i, line in enumerate(p.read_text(encoding='utf-8', errors='ignore').splitlines(), 1) if EXCUSE_WORDS.search(line)]
+        self.assertEqual(hits, [], 'A comment that excuses a workaround gets copied by the next agent. Fix the root cause, '
+                         'or turn the constraint into a named check and delete the comment.')
+
+    def test_ui_timer_count_does_not_grow(self):
+        n = sum(len(TIMER_CALL.findall(p.read_text(encoding='utf-8'))) for p in files('frontend/src', '.ts', '.tsx')
+                if '.test.' not in p.name)
+        self.assertLessEqual(n, TIMER_BUDGET, f'{n} timer calls in frontend/src (budget {TIMER_BUDGET}). Timers used to '
+                             'patch ordering bugs cause jank and GC churn. Use an event, an effect cleanup or the existing '
+                             'polling hooks in lib/use-chat.ts and lib/use-dashboard.ts.')
+
+
 class TestWriting(unittest.TestCase):
     def test_no_em_or_en_dashes_in_docs_or_ui(self):
         targets = [ROOT / 'README.md', ROOT / 'TODO.md', ROOT / 'frontend/README.md', *(ROOT / 'docs').rglob('*.md'),

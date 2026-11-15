@@ -21,6 +21,18 @@ class TestDevCli(unittest.TestCase):
         self.assertEqual(dev.summarize('Ran 3 tests in 0.1s\n\nFAILED (failures=1)\n'), 'FAILED (failures=1) (3 tests, 0 s)')
         self.assertEqual(dev.summarize('collect done\n'), 'collect done')
 
+    def test_forward_record_always_publishes_the_public_ledger(self):
+        self.assertEqual(dev.FORWARD['record'][-2:], ['--publish', 'docs/benchmarks/forward-ledger.jsonl'])
+        self.assertNotIn('--publish', dev.FORWARD['score'])
+
+    def test_dashboard_restart_waits_for_idle(self):
+        idle = {'active_job': None, 'news': {'phase': 'idle'}, 'models': {'phase': 'downloaded'}}
+        self.assertFalse(dev.dashboard_busy(idle))
+        self.assertFalse(dev.dashboard_busy(None))             # not running: safe to start
+        self.assertTrue(dev.dashboard_busy(dict(idle, active_job='run-1')))
+        self.assertTrue(dev.dashboard_busy(dict(idle, news={'phase': 'running'})))
+        self.assertTrue(dev.dashboard_busy(dict(idle, models={'phase': 'qualifying'})))
+
 
 if __name__ == '__main__':
     unittest.main()
