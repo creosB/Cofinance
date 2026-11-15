@@ -1,0 +1,108 @@
+"""Project CLI for routine local work. Each command replaces an agent fact that used to be rediscovered by hand.
+
+  python dev.py test            run the backend suite in the foreground (no-network guard on)
+  python dev.py test --bg       same, detached, log in data/_logs/suite.log (survives a 60 s bridge timeout)
+  python dev.py run --bg NAME -- python -m qualify.btc_crowd evaluate --root data/x
+                                any long job, detached, log in data/_logs/NAME.log
+  python dev.py status          last result of every log in data/_logs (suite pass/fail, age, last line)
+"""
+from __future__ import annotations
+import argparse
+import os
+import re
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+LOGS = ROOT / 'data' / '_logs'
+SUITE = [sys.executable, '-m', 'unittest', 'discover', '-s', 'tests', '-t', '.']
+NAME = re.compile(r'^[a-z0-9_]{1,40}$')
+
+
+def env():
+    e = dict(os.environ)
+    e.update(PYTHONPATH='.', PYTHONIOENCODING='utf-8')
+    return e
+
+
+def log_path(name):
+    if not NAME.match(name):
+        raise SystemExit('Log names use a-z, 0-9 and _ only.')
+    LOGS.mkdir(parents=True, exist_ok=True)
+    return LOGS / f'{name}.log'
+
+
+def quote(arg):
+    return '"' + arg + '"' if (' ' in arg or not arg) else arg
+
+
+def detached_command(argv, log):
+    """cmd line for a job that outlives the calling shell and writes everything to its log."""
+    inner = ' '.join(quote(a) for a in argv)
+    return f'cmd /c cd /d {quote(str(ROOT))} && set PYTHONPATH=.&& set PYTHONIOENCODING=utf-8&& {inner} > {quote(str(log))} 2>&1'
+
+
+def start_detached(argv, log):
+    log.write_text(f'started {time.strftime("%Y-%m-%d %H:%M:%S")}: {" ".join(argv)}\n', encoding='utf-8')
+    line = detached_command(argv, log)
+    if os.name == 'nt':
+        # WMI starts the process outside the bridge's process tree, so a request timeout cannot kill it.
+        r = subprocess.run(['wmic', 'process', 'call', 'create', line], capture_output=True, text=True)
+        if 'ReturnValue = 0' in r.stdout:
+            return
+        flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+        subprocess.Popen(line, shell=True, creationflags=flags, stdin=subprocess.DEVNULL, close_fds=True)
+    else:
+        subprocess.Popen(['sh', '-c', line.replace('cmd /c ', '')], start_new_session=True, stdin=subprocess.DEVNULL)
+
+
+def summarize(text):
+    ran = re.findall(r'Ran (\d+) tests? in ([\d.]+)s', text)
+    result = re.findall(r'^(OK.*|FAILED.*)$', text, flags=re.M)
+    if ran and result:
+        return f'{result[-1]} ({ran[-1][0]} tests, {float(ran[-1][1]):.0f} s)'
+    lines = [l for l in text.splitlines() if l.strip() and 'ScriptRunContext' not in l]
+    return (lines[-1][:160] if lines else '(empty)')
+
+
+def status():
+    if not LOGS.exists():
+        print('No logs yet.')
+        return
+    for p in sorted(LOGS.glob('*.log'), key=lambda p: p.stat().st_mtime, reverse=True):
+        age = int(time.time() - p.stat().st_mtime)
+        print(f'{p.stem:22s} {age // 60:4d} min ago  {summarize(p.read_text(encoding="utf-8", errors="replace"))}')
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(prog='dev.py')
+    sub = ap.add_subparsers(dest='cmd', required=True)
+    t = sub.add_parser('test')
+    t.add_argument('--bg', action='store_true')
+    t.add_argument('pattern', nargs='?', help='optional test module, e.g. tests.test_invariants')
+    r = sub.add_parser('run')
+    r.add_argument('--bg', action='store_true', required=True)
+    r.add_argument('name')
+    r.add_argument('argv', nargs=argparse.REMAINDER)
+    sub.add_parser('status')
+    a = ap.parse_args(argv)
+    if a.cmd == 'status':
+        return status()
+    if a.cmd == 'test':
+        cmd = [sys.executable, '-m', 'unittest', a.pattern] if a.pattern else SUITE
+        if a.bg:
+            start_detached(cmd, log_path('suite'))
+            print('suite started in the background: python dev.py status')
+            return
+        raise SystemExit(subprocess.call(cmd, cwd=ROOT, env=env()))
+    job = [x for x in a.argv if x != '--']
+    if not job:
+        raise SystemExit('Give the command after --')
+    start_detached(job, log_path(a.name))
+    print(f'{a.name} started in the background: python dev.py status')
+
+
+if __name__ == '__main__':
+    main()
