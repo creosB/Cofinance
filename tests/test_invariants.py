@@ -68,6 +68,48 @@ class TestArchitecture(unittest.TestCase):
                          'the approved hosts.')
 
 
+V1_PACKAGES = {'agents', 'tools', 'storage', 'app'}
+V1_UI = {'layout', 'styles'}          # ui/layout.py and ui/styles.py belong to the v1 Streamlit app (app.py)
+CORE_MAY_IMPORT_FROM_QUALIFY = {'qualify.decide_eval', 'qualify.run', 'qualify.scorers'}
+
+
+def imported(path):
+    for node in ast.walk(ast.parse(path.read_text(encoding='utf-8'))):
+        if isinstance(node, ast.Import):
+            yield from ((a.name, node.lineno) for a in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            yield node.module, node.lineno
+
+
+class TestBoundaries(unittest.TestCase):
+    def test_v2_never_imports_v1(self):
+        v2 = [*(ROOT / 'core').glob('*.py'), *(ROOT / 'qualify').glob('*.py'),
+              *(p for p in (ROOT / 'ui').glob('*.py') if p.stem not in V1_UI)]
+        bad = [f'{p.relative_to(ROOT)}:{line} {name}' for p in v2 for name, line in imported(p)
+               if name.split('.')[0] in V1_PACKAGES or name in {f'ui.{m}' for m in V1_UI}]
+        self.assertEqual(bad, [], 'v1 (app.py, agents/, tools/, storage/, ui/layout.py, ui/styles.py) is kept as history. '
+                         'v2 must not depend on it; copy what you need into core/ and test it there.')
+
+    def test_core_stays_headless(self):
+        bad = []
+        for p in (ROOT / 'core').glob('*.py'):
+            for name, line in imported(p):
+                top = name.split('.')[0]
+                if top == 'ui' or (top == 'qualify' and name not in CORE_MAY_IMPORT_FROM_QUALIFY):
+                    bad.append(f'{p.relative_to(ROOT)}:{line} {name}')
+        self.assertEqual(bad, [], 'core/ is the headless engine: it never imports ui/, and from qualify/ only the '
+                         'qualification gates (run, scorers, decide_eval). Move shared code into core/ instead.')
+
+    def test_tests_cannot_reach_the_network(self):
+        import os
+        import socket
+        if os.environ.get('COFINANCE_NETWORK_TESTS') == '1':
+            self.skipTest('live network checks opted in')
+        with self.assertRaises(RuntimeError, msg='The no-network guard is not installed. Run the suite as '
+                               '`python -m unittest discover -s tests -t .` so tests/__init__.py is imported.'):
+            socket.getaddrinfo('example.com', 443)
+
+
 class TestFrozenEvidence(unittest.TestCase):
     def test_qualification_inputs_are_unchanged(self):
         changed = [rel for rel, sha in FROZEN.items()
