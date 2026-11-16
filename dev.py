@@ -151,6 +151,14 @@ def restart_dashboard():
     raise SystemExit('Dashboard did not answer within 60 s; check its console window.')
 
 
+def features():
+    import json
+    data = json.loads((ROOT / 'docs' / 'feature-map.json').read_text(encoding='utf-8'))
+    for f in data['features']:
+        live = f'  live: {f["live"]}' if f.get('live') else ''
+        print(f'{f["id"]:14s} {f["view"]:10s} {f["name"]}\n{"":25s}proof: {", ".join(f["proof"])}{live}')
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog='dev.py')
     sub = ap.add_subparsers(dest='cmd', required=True)
@@ -168,9 +176,12 @@ def main(argv=None):
     f.add_argument('action', choices=sorted(FORWARD))
     f.add_argument('--bg', action='store_true')
     sub.add_parser('dashboard')
+    sub.add_parser('features')
     a = ap.parse_args(argv)
     if a.cmd == 'status':
         return status()
+    if a.cmd == 'features':
+        return features()
     if a.cmd == 'dashboard':
         return restart_dashboard()
     if a.cmd in ('news', 'forward'):
