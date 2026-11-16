@@ -101,7 +101,25 @@ class TestBackgroundJobs(unittest.TestCase):
         import os
         if os.name != 'nt':
             self.skipTest('Windows launch path')
-        dev.start_detached([dev.PY, '-c', "print('hello from the background')"], dev.log_path('e2e'))
+        pid = dev.start_detached([dev.PY, '-c', "print('hello from the background')"], dev.log_path('e2e'))
+        self.assertIsInstance(pid, int)
+        # The exit marker precedes interpreter/shell teardown. Wait on the actual process before deleting its log.
+        import ctypes
+        from ctypes import wintypes
+        kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+        kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        kernel.OpenProcess.restype = wintypes.HANDLE
+        kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        kernel.WaitForSingleObject.restype = wintypes.DWORD
+        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        kernel.CloseHandle.restype = wintypes.BOOL
+        handle = kernel.OpenProcess(0x00100000, False, pid)
+        if handle:
+            self.addCleanup(kernel.CloseHandle, handle)
+            self.addCleanup(lambda: self.assertEqual(kernel.WaitForSingleObject(handle, 10000), 0,
+                                                     'Background shell did not release its log before cleanup'))
+        else:
+            self.assertEqual(ctypes.get_last_error(), 87, 'Could not open the launched process for cleanup')
         self.assertEqual(dev.wait('e2e', 30, tick=.2), 0)
         text = dev.log_path('e2e').read_text(encoding='utf-8')
         self.assertIn('hello from the background', text)

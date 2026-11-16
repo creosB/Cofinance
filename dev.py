@@ -117,11 +117,11 @@ def start_detached(argv, log):
         # WMI starts the process outside the bridge's process tree, so a request timeout cannot kill it.
         r = subprocess.run(['wmic', 'process', 'call', 'create', line], capture_output=True, text=True)
         if 'ReturnValue = 0' in r.stdout:
-            return
+            return int(re.search(r'ProcessId\s*=\s*(\d+)', r.stdout).group(1))
         flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
-        subprocess.Popen(line, shell=True, creationflags=flags, stdin=subprocess.DEVNULL, close_fds=True)
+        return subprocess.Popen(line, shell=True, creationflags=flags, stdin=subprocess.DEVNULL, close_fds=True).pid
     else:
-        subprocess.Popen(['sh', '-c', line.replace('cmd /c ', '')], start_new_session=True, stdin=subprocess.DEVNULL)
+        return subprocess.Popen(['sh', '-c', line.replace('cmd /c ', '')], start_new_session=True, stdin=subprocess.DEVNULL).pid
 
 
 def summarize(text):
