@@ -64,6 +64,15 @@ VARIANTS = {
 # v2, lever 1 (structure): same as v1, but the Data Analyst's reply ends at its first blank line. Dev diagnosis on v1:
 # LFM3 wrote the summary as paragraph one, then restated the facts until the 256-token cap (51 of 72 cases).
 VARIANTS['v2'] = {**VARIANTS['v1'], 'analyst_stop': ['\n\n']}
+# v3, lever 2 (guidance): same as v2, but Decision gets a symmetric counting rubric instead of a bare question.
+# v1 and v2 began every Decision reply with UP. Written before any v3 number; judged on balanced accuracy against
+# always-UP (0.500) with coverage reported, because ABSTAIN is now a real option.
+VARIANTS['v3'] = {**VARIANTS['v2'], 'decision_system': (
+    'You are [Decision], the last step of a research team. You get the team\'s accepted answer and its two '
+    'specialist reports about one asset, based on the latest market close. Decide the direction over the next five '
+    'US market sessions. Do not assume prices usually rise. Count only these signals: the last session change '
+    '(up is +1, down is -1), and each accepted headline marked bullish (+1) or bearish (-1). Add them. If the total '
+    'is above zero reply UP, below zero reply DOWN, zero or no signals reply ABSTAIN. Reply with exactly one word.')}
 
 
 def symbol(t):

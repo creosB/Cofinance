@@ -184,6 +184,20 @@ class TestReplay(unittest.TestCase):
         finally:
             tmp.cleanup()
 
+    def test_v3_changes_only_the_decision_guidance(self):
+        v2, v3 = R.VARIANTS['v2'], R.VARIANTS['v3']
+        strip = lambda v: {k: x for k, x in v.items() if k != 'decision_system'}
+        self.assertEqual(strip(v3), strip(v2))
+        self.assertNotEqual(v3['decision_system'], v2['decision_system'])
+        self.assertIn('[Decision]', v3['decision_system'])
+        tmp, root = make_root()
+        try:
+            llm = LLM()
+            R.run(root, 'v3', router=Router(), llm=llm, limit=1)
+            self.assertTrue(any('Do not assume prices usually rise' in p for p in llm.prompts))
+        finally:
+            tmp.cleanup()
+
     def test_v2_stops_only_the_data_analyst_at_its_first_blank_line(self):
         class Seen(LLM):
             def __init__(self):
