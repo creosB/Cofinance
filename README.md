@@ -192,7 +192,7 @@ For frontend development, run the Python server, then `npm run dev` in `frontend
 
 ## Open work
 
-The source of truth is [TODO.md](TODO.md), not a claim that v2 is finished. Main remaining gaps:
+v2 is not finished. The working to-do list lives in the maintainer's private roadmap; the main remaining gaps are:
 
 - Human-reviewed labels, two additional real traps, reliable calibration and a fresh rule-urgency test on or after **2026-11-15**. Current rules are live, but not yet validated on that fresh corpus.
 - Repair the d1 compatibility blocker (needs a newer Transformers, which needs approval) before comparing optional judges or cascades. Jev now has a valid train-split score, but it is too slow and its scores too compressed to adopt.

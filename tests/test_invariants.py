@@ -161,7 +161,7 @@ class TestCodeHygiene(unittest.TestCase):
 
 class TestWriting(unittest.TestCase):
     def test_no_em_or_en_dashes_in_docs_or_ui(self):
-        targets = [ROOT / 'README.md', ROOT / 'TODO.md', ROOT / 'frontend/README.md', *(ROOT / 'docs').rglob('*.md'),
+        targets = [ROOT / 'README.md', ROOT / 'frontend/README.md', *(ROOT / 'docs').rglob('*.md'),
                    *files('frontend/src', '.tsx', '.ts')]
         hits = sorted(str(p.relative_to(ROOT)) for p in targets if p.exists() and DASHES.search(p.read_text(encoding='utf-8')))
         self.assertEqual(hits, [], 'Em and en dashes render badly in chat clients and read as machine prose. Use a '

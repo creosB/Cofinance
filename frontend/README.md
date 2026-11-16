@@ -1,6 +1,6 @@
 # Cofinance local research workspace
 
-The implementation checklist and remaining original milestones are in [TODO.md](../TODO.md).
+Open work is listed in the main [README](../README.md#open-work).
 This is a working interactive slice, not a calibrated or fully complete finance-research product.
 
 ## Start on Windows
