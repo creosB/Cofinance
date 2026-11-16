@@ -95,7 +95,7 @@ The 91-row training split has AI-generated labels, not human ground truth. Its h
 | Arm | Observed outcome | Meaning |
 | --- | --- | --- |
 | GLiNER alone | 72.5% materiality accuracy; macro-F1 0.667; AUC 0.790; 0 request errors | Provisional training baseline, not production accuracy |
-| MiniCPM5-2B-Jev | 91/91 requests timed out under the current request budget | Integration/runtime failure; no valid quality comparison |
+| MiniCPM5-2B-Jev | 91/91 requests timed out under the 10 s request budget. A 3-row probe on 2026-11-16 measured about 72 s per request (p95 89 s) on this CPU | Budget was far too short; the arm is a slow judge, and its quality is still unmeasured |
 | d1-2B | Load failed due to an incompatible Transformers import | Blocked before inference; no quality score |
 
 No judge replacement has been adopted. Downloaded model files are pinned and checksum-verified; that is not the same as a working, qualified model.

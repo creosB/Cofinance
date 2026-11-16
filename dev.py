@@ -117,6 +117,8 @@ def summarize(text):
 
 
 def status():
+    # Logs hold arbitrary job output; a cp1252 pipe (| findstr) must not crash the listing.
+    sys.stdout.reconfigure(errors='replace')
     if not LOGS.exists():
         print('No logs yet.')
         return

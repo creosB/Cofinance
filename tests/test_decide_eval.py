@@ -1,6 +1,7 @@
 import unittest
+from unittest import mock
 from core.signals import Judgment
-from qualify.decide_eval import adopt_adjudicator, ece, evaluate_classifier, load_rows
+from qualify.decide_eval import adopt_adjudicator, build_arm, ece, evaluate_classifier, load_rows
 from qualify.scorers import score, sentence_count
 
 
@@ -50,6 +51,21 @@ class TestDecideEval(unittest.TestCase):
         self.assertTrue(adopt_adjudicator(base, {"macro_f1": 0.71, "false_alert_rate": 0.06, "errors": 0})["adopt"])
         self.assertFalse(adopt_adjudicator(base, {"macro_f1": 0.72, "false_alert_rate": 0.09, "errors": 0})["adopt"])
         self.assertFalse(adopt_adjudicator(base, {"macro_f1": 0.80, "false_alert_rate": 0.12, "errors": 0})["adopt"])
+
+    def test_http_judge_gets_the_request_timeout(self):
+        # A CPU judge can need minutes per request; a fixed 10 s made every Jev row time out (91 of 91).
+        seen = []
+
+        def fake_transport(url, timeout=10.0, **kw):
+            seen.append((url, timeout))
+            return lambda *a, **k: {}
+
+        with mock.patch("core.systemone.http_transport", fake_transport):
+            build_arm("systemone=http://127.0.0.1:8013")
+            build_arm("systemone=http://127.0.0.1:8013", request_timeout=240.0)
+            build_arm("cascade:systemone=http://127.0.0.1:8013+systemone=http://127.0.0.1:8014",
+                      request_timeout=90.0)
+        self.assertEqual([t for _, t in seen], [10.0, 240.0, 90.0, 90.0])
 
     def test_seed_headlines(self):
         rows = load_rows("qualify/headlines.jsonl")

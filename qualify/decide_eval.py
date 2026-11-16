@@ -107,17 +107,18 @@ def adopt_adjudicator(baseline: Dict[str, Any], candidate: Dict[str, Any],
             "regression": regress}
 
 
-def build_arm(spec: str, d1_revision: Optional[str] = None) -> Any:
+def build_arm(spec: str, d1_revision: Optional[str] = None, request_timeout: float = 10.0) -> Any:
     if spec.startswith("cascade:"):
         from core.cascade import CascadeClassifier
         a, b = spec[len("cascade:"):].split("+", 1)
-        return CascadeClassifier(build_arm(a, d1_revision), build_arm(b, d1_revision), GateConfig())
+        return CascadeClassifier(build_arm(a, d1_revision, request_timeout),
+                                 build_arm(b, d1_revision, request_timeout), GateConfig())
     if spec == "gliner":
         from core.gliner_decide import GlinerDecideClassifier
         return GlinerDecideClassifier.from_pretrained()
     from core.systemone import SystemOneClient, SystemOneSignalClassifier, http_transport, inprocess_transport
     if spec.startswith("systemone="):
-        return SystemOneSignalClassifier(SystemOneClient(http_transport(spec.split("=", 1)[1])))
+        return SystemOneSignalClassifier(SystemOneClient(http_transport(spec.split("=", 1)[1], timeout=request_timeout)))
     if spec == "d1":
         if not d1_revision:
             raise SystemExit("d1 loads remote code: pass --d1-revision <commit sha> to pin it")
@@ -136,6 +137,8 @@ def main() -> int:
     ap.add_argument("--data", default="qualify/headlines.jsonl")
     ap.add_argument("--out", default="")
     ap.add_argument("--d1-revision", default=None)
+    ap.add_argument("--request-timeout", type=float, default=10.0,
+                    help="seconds per request to a systemone HTTP judge (CPU judges can need minutes)")
     ap.add_argument("--compare", nargs=2, metavar=("BASELINE", "CANDIDATE"))
     a = ap.parse_args()
     if a.compare:
@@ -145,7 +148,7 @@ def main() -> int:
                 reports.append(json.load(f))
         print(json.dumps(adopt_adjudicator(*reports), indent=2))
         return 0
-    clf = build_arm(a.arm, a.d1_revision)
+    clf = build_arm(a.arm, a.d1_revision, a.request_timeout)
     rep = evaluate_classifier(clf, load_rows(a.data))
     rep["arm"] = a.arm
     if hasattr(clf, "routes"):
