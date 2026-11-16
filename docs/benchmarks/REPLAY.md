@@ -57,10 +57,31 @@ SPY sessions 2026-10-27 to 2026-11-06 (after LFM3's release on 10/27), 9 origins
 
 **Verdict:** a clean pipeline win and no change in the call. The accuracy step is the error moving from one case to another (11/06 TSLA in v1, 11/04 GOOGL in v2), not a better decision: v2 is still exactly always-UP. The stop is now the live default for the Data Analyst (replay v1 passes no stop, so it stays reproducible). [v2 result file](replay-v2-2026-11-16.json)
 
-## Next levers (one at a time, same window)
+## Variant v3, lever 2: a counting rubric for Decision (sealed 2026-11-17): failed
 
-2. **Decision guidance:** a rubric that weighs trend, drawdown and news direction, with ABSTAIN allowed. Every Decision reply in v1 and v2 began with UP.
-3. **Parallel views:** a bull and a bear reader before Decision.
+v3 is v2 plus a new Decision prompt, committed before any v3 output: count the last session change (+1 up, -1 down) and each bullish (+1) or bearish (-1) headline; above zero UP, below zero DOWN, zero ABSTAIN; do not assume prices usually rise. Judged on balanced accuracy against always-UP (0.500).
+
+| | v2 | v3 |
+| --- | --- | --- |
+| Calls | 71 UP, 1 error | **0 UP, 0 DOWN, 63 ABSTAIN, 9 errors** |
+| Coverage | 98.6% | **0%** |
+| Balanced accuracy | 0.500 | 0.000 |
+| Agreed with the rubric computed in Python | n/a | 11 of 72 (only cases where the rubric also abstains) |
+
+**Verdict: not adopted.** LFM3 did not count; it swapped one default (UP) for another (ABSTAIN). The 9 errors are replies that began reasoning ("We need to...") instead of the one-word answer. For reference, the rubric itself, computed in Python while v3 ran, is right on 26 of the 59 cases it calls (44%) in this window, so even perfect adherence would not have beaten always-UP here. The rubric was not changed after that number was seen. [v3 result file](replay-v3-2026-11-17.json)
+
+**What this says about structure:** a 1.7B narrator does not do arithmetic on its own reports. That matches the project rule that Python owns policy and models only classify or narrate. The Decision step asks the model to decide, which is the one place the design breaks that rule.
+
+## What the window can and cannot tell us
+
+72 cases from nine overlapping days, in a falling market, cannot separate good levers from lucky ones: momentum's 52.8% comes from two assets that fell all window. Pipeline health (fallbacks, guard passes, errors, speed) is measured cleanly here; direction accuracy needs more independent weeks.
+
+## Next
+
+1. **Memorization probe** on LFM3 for older windows, which would allow a longer price history (older news still needs a historical source).
+2. **Structure:** the model classifies each signal; Python adds them into the call.
+3. **Data:** a trend fact (20-session change) for the Data Analyst, which the team does not see today.
+4. **Parallel views:** a bull and a bear reader before Decision.
 
 ## Limits
 
