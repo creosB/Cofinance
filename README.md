@@ -132,6 +132,13 @@ To iterate fast without fooling ourselves, the lab reuses the same target on 2,8
 
 **Risk lab (experimental, 2026-11-16).** Same cases, a risk target instead of direction. As a forecast of how big next week's move will be, 20-session volatility was *worse* than each asset's usual risk (failed on dev and validation; the test stayed closed). As a flag, it passed a rule fixed before the look: on the unseen test split (opened once, logged), weeks flagged as elevated had bigger-than-usual moves 31.6% of the time vs 15.4% otherwise (p 0.014). It was fragile (57 flagged cases, mostly MSFT), so it was rechecked once on nine new assets with a rule fixed before their prices were fetched: the pooled flag passed again (34.4% vs 27.0%, p 0.015) but only 5 of 9 assets agreed, and 6 were required. **Not confirmed; no risk flag is shown in chat.** Not a trading signal. [Method, result and caveats](docs/benchmarks/RISK_LAB.md)
 
+### Replay benchmark: the full system at past dates
+
+> [!WARNING]
+> **Experimental, dev window.** Tuning on this window is expected; no claim rests on it. Not a trading signal or financial advice.
+
+The local models are offline, so the whole live pipeline (router, Data Analyst, News Researcher, Team Lead, guards) can be run at a past date T with prices and gated news cut at T, then scored on the next five sessions. This is the measurement every guidance, parallelism and structure change is judged by. **v1 (72 cases, 10/27 to 11/06, 8 assets):** the system said UP on 71 of 72 (one error), 41.7% correct, the same as always-UP (43.1%) in a falling window; momentum20 got 52.8%, carried by NVDA and BTC falling all window. The Data Analyst ran out of tokens in 51 of 72 cases. 0 leaks. [Method, result and levers](docs/benchmarks/REPLAY.md) · [Result file](docs/benchmarks/replay-v1-2026-11-16.json)
+
 ### Forward benchmark (started 2026-11-09)
 
 > [!WARNING]

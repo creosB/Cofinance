@@ -294,8 +294,30 @@ def calendar_closes(bars, spy_dates, origin, n=21):
 
 
 def parse_label(text):
-    t = (text or '').strip().upper().rstrip('.')
-    return t if t in LABELS else 'ERROR'
+    """The label is the reply's first word (UP, DOWN or ABSTAIN); anything else is an error."""
+    words = (text or '').strip().upper().split()
+    first = words[0].strip('.,:;!*"\'') if words else ''
+    return first if first in LABELS else 'ERROR'
+
+
+AGENTS = ('Data Analyst', 'News Researcher', 'Market Team Lead', 'Decision')
+
+
+class Recorder:
+    """Wraps the narrator and logs each call (agent, ok or error, start of the reply), so fallbacks are visible."""
+
+    def __init__(self, llm):
+        self.llm, self.calls = llm, []
+
+    def complete(self, system, prompt, *, max_tokens=256, **kw):
+        agent = next((a for a in AGENTS if f'[{a}]' in system), 'other')
+        try:
+            text = self.llm.complete(system, prompt, max_tokens=max_tokens, **kw)
+            self.calls.append({'agent': agent, 'ok': True, 'text': (text or '')[:160]})
+            return text
+        except Exception as exc:
+            self.calls.append({'agent': agent, 'ok': False, 'error': f'{type(exc).__name__}: {exc}'[:120]})
+            raise
 
 
 def decision_prompt(query, res):
@@ -326,13 +348,13 @@ def run(root, variant, *, router, llm, clock=time.time, limit=None):
             if limit is not None and made >= limit:
                 return {'stopped_after': made}
             market, news = ReplayMarket(series, names, fng, origin), ReplayNews(news_rows, cutoff)
-            orch = TeamLeadOrchestrator(router, DataAnalystAgent(llm, market), NewsResearcherAgent(llm, news), llm, market)
+            rec_llm = Recorder(llm)
+            orch = TeamLeadOrchestrator(router, DataAnalystAgent(rec_llm, market), NewsResearcherAgent(rec_llm, news), rec_llm, market)
             query = QUERY.format(t=t)
             t0 = clock()
-            rec = {'id': cid, 'symbol': t, 'origin': origin, 'entry_date': entry, 'exit_date': exit_, 'variant': variant}
+            rec = {'id': cid, 'symbol': t, 'origin': origin, 'entry_date': entry, 'exit_date': exit_, 'variant': variant, 'label': 'ERROR'}
             try:
                 res = orch.run(query, session_id=cid, fallback_tickers=[t])
-                raw = llm.complete(cfg['decision_system'], decision_prompt(query, res), max_tokens=16)
                 gate = next((e.payload for e in reversed(res.events) if e.event_type == 'GATE_CHECK'), {})
                 rec.update(route={'intent': res.routed.intent, 'tickers': res.routed.tickers, 'delegated': res.delegated_agents},
                            data_summary=res.data_report.summary if res.data_report else None,
@@ -340,9 +362,16 @@ def run(root, variant, *, router, llm, clock=time.time, limit=None):
                            news_summary=res.news_report.summary if res.news_report else None,
                            news_faithful=res.news_report.faithful_numbers if res.news_report else None,
                            answer=res.final_synthesis, answer_faithful=res.faithful_synthesis,
-                           guard_reason=gate.get('validation_reason'), decision_raw=(raw or '')[:80], label=parse_label(raw))
+                           guard_reason=gate.get('validation_reason'))
+                try:
+                    raw = rec_llm.complete(cfg['decision_system'], decision_prompt(query, res),
+                                           max_tokens=cfg.get('decision_tokens', 24), allow_length=True)
+                    rec.update(decision_raw=(raw or '')[:120], label=parse_label(raw))
+                except Exception as exc:
+                    rec.update(error='decision: ' + f'{type(exc).__name__}: {exc}'[:280])
             except Exception as exc:
-                rec.update(label='ERROR', error=f'{type(exc).__name__}: {exc}'[:300])
+                rec.update(error='team: ' + f'{type(exc).__name__}: {exc}'[:280])
+            rec['calls'] = rec_llm.calls
             closes = calendar_closes(series[t], spy_dates, origin)
             up = sum(n['direction'] == 'bullish' for n in news.served)
             down = sum(n['direction'] == 'bearish' for n in news.served)
@@ -409,6 +438,9 @@ def score(root, variant):
               'by_asset': {t: {a: arm_metrics([r for r in rows if r['symbol'] == t], a) for a in ('system', 'momentum20', 'always_up')} for t in ASSETS},
               'pipeline': {'routes': route_counts(preds),
                            'answer_faithful': sum(bool(p.get('answer_faithful')) for p in preds),
+                           'data_faithful': sum(bool(p.get('data_faithful')) for p in preds),
+                           'news_faithful': sum(bool(p.get('news_faithful')) for p in preds),
+                           'call_errors': {a: sum(1 for p in preds for c in p.get('calls', []) if c['agent'] == a and not c['ok']) for a in AGENTS},
                            'with_news': sum(p.get('news_rows', 0) > 0 for p in preds),
                            'errors': sum(p['label'] == 'ERROR' for p in preds),
                            'median_seconds': statistics.median([p['seconds'] for p in preds]) if preds else None},
@@ -455,8 +487,8 @@ def main():
         router = GlinerQueryRouter(clf.backend, set(DEFAULT_ALIASES.values()) | set(ASSETS))
         with narrator(a.model_root, a.root / 'model-runtime.log', alias='lfm3-replay') as (call, meta):
             class LLM:
-                def complete(self, system, prompt, *, max_tokens=256):
-                    return call(system, prompt, max_tokens=max_tokens)
+                def complete(self, system, prompt, *, max_tokens=256, **kw):
+                    return call(system, prompt, max_tokens=max_tokens, **kw)
             dump(a.root / f'model_{a.variant}.json', meta)
             print(json.dumps(run(a.root, a.variant, router=router, llm=LLM(), limit=a.limit)))
 

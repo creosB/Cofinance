@@ -41,9 +41,9 @@ class LLM:
     def __init__(self):
         self.prompts = []
 
-    def complete(self, system, prompt, *, max_tokens=256):
+    def complete(self, system, prompt, *, max_tokens=256, **kw):
         self.prompts.append(system + '\n' + prompt)
-        return 'UP' if '[Decision]' in system else ''
+        return 'UP because the reports agree' if '[Decision]' in system else ''
 
 
 def news_row(ticker, title, day, action='digest', direction='bullish', hour=12):
@@ -163,7 +163,26 @@ class TestReplay(unittest.TestCase):
 
     def test_labels(self):
         self.assertEqual(R.parse_label(' up.'), 'UP')
+        self.assertEqual(R.parse_label('DOWN, the news is negative'), 'DOWN')
         self.assertEqual(R.parse_label('Probably up'), 'ERROR')
+        self.assertEqual(R.parse_label(''), 'ERROR')
+
+    def test_a_failed_decision_keeps_the_team_output_and_logs_the_call(self):
+        class Cut(LLM):
+            def complete(self, system, prompt, *, max_tokens=256, **kw):
+                if '[Decision]' in system:
+                    raise ValueError('Incomplete forecast')
+                return super().complete(system, prompt, max_tokens=max_tokens, **kw)
+        tmp, root = make_root()
+        try:
+            R.run(root, 'v1', router=Router(), llm=Cut(), limit=1)
+            p = lines(root / 'predictions_v1.jsonl')[0]
+            self.assertEqual(p['label'], 'ERROR')
+            self.assertTrue(p['error'].startswith('decision:'))
+            self.assertIsNotNone(p['answer'])
+            self.assertEqual([c['agent'] for c in p['calls'] if not c['ok']], ['Decision'])
+        finally:
+            tmp.cleanup()
 
 
 if __name__ == '__main__':

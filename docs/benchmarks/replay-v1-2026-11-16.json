@@ -1,0 +1,423 @@
+{
+  "format": "cofinance-replay/1",
+  "warning": "Experimental replay benchmark on a dev window. Not a trading signal or financial advice.",
+  "variant": "v1",
+  "window": [
+    "2026-10-27",
+    "2026-11-06"
+  ],
+  "window_kind": "dev",
+  "cases": 72,
+  "scored": 72,
+  "missing_outcomes": [],
+  "leaks": 0,
+  "up_rate": 0.4306,
+  "arms": {
+    "system": {
+      "n": 72,
+      "accuracy_all": 0.4167,
+      "coverage": 0.9861,
+      "accuracy_covered": 0.4225,
+      "balanced_accuracy": 0.4839,
+      "labels": {
+        "UP": 71,
+        "DOWN": 0,
+        "ABSTAIN": 0,
+        "ERROR": 1
+      }
+    },
+    "news_rule": {
+      "n": 72,
+      "accuracy_all": 0.3889,
+      "coverage": 0.6389,
+      "accuracy_covered": 0.6087,
+      "balanced_accuracy": 0.4044,
+      "labels": {
+        "UP": 29,
+        "DOWN": 17,
+        "ABSTAIN": 26,
+        "ERROR": 0
+      }
+    },
+    "momentum20": {
+      "n": 72,
+      "accuracy_all": 0.5278,
+      "coverage": 1.0,
+      "accuracy_covered": 0.5278,
+      "balanced_accuracy": 0.5067,
+      "labels": {
+        "UP": 25,
+        "DOWN": 47,
+        "ABSTAIN": 0,
+        "ERROR": 0
+      }
+    },
+    "always_up": {
+      "n": 72,
+      "accuracy_all": 0.4306,
+      "coverage": 1.0,
+      "accuracy_covered": 0.4306,
+      "balanced_accuracy": 0.5,
+      "labels": {
+        "UP": 72,
+        "DOWN": 0,
+        "ABSTAIN": 0,
+        "ERROR": 0
+      }
+    }
+  },
+  "by_asset": {
+    "NVDA": {
+      "system": {
+        "n": 9,
+        "accuracy_all": 0.0,
+        "coverage": 1.0,
+        "accuracy_covered": 0.0,
+        "balanced_accuracy": null,
+        "labels": {
+          "UP": 9,
+          "DOWN": 0,
+          "ABSTAIN": 0,
+          "ERROR": 0
+        }
+      },
+      "momentum20": {
+        "n": 9,
+        "accuracy_all": 1.0,
+        "coverage": 1.0,
+        "accuracy_covered": 1.0,
+        "balanced_accuracy": null,
+        "labels": {
+          "UP": 0,
+          "DOWN": 9,
+          "ABSTAIN": 0,
+          "ERROR": 0
+        }
+      },
+      "always_up": {
+        "n": 9,
+        "accuracy_all": 0.0,
+        "coverage": 1.0,
+        "accuracy_covered": 0.0,
+        "balanced_accuracy": null,
+        "labels": {
+          "UP": 9,
+          "DOWN": 0,
+          "ABSTAIN": 0,
+          "ERROR": 0
+        }
+      }
+    },
+    "AAPL": {
+      "system": {
+        "n": 9,
+        "accuracy_all": 0.6667,
+        "coverage": 1.0,
+        "accuracy_covered": 0.6667,
+        "balanced_accuracy": 0.5,
+        "labels": {
+          "UP": 9,
+          "DOWN": 0,
+          "ABSTAIN": 0,
+          "ERROR": 0
+        }
+      },
+      "momentum20": {
+        "n": 9,
+        "accuracy_all": 0.5556,
+        "coverage": 1.0,
+        "accuracy_covered": 0.5556,
+        "balanced_accuracy": 0.4167,
+        "labels": {
+          "UP": 8,
+          "DOWN": 1,
+          "ABSTAIN": 0,
+          "ERROR": 0
+        }
+      },
+      "always_up": {
+        "n": 9,
+        "accuracy_all": 0.6667,
+        "coverage": 1.0,
+        "accuracy_covered": 0.6667,
+        "balanced_accuracy": 0.5,
+        "labels": {
+          "UP": 9,
+          "DOWN": 0,
+          "ABSTAIN": 0,
+          "ERROR": 0
+        }
+      }
+    },
+    "MSFT": {
+      "system": {
+        "n": 9,
+        "accuracy_all": 0.4444,
+        "coverage": 1.0,
+        "accuracy_covered": 0.4444,
+        "balanced_accuracy": 0.5,
+        "labels": {
+          "UP": 9,
+          "DOWN": 0,
+          "ABSTAIN": 0,
+          "ERROR": 0
+        }
+      },
+      "momentum20": {
+        "n": 9,
+        "accuracy_all": 0.5556,
+        "coverage": 1.0,
+        "accuracy_covered": 0.5556,
+        "balanced_accuracy": 0.575,
+        "labels": {
+          "UP": 6,
+          "DOWN": 3,
+          "ABSTAIN": 0,
+          "ERROR": 0
+        }
+      },
+      "always_up": {
+        "n": 9,
+        "accuracy_all": 0.4444,
+        "coverage": 1.0,
+        "accuracy_covered": 0.4444,
+        "balanced_accuracy": 0.5,
+        "labels": {
+          "UP": 9,
+          "DOWN": 0,
+          "ABSTAIN": 0,
+          "ERROR": 0
+        }
+      }
+    },
+    "AMZN": {
+      "system": {
+        "n": 9,
+        "accuracy_all": 0.6667,
+        "coverage": 1.0,
+        "accuracy_covered": 0.6667,
+        "balanced_accuracy": 0.5,
+        "labels": {
+          "UP": 9,
+          "DOWN": 0,
+          "ABSTAIN": 0,
+          "ERROR": 0
+        }
+      },
+      "momentum20": {
+        "n": 9,
+        "accuracy_all": 0.3333,
+        "coverage": 1.0,
+        "accuracy_covered": 0.3333,
+        "balanced_accuracy": 0.3333,
+        "labels": {
+          "UP": 4,
+          "DOWN": 5,
+          "ABSTAIN": 0,
+          "ERROR": 0
+        }
+      },
+      "always_up": {
+        "n": 9,
+        "accuracy_all": 0.6667,
+        "coverage": 1.0,
+        "accuracy_covered": 0.6667,
+        "balanced_accuracy": 0.5,
+        "labels": {
+          "UP": 9,
+          "DOWN": 0,
+          "ABSTAIN": 0,
+          "ERROR": 0
+        }
+      }
+    },
+    "TSLA": {
+      "system": {
+        "n": 9,
+        "accuracy_all": 0.2222,
+        "coverage": 0.8889,
+        "accuracy_covered": 0.25,
+        "balanced_accuracy": 0.3333,
+        "labels": {
+          "UP": 8,
+          "DOWN": 0,
+          "ABSTAIN": 0,
+          "ERROR": 1
+        }
+      },
+      "momentum20": {
+        "n": 9,
+        "accuracy_all": 0.1111,
+        "coverage": 1.0,
+        "accuracy_covered": 0.1111,
+        "balanced_accuracy": 0.1667,
+        "labels": {
+          "UP": 7,
+          "DOWN": 2,
+          "ABSTAIN": 0,
+          "ERROR": 0
+        }
+      },
+      "always_up": {
+        "n": 9,
+        "accuracy_all": 0.3333,
+        "coverage": 1.0,
+        "accuracy_covered": 0.3333,
+        "balanced_accuracy": 0.5,
+        "labels": {
+          "UP": 9,
+          "DOWN": 0,
+          "ABSTAIN": 0,
+          "ERROR": 0
+        }
+      }
+    },
+    "AMD": {
+      "system": {
+        "n": 9,
+        "accuracy_all": 0.5556,
+        "coverage": 1.0,
+        "accuracy_covered": 0.5556,
+        "balanced_accuracy": 0.5,
+        "labels": {
+          "UP": 9,
+          "DOWN": 0,
+          "ABSTAIN": 0,
+          "ERROR": 0
+        }
+      },
+      "momentum20": {
+        "n": 9,
+        "accuracy_all": 0.4444,
+        "coverage": 1.0,
+        "accuracy_covered": 0.4444,
+        "balanced_accuracy": 0.5,
+        "labels": {
+          "UP": 0,
+          "DOWN": 9,
+          "ABSTAIN": 0,
+          "ERROR": 0
+        }
+      },
+      "always_up": {
+        "n": 9,
+        "accuracy_all": 0.5556,
+        "coverage": 1.0,
+        "accuracy_covered": 0.5556,
+        "balanced_accuracy": 0.5,
+        "labels": {
+          "UP": 9,
+          "DOWN": 0,
+          "ABSTAIN": 0,
+          "ERROR": 0
+        }
+      }
+    },
+    "GOOGL": {
+      "system": {
+        "n": 9,
+        "accuracy_all": 0.7778,
+        "coverage": 1.0,
+        "accuracy_covered": 0.7778,
+        "balanced_accuracy": 0.5,
+        "labels": {
+          "UP": 9,
+          "DOWN": 0,
+          "ABSTAIN": 0,
+          "ERROR": 0
+        }
+      },
+      "momentum20": {
+        "n": 9,
+        "accuracy_all": 0.2222,
+        "coverage": 1.0,
+        "accuracy_covered": 0.2222,
+        "balanced_accuracy": 0.5,
+        "labels": {
+          "UP": 0,
+          "DOWN": 9,
+          "ABSTAIN": 0,
+          "ERROR": 0
+        }
+      },
+      "always_up": {
+        "n": 9,
+        "accuracy_all": 0.7778,
+        "coverage": 1.0,
+        "accuracy_covered": 0.7778,
+        "balanced_accuracy": 0.5,
+        "labels": {
+          "UP": 9,
+          "DOWN": 0,
+          "ABSTAIN": 0,
+          "ERROR": 0
+        }
+      }
+    },
+    "BTC": {
+      "system": {
+        "n": 9,
+        "accuracy_all": 0.0,
+        "coverage": 1.0,
+        "accuracy_covered": 0.0,
+        "balanced_accuracy": null,
+        "labels": {
+          "UP": 9,
+          "DOWN": 0,
+          "ABSTAIN": 0,
+          "ERROR": 0
+        }
+      },
+      "momentum20": {
+        "n": 9,
+        "accuracy_all": 1.0,
+        "coverage": 1.0,
+        "accuracy_covered": 1.0,
+        "balanced_accuracy": null,
+        "labels": {
+          "UP": 0,
+          "DOWN": 9,
+          "ABSTAIN": 0,
+          "ERROR": 0
+        }
+      },
+      "always_up": {
+        "n": 9,
+        "accuracy_all": 0.0,
+        "coverage": 1.0,
+        "accuracy_covered": 0.0,
+        "balanced_accuracy": null,
+        "labels": {
+          "UP": 9,
+          "DOWN": 0,
+          "ABSTAIN": 0,
+          "ERROR": 0
+        }
+      }
+    }
+  },
+  "pipeline": {
+    "routes": {
+      "thesis_review": 72
+    },
+    "answer_faithful": 59,
+    "data_faithful": 21,
+    "news_faithful": 17,
+    "call_errors": {
+      "Data Analyst": 51,
+      "News Researcher": 0,
+      "Market Team Lead": 7,
+      "Decision": 0
+    },
+    "with_news": 57,
+    "errors": 1,
+    "median_seconds": 38.65
+  },
+  "limits": [
+    "dev window: daily origins overlap, cases are correlated",
+    "news availability is the item time, not an archived first-seen time",
+    "no point-in-time fundamentals for stocks",
+    "prices are a current download",
+    "LFM3 training cutoff unpublished (released 2026-10-27)"
+  ]
+}
