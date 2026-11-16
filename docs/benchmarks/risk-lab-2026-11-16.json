@@ -1,0 +1,198 @@
+{
+  "format": "cofinance-risk-lab/2",
+  "warning": "Experimental risk measurement on past prices. Says nothing about direction. Not a trading signal or financial advice.",
+  "cases_sha256": "d51ff059bd397db110f428c7646159b579bde1dcecffd67b9a988db90c6f1cd4",
+  "code_sha256": "7d4ed0e262b1ef8486fcb7e4a6e522927701ab2ecc9a5a7f52c8e590cf3aa60c",
+  "gate": {
+    "level_v1": {
+      "mean_gain_above": 0.0,
+      "p_value_max": 0.05,
+      "must_pass": [
+        "validation",
+        "test"
+      ]
+    },
+    "flag_v2": {
+      "elevated_above": 1.25,
+      "outcome_sd": 1.0,
+      "precondition": "difference above 0 on dev and validation",
+      "decides_on": "test",
+      "p_value_max": 0.05
+    },
+    "block_weeks": 8,
+    "resamples": 4000,
+    "seed": 20261116,
+    "min_past_cases": 52
+  },
+  "skipped_without_history": {
+    "AAPL": 52,
+    "BTC-USD": 52,
+    "ETH-USD": 52,
+    "MSFT": 52,
+    "NVDA": 52
+  },
+  "splits": {
+    "dev": {
+      "n_cases": 1861,
+      "n_weeks": 405,
+      "from": "2015-12-09",
+      "through": "2023-12-19",
+      "mean_qlike_forecast": -4.5126,
+      "mean_qlike_baseline": -4.6136,
+      "mean_weekly_gain": -0.1005,
+      "p_value": 0.9950012496875781,
+      "passes": false,
+      "range90_coverage": {
+        "forecast": 0.9269,
+        "baseline": 0.8974
+      },
+      "elevated_case_share": 0.4014,
+      "big_move_rate": {
+        "elevated": 0.1071,
+        "other": 0.035
+      },
+      "flag": {
+        "outcome": "abs(return) > 1.0 x usual weekly sd",
+        "passes": true,
+        "elevated_cases": 747,
+        "other_cases": 1114,
+        "elevated_rate": 0.3347,
+        "other_rate": 0.1984,
+        "difference": 0.1363,
+        "ratio": 1.687,
+        "p_value": 0.00024993751562109475
+      },
+      "per_asset": {
+        "AAPL": {
+          "n": 405,
+          "mean_gain": -0.0374
+        },
+        "BTC-USD": {
+          "n": 402,
+          "mean_gain": -0.1764
+        },
+        "ETH-USD": {
+          "n": 244,
+          "mean_gain": -0.1651
+        },
+        "MSFT": {
+          "n": 405,
+          "mean_gain": -0.0293
+        },
+        "NVDA": {
+          "n": 405,
+          "mean_gain": -0.1232
+        }
+      }
+    },
+    "validation": {
+      "n_cases": 330,
+      "n_weeks": 66,
+      "from": "2024-01-04",
+      "through": "2025-04-23",
+      "mean_qlike_forecast": -4.664,
+      "mean_qlike_baseline": -4.7484,
+      "mean_weekly_gain": -0.0844,
+      "p_value": 0.971007248187953,
+      "passes": false,
+      "range90_coverage": {
+        "forecast": 0.9515,
+        "baseline": 0.9515
+      },
+      "elevated_case_share": 0.2455,
+      "big_move_rate": {
+        "elevated": 0.0617,
+        "other": 0.0161
+      },
+      "flag": {
+        "outcome": "abs(return) > 1.0 x usual weekly sd",
+        "passes": true,
+        "elevated_cases": 81,
+        "other_cases": 249,
+        "elevated_rate": 0.2963,
+        "other_rate": 0.2169,
+        "difference": 0.0794,
+        "ratio": 1.366,
+        "p_value": 0.02649337665583604
+      },
+      "per_asset": {
+        "AAPL": {
+          "n": 66,
+          "mean_gain": 0.0409
+        },
+        "BTC-USD": {
+          "n": 66,
+          "mean_gain": -0.1278
+        },
+        "ETH-USD": {
+          "n": 66,
+          "mean_gain": -0.1595
+        },
+        "MSFT": {
+          "n": 66,
+          "mean_gain": -0.0303
+        },
+        "NVDA": {
+          "n": 66,
+          "mean_gain": -0.1453
+        }
+      }
+    },
+    "test": {
+      "n_cases": 375,
+      "n_weeks": 75,
+      "from": "2025-05-07",
+      "through": "2026-10-27",
+      "mean_qlike_forecast": -4.5907,
+      "mean_qlike_baseline": -4.7284,
+      "mean_weekly_gain": -0.1377,
+      "p_value": 0.7663084228942765,
+      "passes": false,
+      "range90_coverage": {
+        "forecast": 0.9227,
+        "baseline": 0.9307
+      },
+      "elevated_case_share": 0.152,
+      "big_move_rate": {
+        "elevated": 0.1228,
+        "other": 0.0314
+      },
+      "flag": {
+        "outcome": "abs(return) > 1.0 x usual weekly sd",
+        "passes": true,
+        "elevated_cases": 57,
+        "other_cases": 318,
+        "elevated_rate": 0.3158,
+        "other_rate": 0.1541,
+        "difference": 0.1617,
+        "ratio": 2.049,
+        "p_value": 0.0142464383904024
+      },
+      "per_asset": {
+        "AAPL": {
+          "n": 75,
+          "mean_gain": -0.3438
+        },
+        "BTC-USD": {
+          "n": 75,
+          "mean_gain": -0.0953
+        },
+        "ETH-USD": {
+          "n": 75,
+          "mean_gain": -0.6877
+        },
+        "MSFT": {
+          "n": 75,
+          "mean_gain": 0.2896
+        },
+        "NVDA": {
+          "n": 75,
+          "mean_gain": 0.1486
+        }
+      }
+    }
+  },
+  "claim": true,
+  "claim_about": "v2 risk flag on the unseen test split; the v1 level forecast already failed",
+  "opened_at": "2026-11-16T15:34:13.465888+00:00"
+}

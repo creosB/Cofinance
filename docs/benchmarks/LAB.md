@@ -45,6 +45,8 @@ Market trend looked best on validation, but it was worse than always-UP on dev, 
 
 Trend filters did not predict direction better, but they **cut drawdowns sharply**. On dev, dual momentum went from 59% (always-UP) to 20% with a higher illustrative return. On validation it went from 27% to 11%, with a lower return. That is a risk-regime signal, not a forecast. It is consistent with long-known trend-following behavior and still needs the locked test before any claim.
 
+The risk idea was then tested directly in the [risk lab](RISK_LAB.md) (2026-11-16), which opened the test split once (logged in `test_peeks.jsonl`). No direction arm has seen the test split.
+
 ## Reproduce
 
 ```text
