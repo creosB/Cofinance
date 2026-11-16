@@ -66,10 +66,25 @@ def child(argv):
     return code
 
 
-def job_state(text):
-    """(state, exit code): ('done', 0), ('failed', n) or ('running', None) when the log has no exit marker yet."""
+def boot_time():
+    """Epoch seconds of the last OS start, or None when unknown. A restart kills every job without an exit marker."""
+    try:
+        if os.name == 'nt':
+            import ctypes
+            ctypes.windll.kernel32.GetTickCount64.restype = ctypes.c_ulonglong
+            return time.time() - ctypes.windll.kernel32.GetTickCount64() / 1000
+        return time.time() - float(Path('/proc/uptime').read_text().split()[0])
+    except Exception:
+        return None
+
+
+def job_state(text, mtime=None, boot=None):
+    """(state, exit code): ('done', 0), ('failed', n), ('running', None) when the log has no exit marker yet,
+    or ('lost', None) when it has none and was last written before the OS restarted (the job was killed)."""
     marks = re.findall(r'^' + re.escape(EXIT) + r'(-?\d+)\s*$', text, flags=re.M)
     if not marks:
+        if mtime is not None and boot is not None and mtime < boot:
+            return 'lost', None
         return 'running', None
     code = int(marks[-1])
     return ('done' if code == 0 else 'failed'), code
@@ -78,11 +93,14 @@ def job_state(text):
 def wait(name, max_s=WAIT_DEFAULT, tick=2.0):
     """Block until a background job finishes or max_s passes. This is the loop guard for polling: one call, a hard cap,
     and a plain answer (exit 0 done, 1 failed, 2 still running) instead of repeated sleep-and-status calls."""
-    log, started = log_path(name), time.monotonic()
+    log, started, boot = log_path(name), time.monotonic(), boot_time()
     max_s = min(max_s, WAIT_MAX)
     while True:
         text = log.read_text(encoding='utf-8', errors='replace') if log.exists() else ''
-        state, code = job_state(text)
+        state, code = job_state(text, log.stat().st_mtime if log.exists() else None, boot)
+        if state == 'lost':
+            print(f'{name} lost: no exit marker and the log predates the last OS restart. Rerun it (resumable jobs continue).')
+            return 1
         if state != 'running':
             print(f'{name} {state}: {summarize(text)}')
             return 0 if code == 0 else 1
@@ -122,10 +140,12 @@ def status():
     if not LOGS.exists():
         print('No logs yet.')
         return
+    boot = boot_time()
     for p in sorted(LOGS.glob('*.log'), key=lambda p: p.stat().st_mtime, reverse=True):
-        age = int(time.time() - p.stat().st_mtime)
+        mtime = p.stat().st_mtime
+        age = int(time.time() - mtime)
         text = p.read_text(encoding='utf-8', errors='replace')
-        print(f'{p.stem:22s} {age // 60:4d} min ago  {job_state(text)[0]:8s} {summarize(text)}')
+        print(f'{p.stem:22s} {age // 60:4d} min ago  {job_state(text, mtime, boot)[0]:8s} {summarize(text)}')
 
 
 FORWARD = {'record': ['record', '--root', 'data/forward_benchmark', '--publish', 'docs/benchmarks/forward-ledger.jsonl'],

@@ -1,5 +1,8 @@
+import os
+import time
 import unittest
 from pathlib import Path
+from unittest import mock
 import dev
 
 
@@ -52,6 +55,20 @@ class TestBackgroundJobs(unittest.TestCase):
         self.assertEqual(dev.job_state('Ran 3 tests in 1s\n\nOK\ndev.py exit 0\n'), ('done', 0))
         self.assertEqual(dev.job_state('boom\ndev.py exit 1\n'), ('failed', 1))
         self.assertEqual(dev.summarize('Ran 3 tests in 1s\n\nOK\ndev.py exit 0\n'), 'OK (3 tests, 1 s)')
+
+    def test_log_from_before_a_restart_is_lost_not_running(self):
+        # 11/16: a PC restart killed replay_v1 mid-run and status said 'running' for half an hour.
+        self.assertEqual(dev.job_state('started\n....', mtime=100.0, boot=200.0), ('lost', None))
+        self.assertEqual(dev.job_state('started\n....', mtime=300.0, boot=200.0), ('running', None))
+        self.assertEqual(dev.job_state('ok\ndev.py exit 0\n', mtime=100.0, boot=200.0), ('done', 0))
+        self.assertEqual(dev.job_state('started\n....', mtime=100.0, boot=None), ('running', None))
+        self.log('d', 'started\n...')
+        old = time.time() - 3600
+        os.utime(dev.log_path('d'), (old, old))
+        with mock.patch.object(dev, 'boot_time', return_value=time.time() - 60):
+            self.assertEqual(dev.wait('d', 1, tick=.01), 1)
+        boot = dev.boot_time()
+        self.assertTrue(boot is None or boot < time.time())
 
     def test_wait_answers_once_with_a_plain_code(self):
         self.log('a', 'Ran 2 tests in 1s\n\nOK\ndev.py exit 0\n')
