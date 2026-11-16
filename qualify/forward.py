@@ -130,13 +130,37 @@ def label(text):
     return (t,None) if t in LABELS else ('ERROR','invalid_label')
 
 
+def stage(entry,spy):
+    """A batch is 'sealed' until HORIZON completed SPY sessions have opened after its seal, then 'matured' for good.
+    The one rule behind both record (may the next batch start?) and score (does this batch count?).
+    Returns (stage, exit_date); exit_date is the HORIZON-th session after the seal, None while sealed."""
+    after=[b for b in spy if b['timestamp']>entry['sealed_at_epoch']]
+    return ('matured',after[HORIZON-1]['date']) if len(after)>=HORIZON else ('sealed',None)
+
+
+def ledger_state(entries,spy):
+    """'empty' (no batch yet), 'open' (the newest batch is still sealed, so recording is refused) or 'ready'."""
+    if not entries:return 'empty'
+    return 'ready' if stage(entries[-1],spy)[0]=='matured' else 'open'
+
+
+def statechart():
+    """The forward ledger lifecycle as a Mermaid state diagram. Each record seals one batch; nothing else moves it."""
+    return ('stateDiagram-v2\n'
+            '    [*] --> empty\n'
+            '    empty --> open: record seals batch 1\n'
+            f'    open --> ready: {HORIZON}th SPY session after the seal completes, batch matured and scoreable\n'
+            '    ready --> open: record seals the next batch\n'
+            '    open --> open: record refused, score counts the batch as pending\n')
+
+
 def record(root,*,narrator,clock=time.time,fetcher=fetch,news_db=Path('data/news.db'),publish=None):
     root.mkdir(parents=True,exist_ok=True)
     protocol_sha=freeze(root);entries,prev=chain(root)
     now=clock()
     series={s:completed(parse(fetcher(s,int(now-220*86400),int(now))),now) for s in (*ASSETS,'SPY')}
     spy=series['SPY']
-    if entries and sum(b['timestamp']>entries[-1]['sealed_at_epoch'] for b in spy)<HORIZON:
+    if ledger_state(entries,spy)=='open':
         raise ValueError('Previous batch is still open: record after its five US sessions complete')
     if len(spy)<61:raise ValueError('Not enough completed SPY sessions')
     origin=spy[-1]['date']
@@ -205,9 +229,9 @@ def score(root,*,clock=time.time,fetcher=fetch):
     series={s:completed(parse(fetcher(s,start,int(now))),now) for s in (*ASSETS,'SPY')}
     rows=[];pending=[];missing=[];batches=0
     for e in entries:
-        sessions=[b for b in series['SPY'] if b['timestamp']>e['sealed_at_epoch']]
-        if len(sessions)<HORIZON:pending.append(e['batch']);continue
-        batches+=1;exit_date=sessions[HORIZON-1]['date']
+        st,exit_date=stage(e,series['SPY'])
+        if st=='sealed':pending.append(e['batch']);continue
+        batches+=1
         for c in e['cases']:
             if 'excluded' in c:continue
             bars=series[c['symbol']]
