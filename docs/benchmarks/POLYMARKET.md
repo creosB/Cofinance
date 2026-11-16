@@ -47,7 +47,18 @@ All buckets: [polymarket-calibration.json](polymarket-calibration.json).
 
 1. **The crowd was reasonably calibrated a day and a week out.** Most buckets contain their price inside the 95% interval. That makes the odds useful as context next to research, labeled as crowd opinion.
 2. **No demonstrated longshot edge.** At 1 and 7 days, cheap outcomes won about as often as priced, within wide intervals. Buying them (the old Strategy B) has no measured edge, and recorded prices understate the real cost of buying.
-3. **Hypotheses only, not findings.** A month out, 70 markets priced below 20 cents produced no winners when roughly 3 were expected (probability about 0.04 if prices were fair). At 1 day, the 20 to 30 cent bucket won more often than priced. Many buckets were inspected, so either result can be chance. Both need a fresh, separately frozen sample before anyone relies on them.
+3. **Hypotheses only, not findings.** A month out, 70 markets priced below 20 cents produced no winners when roughly 3 were expected (probability about 0.04 if prices were fair). At 1 day, the 20 to 30 cent bucket won more often than priced. Many buckets were inspected, so either result can be chance. Both got a fresh, separately frozen sample on 2026-11-16 and neither held up (see the retest section below): treat both as chance.
+
+## Retest of the two hypotheses (2026-11-16): not confirmed
+
+Both hypotheses were fixed in code before any price was downloaded, then checked once on a new sample: 3,000 random markets from 100 end days the first study never used (seed 20261116; 48,652 eligible; 172 closed outside the window and 132 did not settle cleanly, both excluded). Only 2 events are shared with the first study, and no market repeats (the freeze fails if one does). Price history coverage: 3,000 of 3,000, 0 errors. Rule: exact one-sided test of the wins, one market per event (the lowest id), each market winning at its recorded price; "confirmed" only below 0.025 for each test. The verdict file locks after the first look.
+
+| Hypothesis | Events | Expected wins | Won | p-value | Verdict |
+| --- | --- | --- | --- | --- | --- |
+| H1: 30 days out, priced below 20 cents, wins less than priced | 63 | 3.3 | 2 | 0.34 | not confirmed |
+| H2: 1 day out, priced 20 to 30 cents, wins more than priced | 103 | 26.1 | 29 | 0.29 | not confirmed |
+
+Counting every market instead of one per event gives the same answer (H1: 3 wins, 4.0 expected, p 0.43; H2: 29 wins, 26.4 expected, p 0.31). H1 had few cheap outcomes (91 markets), so it was never a strong test: it only says this sample shows no shortfall. The first study's 0 of 70 and 38% of 60 look like chance from inspecting many buckets. Nothing here changes how the odds card describes cheap outcomes. Result file: [polymarket-retest.json](polymarket-retest.json). Reproduce: `python -m qualify.pm_retest freeze`, the four `pm_lab history` shards, then `python -m qualify.pm_retest evaluate` (with `--root data\pm_retest_20261116`).
 
 ## How chat uses it
 
