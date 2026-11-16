@@ -44,7 +44,8 @@ def narrator(model_root:Path,log_path:Path,alias:str='lfm3-history'):
                 body={'model':alias,'messages':[{'role':'system','content':system},{'role':'user','content':prompt}],
                     'temperature':0,'max_tokens':int(kwargs.get('max_tokens',16)),'chat_template_kwargs':{'enable_thinking':False}}
                 if kwargs.get('stop'):body['stop']=list(kwargs['stop'])
-                res=local_json(url+'/v1/chat/completions',body,key=key,timeout=90)
+                if kwargs.get('response_format'):body['response_format']=kwargs['response_format']
+                res=local_json(url+'/v1/chat/completions',body,key=key,timeout=kwargs.get('timeout',90))
                 choice=res['choices'][0]
                 if choice.get('finish_reason')!='stop' and not kwargs.get('allow_length'):raise ValueError('Incomplete forecast')
                 return choice['message']['content']
