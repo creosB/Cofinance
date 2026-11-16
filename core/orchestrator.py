@@ -78,7 +78,8 @@ def number_review(candidate: str, allowed, passed: bool) -> Dict[str, Any]:
 class SmallLLMBackend(Protocol):
     """Any 1B/2B local model served via llama-server, LM Studio, Ollama, or test stub."""
 
-    def complete(self, system: str, prompt: str, *, max_tokens: int = 256) -> str: ...
+    def complete(self, system: str, prompt: str, *, max_tokens: int = 256, **options: Any) -> str: ...
+    # options: optional 'stop' (list of strings). Callers pass it only when set, so plain backends keep working.
 
 
 class MarketDataTools(Protocol):
@@ -266,9 +267,12 @@ class DataAnalystAgent:
         "If the Fear and Greed index is above seventy-five, warn that sentiment may be overheated."
     )
 
-    def __init__(self, llm: SmallLLMBackend, tools: MarketDataTools) -> None:
+    def __init__(self, llm: SmallLLMBackend, tools: MarketDataTools, stop: Optional[Sequence[str]] = None) -> None:
         self.llm = llm
         self.tools = tools
+        # Replay v2 lever 1: LFM3 writes its summary as the first paragraph, then keeps restating the facts until the
+        # token cap. A stop sequence ends the reply after that paragraph. Opt-in until the replay benchmark shows it helps.
+        self.stop = list(stop) if stop else None
 
     def run(self, tickers: Sequence[str], risk_mode: str, bus: EventBus, session_id: str) -> SpecialistReport:
         facts: Dict[str, Any] = {}
@@ -289,7 +293,8 @@ class DataAnalystAgent:
         prompt = "Facts from market-data tools:\n" + "\n\n".join(
             "\n".join(market_fact_lines(tkr, snap)) for tkr, snap in facts.items())
         try:
-            raw = self.llm.complete(sys_prompt, prompt, max_tokens=256) if allowed else ""
+            options = {"stop": self.stop} if self.stop else {}
+            raw = self.llm.complete(sys_prompt, prompt, max_tokens=256, **options) if allowed else ""
             clean = clean_narration(final_answer(raw) or "")
         except Exception:
             clean = ""

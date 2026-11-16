@@ -61,6 +61,9 @@ VARIANTS = {
             'ABSTAIN. Abstain when the reports give no clear reason either way. No explanation.'),
     },
 }
+# v2, lever 1 (structure): same as v1, but the Data Analyst's reply ends at its first blank line. Dev diagnosis on v1:
+# LFM3 wrote the summary as paragraph one, then restated the facts until the 256-token cap (51 of 72 cases).
+VARIANTS['v2'] = {**VARIANTS['v1'], 'analyst_stop': ['\n\n']}
 
 
 def symbol(t):
@@ -349,7 +352,8 @@ def run(root, variant, *, router, llm, clock=time.time, limit=None):
                 return {'stopped_after': made}
             market, news = ReplayMarket(series, names, fng, origin), ReplayNews(news_rows, cutoff)
             rec_llm = Recorder(llm)
-            orch = TeamLeadOrchestrator(router, DataAnalystAgent(rec_llm, market), NewsResearcherAgent(rec_llm, news), rec_llm, market)
+            analyst = DataAnalystAgent(rec_llm, market, stop=cfg.get('analyst_stop'))
+            orch = TeamLeadOrchestrator(router, analyst, NewsResearcherAgent(rec_llm, news), rec_llm, market)
             query = QUERY.format(t=t)
             t0 = clock()
             rec = {'id': cid, 'symbol': t, 'origin': origin, 'entry_date': entry, 'exit_date': exit_, 'variant': variant, 'label': 'ERROR'}

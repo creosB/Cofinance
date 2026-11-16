@@ -184,6 +184,28 @@ class TestReplay(unittest.TestCase):
         finally:
             tmp.cleanup()
 
+    def test_v2_stops_only_the_data_analyst_at_its_first_blank_line(self):
+        class Seen(LLM):
+            def __init__(self):
+                super().__init__()
+                self.stops = []
+
+            def complete(self, system, prompt, *, max_tokens=256, **kw):
+                agent = next((a for a in R.AGENTS if f'[{a}]' in system), 'other')
+                self.stops.append((agent, kw.get('stop')))
+                return super().complete(system, prompt, max_tokens=max_tokens, **kw)
+        for variant, want in (('v1', None), ('v2', ['\n\n'])):
+            tmp, root = make_root()
+            try:
+                llm = Seen()
+                R.run(root, variant, router=Router(), llm=llm, limit=1)
+                seen = dict(llm.stops)
+                self.assertEqual(seen.get('Data Analyst'), want, variant)
+                self.assertTrue(all(s is None for a, s in llm.stops if a != 'Data Analyst'), variant)
+                self.assertEqual({k: v for k, v in R.VARIANTS['v2'].items() if k != 'analyst_stop'}, R.VARIANTS['v1'])
+            finally:
+                tmp.cleanup()
+
 
 if __name__ == '__main__':
     unittest.main()

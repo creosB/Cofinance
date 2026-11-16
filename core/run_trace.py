@@ -171,13 +171,13 @@ class TracedLLM:
     def __init__(self, backend: Any, trace: TraceRecorder, actor: str) -> None:
         self.backend, self.trace, self.actor = backend, trace, actor
 
-    def complete(self, system, prompt, *, max_tokens=256):
+    def complete(self, system, prompt, *, max_tokens=256, **options):
         # Tool-only mode is a deterministic fallback, never counted as a model call.
         if getattr(self.backend, "disabled", False):
             self.trace.event("Tool-only report", "decision", {"reason": "narrator_disabled"}, actor=self.actor, fallback=True)
             return ""
         # Do not record private system prompts or hidden reasoning tokens.
-        return self.trace.call("Narrate evidence", "model", lambda: self.backend.complete(system, prompt, max_tokens=max_tokens),
+        return self.trace.call("Narrate evidence", "model", lambda: self.backend.complete(system, prompt, max_tokens=max_tokens, **options),
                                actor=self.actor, model=model_name(self.backend),
                                inputs={"evidence": prompt, "system_characters": len(system), "output_token_limit": max_tokens})
 

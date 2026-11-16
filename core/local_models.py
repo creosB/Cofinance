@@ -332,14 +332,17 @@ class LocalModels:
                 time.sleep(.5)
         raise ModelError("Local narrator did not become ready within 90 seconds.")
 
-    def complete(self, system, prompt, *, max_tokens=256):
+    def complete(self, system, prompt, *, max_tokens=256, stop=None):
         if not self.ready or not self.process or self.process.poll() is not None:
             raise ModelError("Local narrator is not loaded.")
         self.check_cancel()
-        response = local_json(self.url + "/v1/chat/completions", {
+        body = {
             "model": MODEL_ID, "messages": [{"role":"system","content":system},{"role":"user","content":prompt}],
             "temperature": 0, "max_tokens": min(512,max_tokens), "stream": False,
-            "chat_template_kwargs": {"enable_thinking": False}}, key=self.key)
+            "chat_template_kwargs": {"enable_thinking": False}}
+        if stop:
+            body["stop"] = list(stop)
+        response = local_json(self.url + "/v1/chat/completions", body, key=self.key)
         self.check_cancel()
         choices = response.get("choices", [])
         if not choices or choices[0].get("finish_reason") != "stop":
