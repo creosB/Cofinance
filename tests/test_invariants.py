@@ -160,6 +160,18 @@ class TestCodeHygiene(unittest.TestCase):
 
 
 class TestWriting(unittest.TestCase):
+    def test_private_todo_stays_excluded(self):
+        ignored = set((ROOT / '.gitignore').read_text(encoding='utf-8').split())
+        self.assertIn('/TODO.md', ignored, 'Private planning is not a public repository artifact. Keep /TODO.md ignored.')
+        self.assertFalse((ROOT / 'TODO.md').exists(), 'Do not recreate the removed root TODO.md. Public docs describe the product and reproducible results.')
+
+    def test_active_docs_do_not_publish_private_workflow_locations(self):
+        private = ('https://app.clickup.com/', 'private roadmap', ':' + chr(92) + 'users' + chr(92), ':/users/')
+        targets = (ROOT / 'README.md', ROOT / 'docs/benchmarks/REPLAY.md')
+        hits = [str(p.relative_to(ROOT)) for p in targets if p.exists() and
+                any(marker in p.read_text(encoding='utf-8').lower() for marker in private)]
+        self.assertEqual(hits, [], 'Public product docs must not publish personal PC paths, private workspace links or private planning locations. Keep only product behavior, reproduction steps and evidence.')
+
     def test_no_em_or_en_dashes_in_docs_or_ui(self):
         targets = [ROOT / 'README.md', ROOT / 'frontend/README.md', *(ROOT / 'docs').rglob('*.md'),
                    *files('frontend/src', '.tsx', '.ts')]

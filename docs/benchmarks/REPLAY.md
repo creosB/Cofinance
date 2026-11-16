@@ -1,90 +1,100 @@
-# Replay benchmark: the full system at past dates
+# Replay benchmark: historical research and decisions
 
 > [!WARNING]
-> **Experimental.** A dev-window measurement of a research tool. Not a trading signal, not financial advice. Cofinance never trades.
+> **Experimental dev-window results.** No predictive edge demonstrated. Not a trading signal or financial advice. Cofinance never trades.
 
-## Question
+## Method
 
-The models are local and offline. So the whole live pipeline can be handed old data as if it were current, and its call can be scored against what happened next. This measures the system as it runs (router, Data Analyst, News Researcher, Team Lead, guards), not one prompt in isolation. Changes to guidance, parallelism and structure are each measured here, one at a time.
+`qualify/replay.py` runs the live router, Data Analyst, News Researcher, Team Lead and guards with historical replacements for the two data-tool ports. An **additional benchmark-only Decision call**, not a production forecast feature, returns UP, DOWN or ABSTAIN from the accepted team answer and specialist summaries.
 
-## Method (`qualify/replay.py`)
+- Market bars are restricted to origin T. News must pass the live gate and be available within seven days before the end of T, UTC.
+- Target: next session open to the fifth subsequent US-session close.
+- Baselines: always-UP, trailing 20-session momentum, and the majority direction of served news items.
+- Predictions are sealed before scoring. Existing sealed variants are never overwritten.
+- Tests include poisoned future prices. Three deliberate breaks were caught: removed news cutoff, future-derived all-time high, and scoring without a seal.
 
-- **Tools cut at the origin day T.** Prices: bars on or before T only. News: items that passed the live pre-gate and SignalGate at their own time and were available within 7 days before the end of T (UTC). The team is never told the date.
-- **Unchanged live code:** GLiNER router, the three agents, the guards. Only the two tool ports are swapped.
-- **Decision step:** one extra LFM3 call turns the accepted answer into UP, DOWN or ABSTAIN (first word of the reply).
-- **Target:** direction from T+1's open to the 5th session's close.
-- **Baselines:** always-UP; momentum20 (20-session close change); a news rule (more bullish than bearish served items means UP).
-- **Discipline:** predictions are resumable, sealed with hashes of the predictions and the code, and scored only after the seal. A sealed variant never reruns; a change is a new variant.
-- **Proof:** a test run with every future price poisoned to 99999 never shows it to any model; 3 of 3 deliberate breaks caught (no news cutoff, all-time high reading the future, scoring before the seal).
+## Development window
 
-## Window v1 (dev)
+Nine SPY-session origins, 2026-10-27 through 2026-11-06, across NVDA, AAPL, MSFT, AMZN, TSLA, AMD, GOOGL and BTC: **72 correlated cases**, not 72 independent weeks. Of 213 unique news items, 70 passed the gate. Outcomes rose in 31 of 72 cases.
 
-SPY sessions 2026-10-27 to 2026-11-06 (after LFM3's release on 10/27), 9 origins x 8 assets (NVDA, AAPL, MSFT, AMZN, TSLA, AMD, GOOGL, BTC) = 72 cases. News: 213 unique items, 70 accepted by the gate. Only 43% of cases rose: a falling window.
+## Results
 
-## Result, variant v1 (sealed 2026-11-16)
-
-| Arm | Accuracy (all 72) | Balanced accuracy | Calls |
+| Arm | Accuracy, all 72 | Balanced accuracy | Labels |
 | --- | --- | --- | --- |
-| System v1 | 41.7% | 0.484 | 71 UP, 1 error |
-| always-UP | 43.1% | 0.500 | 72 UP |
-| momentum20 | 52.8% | 0.507 | 25 UP, 47 DOWN |
-| News rule | 38.9% (60.9% of the 46 it called) | 0.404 | 26 abstained |
+| v1 | 41.7% | 0.484 | 71 UP, 1 error |
+| v2 | 43.1% | 0.500 | 71 UP, 1 error |
+| v3 | 0% including abstentions/errors | 0.000 | 63 ABSTAIN, 9 errors |
+| Always-UP | 43.1% | 0.500 | 72 UP |
+| Momentum20 | 52.8% | 0.507 | 25 UP, 47 DOWN |
+| News rule | 38.9% | 0.404 | 29 UP, 17 DOWN, 26 ABSTAIN |
 
-**Verdict: v1 is always-UP.** The full system said UP on 71 of 72 cases, including weeks where the price trend and the news pointed down, so it added no information over the simplest baseline. Momentum's edge comes from NVDA and BTC, which fell through the whole window (9 of 9 each); one trending window says nothing general.
+News-rule accuracy among its 46 directional calls was 60.9%. v3 made **no directional calls**, so its accuracy among calls is undefined, not zero. Errors and abstentions remain misses in the all-case metric. Zero missing outcomes and zero logged date-cutoff violations were reported. A date audit is not proof against every form of leakage or training contamination.
 
-## What the pipeline did
+### v1: unrestricted specialist output
 
-- Routes: all 72 went to thesis review with both specialists.
-- **Data Analyst ran out of tokens in 51 of 72 cases** and fell back to the plain fact list. Team Lead ran out in 7 (its guard then saw an empty candidate).
-- Team Lead answers passed the number guard in 59 of 72; others were rejected for an empty candidate (7), an unsupported risk (4) or unsupported terms (2), and fell back.
-- Served news: median 2 items per case, at most 5; 57 cases had some.
-- Decision always began with UP, then an explanation.
-- Leaks: 0 (every case's latest bar is T, every served item is before the cutoff). Median 38.7 s per case on CPU.
+The Data Analyst hit its token cap in 51 cases. Team Lead call errors occurred in seven; 59 final candidates passed the guards. Median case latency was 38.7 seconds. The near-constant UP output did not demonstrate useful direction discrimination.
 
-## Variant v2, lever 1: the Data Analyst stops at its first blank line (sealed 2026-11-16)
+[v1 measured report](replay-v1-2026-11-16.json)
 
-**Cause, found on v1's failing calls (dev only):** the budget was never too small. LFM3 wrote a correct one-paragraph summary, then a bullet list restating every fact, then planning text, until the 256-token cap. v2 is v1 plus one change: the Data Analyst's reply ends at its first blank line. Expectation written before the run: fallbacks drop, accuracy may not move.
+### v2: stop the Data Analyst at its first blank line
 
-| | v1 | v2 |
+A four-case diagnostic found usable first paragraphs followed by repetition until the token cap. v2 added a first-blank-line stop, without increasing the 256-token budget.
+
+| Measurement | v1 | v2 |
 | --- | --- | --- |
-| Data Analyst out of tokens | 51 of 72 | **0** |
-| Data Analyst summary passed the guards | 21 of 72 | **72 of 72** |
-| Team Lead answer passed the guards | 59 | 61 |
-| Team Lead out of tokens | 7 | 6 |
-| Median seconds per case | 38.7 | **28.9** |
-| System accuracy (all 72) | 41.7% | 43.1% |
-| System calls | 71 UP, 1 error | 71 UP, 1 error |
+| Data Analyst token-cap errors | 51 | 0 |
+| Analyst summaries passing guards | 21 | 72 |
+| Team Lead call errors | 7 | 6 |
+| Final answers passing guards | 59 | 61 |
+| Median seconds per case | 38.7 | 28.9 |
 
-**Verdict:** a clean pipeline win and no change in the call. The accuracy step is the error moving from one case to another (11/06 TSLA in v1, 11/04 GOOGL in v2), not a better decision: v2 is still exactly always-UP. The stop is now the live default for the Data Analyst (replay v1 passes no stop, so it stays reproducible). [v2 result file](replay-v2-2026-11-16.json)
+The analyst stop is the live default. This is a reliability improvement, **not evidence of better forecasts**: direction remained UP on every valid call. The accuracy difference reflects the error moving between cases. News and Team Lead fallbacks remain; the whole pipeline is not failure-free.
 
-## Variant v3, lever 2: a counting rubric for Decision (sealed 2026-11-17): failed
+[v2 measured report](replay-v2-2026-11-16.json)
 
-v3 is v2 plus a new Decision prompt, committed before any v3 output: count the last session change (+1 up, -1 down) and each bullish (+1) or bearish (-1) headline; above zero UP, below zero DOWN, zero ABSTAIN; do not assume prices usually rise. Judged on balanced accuracy against always-UP (0.500).
+### v3: counting instruction, not adopted
 
-| | v2 | v3 |
-| --- | --- | --- |
-| Calls | 71 UP, 1 error | **0 UP, 0 DOWN, 63 ABSTAIN, 9 errors** |
-| Coverage | 98.6% | **0%** |
-| Balanced accuracy | 0.500 | 0.000 |
-| Agreed with the rubric computed in Python | n/a | 11 of 72 (only cases where the rubric also abstains) |
+The Decision prompt instructed the model to sum last-session price direction and bullish/bearish headline counts, then choose UP, DOWN or ABSTAIN. It returned 63 abstentions and nine malformed responses under the existing 24-token output budget.
 
-**Verdict: not adopted.** LFM3 did not count; it swapped one default (UP) for another (ABSTAIN). The 9 errors are replies that began reasoning ("We need to...") instead of the one-word answer. For reference, the rubric itself, computed in Python while v3 ran, is right on 26 of the 59 cases it calls (44%) in this window, so even perfect adherence would not have beaten always-UP here. The rubric was not changed after that number was seen. [v3 result file](replay-v3-2026-11-17.json)
+A Python reference computed from raw snapshots and served-news labels produced 31 UP, 28 DOWN and 13 ABSTAIN, with 26 of 59 calls correct. Only 11 of 72 labels matched the model. **This is not an isolated arithmetic-adherence test:** the model received narrative reports, which can omit individual labels, while the reference used raw items. Truncation and the response contract are additional confounds. These results do not establish that the model is incapable of arithmetic.
 
-**What this says about structure:** a 1.7B narrator does not do arithmetic on its own reports. That matches the project rule that Python owns policy and models only classify or narrate. The Decision step asks the model to decide, which is the one place the design breaks that rule.
+[v3 measured report](replay-v3-2026-11-17.json)
 
-## What the window can and cannot tell us
+## Fast Decision screening
 
-72 cases from nine overlapping days, in a falling market, cannot separate good levers from lucky ones: momentum's 52.8% comes from two assets that fell all window. Pipeline health (fallbacks, guard passes, errors, speed) is measured cleanly here; direction accuracy needs more independent weeks.
+`qualify.decision_lab` reuses a sealed replay's **exact model-visible team reports**. It does not rerun the router or specialists, collect data, or expose outcomes during prediction. Structured labels are validated; malformed replies stay errors. Source, plan, prompt and prediction hashes are checked before scoring.
 
-## Next
+```text
+python -m qualify.decision_lab run --root data/replay_20261116 --out data/screen_contract --candidate contract-v1
+python -m qualify.decision_lab score --root data/replay_20261116 --out data/screen_contract
+```
 
-1. **Memorization probe** on LFM3 for older windows, which would allow a longer price history (older news still needs a historical source).
-2. **Structure:** the model classifies each signal; Python adds them into the call.
-3. **Data:** a trend fact (20-session change) for the Data Analyst, which the team does not see today.
-4. **Parallel views:** a bull and a bear reader before Decision.
+The default diagnostic selects the first and last origin per asset without looking at outcomes. `--sample full` explicitly screens all cached cases. The supplied contract and evidence-guidance candidates are experiments, not adopted product behavior.
+
+This is a cheap way to reject broken candidates, **not a substitute for end-to-end validation**. A shortlisted candidate still needs a full-team check and independent completed windows. Changing an upstream agent invalidates downstream cached reports.
+
+## Cached diagnostic results, 2026-11-17
+
+Both candidates were fixed before their runs and used identical saved v2 inputs: first and last origin per asset, 16 cases across two correlated days. These are diagnostic dev results, not full-system accuracy estimates.
+
+| Candidate | Correct / all 16 | UP / DOWN / ABSTAIN / error | Directional coverage | Decision-loop seconds |
+| --- | --- | --- | --- | --- |
+| Cached v2 reference | 4 / 16 | 16 / 0 / 0 / 0 | 100% | Not rerun |
+| Structured output, contract-v1 | 2 / 16 | 3 / 2 / 11 / 0 | 31.3% | 75.6 |
+| Evidence guidance, evidence-v1 | 2 / 16 | 5 / 2 / 9 / 0 | 43.8% | 92.5 |
+
+Both were rejected without another 72-case full-team run. They produced valid output, including DOWN labels, but did not improve all-case accuracy. Abstentions count as misses in that metric; accuracy among directional calls was 2/5 and 2/7 respectively. Always-UP scored 4/16, momentum20 9/16, and the news rule 5/16 (5/8 called).
+
+The contract candidate tied the source on the early day and worsened on the late day; the guidance candidate improved on the early day and worsened on the late day. Origin-cluster bootstrap intervals for the all-case accuracy difference versus cached v2 were [-0.25, 0.00] and [-0.375, 0.125]. **Two clusters are insufficient for reliable inference**, and neither result establishes an improvement. No missing outcomes or recorded date-cutoff violations. Timing excludes model startup and includes incidental PC load; this is not a controlled speed comparison. Upstream agents were not rerun.
+
+[Compact results, per-asset and split checks](decision-screen-2026-11-17.json)
 
 ## Limits
 
-Dev window, so tuning on it is expected and nothing here is a claim; cases overlap and are correlated (same week, same market). News availability is the item's own time, not an archived first-seen time. No point-in-time fundamentals for stocks. Prices are a current download. LFM3's training cutoff is unpublished. A claim needs a sealed variant on the test window (weeks after 11/13, replayed once they complete).
-
-Result file: [replay-v1-2026-11-16.json](replay-v1-2026-11-16.json)
+- Known dev outcomes and overlapping origins make these descriptive measurements, not independent performance estimates.
+- The nine-day window cannot establish a generalizable predictive improvement. No significance claim is made from the point estimates.
+- News timestamps are item publish/update/submit times, not archived first-seen times; day-only timestamps count at day end.
+- Stock fundamentals lack point-in-time values. Prices are a current download and can contain revisions.
+- No second-source cross-check was added for these replay inputs.
+- LFM3 was released on 2026-10-27; its training cutoff is unpublished. Release timing and a negative memorization probe cannot prove absence of training contamination.
+- No change to the frozen forward protocol or adoption of a new forecast feature follows from these dev results.

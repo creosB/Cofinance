@@ -137,7 +137,9 @@ To iterate fast without fooling ourselves, the lab reuses the same target on 2,8
 > [!WARNING]
 > **Experimental, dev window.** Tuning on this window is expected; no claim rests on it. Not a trading signal or financial advice.
 
-The local models are offline, so the whole live pipeline (router, Data Analyst, News Researcher, Team Lead, guards) can be run at a past date T with prices and gated news cut at T, then scored on the next five sessions. This is the measurement every guidance, parallelism and structure change is judged by. **v1 (72 cases, 10/27 to 11/06, 8 assets):** the system said UP on 71 of 72 (one error), 41.7% correct, the same as always-UP (43.1%) in a falling window; momentum20 got 52.8%, carried by NVDA and BTC falling all window. The Data Analyst ran out of tokens in 51 of 72 cases. 0 leaks. **v2 (lever 1):** ending the Data Analyst's reply at its first blank line took that to 0 of 72, every analyst summary passed the guards (21 before), and cases ran 25% faster; the call did not change (still UP on 71 of 72). **v3 (lever 2):** a counting rubric for the Decision step failed: LFM3 abstained on 63 of 72 and errored on 9, making no call at all, so a 1.7B narrator does not follow arithmetic guidance. This window (nine overlapping days, falling market) measures pipeline health well but cannot separate direction levers. [Method, result and levers](docs/benchmarks/REPLAY.md) · [Result file](docs/benchmarks/replay-v1-2026-11-16.json)
+The live research pipeline runs with prices and gated news restricted to each historical origin; an additional benchmark-only Decision call predicts the next five sessions. **No predictive edge demonstrated.** On 72 overlapping cases across eight assets, v1 scored 41.7%, v2 scored 43.1%, always-UP scored 43.1%, and momentum20 scored 52.8%. v2 removed the observed Data Analyst token-cap failures and reduced median case latency from 38.7 to 28.9 seconds, but still produced 71 UP labels and one error. v3 produced 63 abstentions and nine malformed responses, so it was not adopted. Its report inputs and short output budget prevent attributing the failure to arithmetic ability alone. The logged date-cutoff checks found no violations; this is not a complete leakage audit. [Method, results and limits](docs/benchmarks/REPLAY.md) · [Result file](docs/benchmarks/replay-v1-2026-11-16.json)
+
+Cached Decision-only checks reject weak prompt candidates before an expensive full replay. The first two diagnostic candidates produced valid labels but no accuracy improvement; neither was adopted. These checks do not replace end-to-end validation.
 
 ### Forward benchmark (started 2026-11-09)
 
@@ -192,13 +194,13 @@ For frontend development, run the Python server, then `npm run dev` in `frontend
 
 ## Open work
 
-v2 is not finished. The working to-do list lives in the maintainer's private roadmap; the main remaining gaps are:
+v2 remains experimental. The main product gaps are:
 
-- Human-reviewed labels, two additional real traps, reliable calibration and a fresh rule-urgency test on or after **2026-11-15**. Current rules are live, but not yet validated on that fresh corpus.
-- Repair the d1 compatibility blocker (needs a newer Transformers, which needs approval) before comparing optional judges or cascades. Jev now has a valid train-split score, but it is too slow and its scores too compressed to adopt.
-- Broader narrator quality evaluation, and claim provenance beyond matching values, words and signs.
-- More primary news coverage (Bitcoin/regulatory) and a bounded ongoing scheduler. Both need approval.
-- Reproducible fresh installation, backup/recovery and production-readiness checks. CI is deliberately out of scope at Baris's request.
+- Human-reviewed labels, reliable calibration and independent validation of the current urgency rules.
+- Compatibility testing for optional judges; no replacement for GLiNER has been adopted.
+- End-to-end prediction accuracy, broader narrator evaluation, and claim provenance beyond matching values, words and signs.
+- Broader primary-source coverage and bounded scheduled collection.
+- Reproducible fresh installation, backup/recovery and production-readiness checks.
 
 ## Repository map
 

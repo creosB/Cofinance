@@ -22,6 +22,9 @@ data/
 # Local agent spend ledger written by tooling on this PC
 .fabrika/
 
+# Private planning is not a repository artifact
+/TODO.md
+
 # Project-local dashboard dependencies and build output
 frontend/node_modules/
 frontend/dist/
