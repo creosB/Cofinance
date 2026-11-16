@@ -65,14 +65,19 @@ def retry(fn,*a,**k):
             time.sleep(1.5*2**attempt)
 
 
-def collect(root,lister=list_markets):
+def collect(root,lister=list_markets,*,seed=SEED,days=DAYS,size=SAMPLE,avoid_days=(),extra=None):
+    """Freeze a sample. The defaults reproduce the 2026-11-10 study exactly. A retest passes its own seed, the end days
+    the first study already used (so no market or event repeats) and `extra`, written into the protocol before any
+    price exists."""
     root.mkdir(parents=True,exist_ok=True)
     if (root/'protocol.json').exists():raise ValueError('Frozen sample exists: use a new root')
     lo,hi=when(WINDOW[0]),when(WINDOW[1]);seen=set();eligible=[];counts=defaultdict(int)
     # Gamma pages are 100 rows and refuse offsets past roughly 2,000, so listing a whole year is impossible.
     # Instead: a seeded random sample of end-date days, every qualifying market on each of those days.
     all_days=[datetime.fromtimestamp(lo+86400*i,timezone.utc).date().isoformat() for i in range(int((hi-lo)//86400))]
-    days=sorted(random.Random(SEED).sample(all_days,min(DAYS,len(all_days))))
+    skip=set(avoid_days)
+    all_days=[d for d in all_days if d not in skip]
+    days=sorted(random.Random(seed).sample(all_days,min(days,len(all_days))))
     for day in days:
         offset=0
         while offset<MAX_OFFSET:
@@ -94,10 +99,10 @@ def collect(root,lister=list_markets):
             if len(page)<100:break
         else:counts['day_truncated_at_offset_cap']+=1
     eligible.sort(key=lambda r:r['id'])
-    sample=sorted(random.Random(SEED).sample(eligible,min(SAMPLE,len(eligible))),key=lambda r:r['anchor'])
+    sample=sorted(random.Random(seed).sample(eligible,min(size,len(eligible))),key=lambda r:r['anchor'])
     (root/'sample.jsonl').write_text(''.join(json.dumps(r)+'\n' for r in sample),encoding='utf-8')
     protocol={'format':FORMAT,'frozen_at':datetime.now(timezone.utc).isoformat(),'window_close_time':WINDOW,
-        'min_volume_usd':MIN_VOLUME,'sampled_end_days':days,'sample_size':len(sample),'seed':SEED,'eligible':len(eligible),
+        'min_volume_usd':MIN_VOLUME,'sampled_end_days':days,'sample_size':len(sample),'seed':seed,'eligible':len(eligible),
         'excluded':dict(counts),'scored_outcome':'first listed outcome of any two-outcome market (Yes, Up, a team...)',
         'horizons_days':HORIZONS,'history_windows_days':WINDOWS,'fresh_seconds':FRESH_S,'fidelity_minutes':FIDELITY_MIN,'buckets':BUCKETS,
         'sample_sha256':digest((root/'sample.jsonl').read_bytes()),
@@ -105,6 +110,7 @@ def collect(root,lister=list_markets):
                  'Horizons are measured back from the actual close time.',
                  'Markets in one event (e.g. one Fed decision) are correlated; event counts are reported.',
                  'Only cleanly settled binary Yes/No markets (final prices 1/0) are included.']}
+    if extra:protocol.update(extra)
     dump(root/'protocol.json',protocol);return {k:protocol[k] for k in ('eligible','sample_size','excluded')}
 
 
