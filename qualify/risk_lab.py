@@ -14,6 +14,17 @@ Fixed before any risk number was computed on any split (2026-11-16):
   gate      a split passes when the mean gain is above 0 and p <= P_MAX. A claim needs validation AND test.
             The test split opens once, only after validation passed under the same code and cases.
             Opening it is also logged in the strategy lab's test_peeks.jsonl, because it shows test-period returns.
+  result    v1 FAILED on dev and validation (gain -0.10 and -0.08, p about 0.99): vol20 alone is a worse level
+            forecast than usual risk. Kept in data/lab_20261109/risk_report_v1.json; the level claim is closed.
+
+v2, fixed 2026-11-16 after v1, before any v2 number was computed on any split:
+  flag      a case is elevated when s_f > ELEVATED * s_b (same s_f and s_b as v1, unchanged).
+  outcome   a bigger-than-usual week: abs(return) > FLAG_SD * s_b. Chosen for power (about a third of weeks);
+            the 2 sd rate that v1 showed descriptively stays a secondary, descriptive number.
+  test      one-sided block bootstrap over weeks of rate(elevated) - rate(other), same blocks, draws, seed.
+  gate      dev and validation were both seen (v1 showed the 2 sd rates), so they are only a precondition:
+            the flag must point the same way (difference above 0) on both. The claim rests on the unseen
+            test split alone: difference above 0 and p <= P_MAX. One look.
 
 python -m qualify.risk_lab run --root data/lab_20261109 [--final]
 """
@@ -28,7 +39,7 @@ from pathlib import Path
 
 from .historical import digest, dump, lines
 
-FORMAT = 'cofinance-risk-lab/1'
+FORMAT = 'cofinance-risk-lab/2'
 MIN_PAST = 52
 BLOCK = 8
 RESAMPLES = 4000
@@ -37,8 +48,11 @@ P_MAX = 0.05
 Z90 = 1.6449
 ELEVATED = 1.25
 BIG_MOVE = 2.0
+FLAG_SD = 1.0
 SPLITS = ('dev', 'validation', 'test')
-GATE = {'mean_gain_above': 0.0, 'p_value_max': P_MAX, 'must_pass': ['validation', 'test'],
+GATE = {'level_v1': {'mean_gain_above': 0.0, 'p_value_max': P_MAX, 'must_pass': ['validation', 'test']},
+        'flag_v2': {'elevated_above': ELEVATED, 'outcome_sd': FLAG_SD, 'precondition': 'difference above 0 on dev and validation',
+                    'decides_on': 'test', 'p_value_max': P_MAX},
         'block_weeks': BLOCK, 'resamples': RESAMPLES, 'seed': SEED, 'min_past_cases': MIN_PAST}
 WARNING = ('Experimental risk measurement on past prices. Says nothing about direction. '
            'Not a trading signal or financial advice.')
@@ -73,20 +87,65 @@ def forecasts(rows):
     return out, dict(skipped)
 
 
+def block_indices(n, block=BLOCK, resamples=RESAMPLES, seed=SEED):
+    """Circular moving-block resamples of n weeks (indices into a doubled series), or None if too short."""
+    import numpy as np
+    if n < 2 * block:
+        return None
+    rng = np.random.default_rng(seed)
+    starts = rng.integers(0, n, size=(resamples, math.ceil(n / block)))
+    return (starts[:, :, None] + np.arange(block)[None, None, :]).reshape(resamples, -1)[:, :n]
+
+
 def block_bootstrap_p(values, block=BLOCK, resamples=RESAMPLES, seed=SEED):
     """One-sided p-value that the mean is above 0. Runs of BLOCK weeks stay together because risk clusters."""
     import numpy as np
     x = np.asarray(values, dtype=float)
-    n = len(x)
-    if n < 2 * block:
+    idx = block_indices(len(x), block, resamples, seed)
+    if idx is None:
         return None
     obs = float(x.mean())
     centered = np.concatenate([x - obs, x - obs])
-    rng = np.random.default_rng(seed)
-    starts = rng.integers(0, n, size=(resamples, math.ceil(n / block)))
-    idx = (starts[:, :, None] + np.arange(block)[None, None, :]).reshape(resamples, -1)[:, :n]
     means = centered[idx].mean(axis=1)
     return float((1 + int((means >= obs).sum())) / (resamples + 1))
+
+
+def flag_test(cases):
+    """v2: are bigger-than-usual weeks more common when the forecast says risk is elevated? Weeks are the unit."""
+    import numpy as np
+    weeks = defaultdict(lambda: [0, 0, 0, 0])
+    for c in cases:
+        hot = math.sqrt(c['var_f']) > ELEVATED * math.sqrt(c['var_b'])
+        big = abs(c['return']) > FLAG_SD * math.sqrt(c['var_b'])
+        w = weeks[c['origin']]
+        i = 0 if hot else 2
+        w[i] += 1
+        w[i + 1] += int(big)
+    out = {'outcome': f'abs(return) > {FLAG_SD} x usual weekly sd', 'passes': False}
+    if not weeks:
+        return out
+    arr = np.array([weeks[k] for k in sorted(weeks)], dtype=float)
+
+    def rates(a):
+        with np.errstate(invalid='ignore', divide='ignore'):
+            hot_rate = a[..., 1].sum(-1) / a[..., 0].sum(-1)
+            other_rate = a[..., 3].sum(-1) / a[..., 2].sum(-1)
+        return hot_rate - other_rate, hot_rate, other_rate
+
+    obs, hot_rate, other_rate = (float(v) for v in rates(arr))
+    out.update(elevated_cases=int(arr[:, 0].sum()), other_cases=int(arr[:, 2].sum()))
+    if not (out['elevated_cases'] and out['other_cases']):
+        return out
+    idx = block_indices(len(arr))
+    p = None
+    if idx is not None:
+        shifted = rates(np.concatenate([arr, arr])[idx])[0] - obs
+        hits = int(np.sum(~np.isnan(shifted) & (shifted >= obs)))
+        p = float((1 + hits) / (RESAMPLES + 1))
+    out.update(elevated_rate=round(hot_rate, 4), other_rate=round(other_rate, 4), difference=round(obs, 4),
+               ratio=round(hot_rate / other_rate, 3) if other_rate else None, p_value=p,
+               passes=bool(p is not None and obs > 0 and p <= P_MAX))
+    return out
 
 
 def gain(c):
@@ -95,7 +154,7 @@ def gain(c):
 
 def describe(cases):
     if not cases:
-        return {'n_cases': 0, 'passes': False}
+        return {'n_cases': 0, 'passes': False, 'flag': {'passes': False}}
     weeks = defaultdict(list)
     for c in cases:
         weeks[c['origin']].append(gain(c))
@@ -124,10 +183,11 @@ def describe(cases):
             'mean_qlike_forecast': round(sum(qlike(c['var_f'], c['return']) for c in cases) / n, 4),
             'mean_qlike_baseline': round(sum(qlike(c['var_b'], c['return']) for c in cases) / n, 4),
             'mean_weekly_gain': round(mean_gain, 4), 'p_value': p,
-            'passes': bool(p is not None and mean_gain > GATE['mean_gain_above'] and p <= P_MAX),
+            'passes': bool(p is not None and mean_gain > GATE['level_v1']['mean_gain_above'] and p <= P_MAX),
             'range90_coverage': {'forecast': cover('var_f'), 'baseline': cover('var_b')},
             'elevated_case_share': round(len(hot) / n, 4),
             'big_move_rate': {'elevated': big(hot), 'other': big(other)},
+            'flag': flag_test(cases),
             'per_asset': per_asset}
 
 
@@ -151,14 +211,16 @@ def run(root, final=False):
         prior = json.loads(report_path.read_text(encoding='utf-8'))
         if prior.get('code_sha256') != code or prior.get('cases_sha256') != cases_sha:
             raise ValueError('Code or cases changed since the validation run; rerun without --final')
-        if not prior['splits']['validation'].get('passes'):
-            raise ValueError('Validation did not pass; the test split stays locked')
+        seen = [(prior['splits'][s].get('flag') or {}).get('difference') for s in ('dev', 'validation')]
+        if not all(d is not None and d > 0 for d in seen):
+            raise ValueError('The flag did not point the same way on dev and validation; the test stays locked')
     splits, skipped = evaluate(lines(root / 'cases.jsonl'), SPLITS if final else SPLITS[:2])
     report = {'format': FORMAT, 'warning': WARNING, 'cases_sha256': cases_sha, 'code_sha256': code,
               'gate': GATE, 'skipped_without_history': skipped, 'splits': splits}
     if final:
         at = datetime.now(timezone.utc).isoformat()
-        report['claim'] = all(splits[s]['passes'] for s in GATE['must_pass'])
+        report['claim'] = bool(splits['test']['flag']['passes'])
+        report['claim_about'] = 'v2 risk flag on the unseen test split; the v1 level forecast already failed'
         report['opened_at'] = at
         entry = {'at': at, 'by': 'risk_lab', 'code_sha256': code, 'claim': report['claim']}
         for name in ('risk_peeks.jsonl', 'test_peeks.jsonl'):
@@ -179,6 +241,10 @@ def table(report):
                    f"p={s['p_value']} {'PASS' if s['passes'] else 'no pass'} "
                    f"cover90 f={s['range90_coverage']['forecast']} b={s['range90_coverage']['baseline']} "
                    f"big moves elevated={s['big_move_rate']['elevated']} other={s['big_move_rate']['other']}")
+        f = s['flag']
+        out.append(f"  flag: elevated {f.get('elevated_cases')} cases rate {f.get('elevated_rate')}, other "
+                   f"{f.get('other_cases')} rate {f.get('other_rate')}, difference {f.get('difference')}, "
+                   f"p={f.get('p_value')} {'PASS' if f['passes'] else 'no pass'}")
     return '\n'.join(out)
 
 

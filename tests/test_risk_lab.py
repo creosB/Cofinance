@@ -7,19 +7,21 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from qualify.historical import digest, write_lines
-from qualify.risk_lab import MIN_PAST, block_bootstrap_p, evaluate, forecasts, qlike, run
+from qualify.risk_lab import MIN_PAST, block_bootstrap_p, evaluate, flag_test, forecasts, qlike, run
 
 
-def make_rows(seed, clustered, weeks=400, symbols=('AAA', 'BBB')):
+def make_rows(seed, clustered, weeks=400, symbols=('AAA', 'BBB'), inverted=False):
     """Weekly cases. Clustered: risk switches between calm and wild every 20 weeks and vol20 sees it.
-    Constant: one risk level, vol20 is only a noisy estimate of it."""
+    Constant: one risk level, vol20 is only a noisy estimate of it. Inverted: vol20 sees the opposite regime."""
     rnd = random.Random(seed)
     rows = []
     start = date(2015, 1, 5)
     for sym in symbols:
         for w in range(weeks):
-            sigma = (0.01 if (w // 20) % 2 == 0 else 0.04) if clustered else 0.025
-            seen = sigma * (1 + rnd.gauss(0, 0.05 if clustered else 0.3))
+            calm = (w // 20) % 2 == 0
+            sigma = (0.01 if calm else 0.04) if clustered else 0.025
+            shown = (0.04 if calm else 0.01) if inverted else sigma
+            seen = shown * (1 + rnd.gauss(0, 0.05 if clustered else 0.3))
             d0 = start + timedelta(days=7 * w)
             split = 'dev' if w < 240 else 'validation' if w < 320 else 'test'
             rows.append({'id': f'{sym}:{d0}', 'symbol': sym, 'origin': str(d0),
@@ -102,15 +104,31 @@ class TestRiskLab(unittest.TestCase):
         finally:
             tmp.cleanup()
 
-    def test_failed_validation_keeps_the_test_locked(self):
-        tmp, root = make_root(make_rows(7, clustered=False))
+    def test_flag_against_the_data_keeps_the_test_locked(self):
+        tmp, root = make_root(make_rows(7, clustered=True, inverted=True))
         try:
-            self.assertFalse(run(root)['splits']['validation']['passes'])
+            rep = run(root)
+            self.assertLess(rep['splits']['validation']['flag']['difference'], 0)
             with self.assertRaises(ValueError):
                 run(root, final=True)
             self.assertFalse((root / 'risk_final.json').exists())
+            self.assertFalse((root / 'test_peeks.jsonl').exists())
         finally:
             tmp.cleanup()
+
+    def test_flag_finds_clustered_risk_and_not_inverted_or_constant(self):
+        hit = evaluate(make_rows(9, clustered=True), ('validation',))[0]['validation']['flag']
+        self.assertTrue(hit['passes'])
+        self.assertGreater(hit['elevated_rate'], hit['other_rate'])
+        for rows in (make_rows(9, clustered=True, inverted=True), make_rows(9, clustered=False)):
+            self.assertFalse(evaluate(rows, ('validation',))[0]['validation']['flag']['passes'])
+
+    def test_flag_counts_weeks_not_assets(self):
+        week = [{'id': f'{s}', 'symbol': s, 'origin': '2024-02-05', 'entry_date': '2024-02-06', 'split': 'dev',
+                 'return': 0.05, 'var_f': 0.0009, 'var_b': 0.0001} for s in 'ABC']
+        f = flag_test(week)
+        self.assertEqual((f['elevated_cases'], f['other_cases'], f['passes']), (3, 0, False))
+        self.assertNotIn('p_value', f)
 
     def test_changed_cases_are_refused(self):
         tmp, root = make_root(make_rows(8, clustered=True))
