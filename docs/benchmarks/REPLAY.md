@@ -41,10 +41,25 @@ SPY sessions 2026-10-27 to 2026-11-06 (after LFM3's release on 10/27), 9 origins
 - Decision always began with UP, then an explanation.
 - Leaks: 0 (every case's latest bar is T, every served item is before the cutoff). Median 38.7 s per case on CPU.
 
-## Levers this points to (v2, one at a time, same window)
+## Variant v2, lever 1: the Data Analyst stops at its first blank line (sealed 2026-11-16)
 
-1. **Data Analyst budget or prompt**, so the analysis exists instead of a template.
-2. **Decision guidance:** a rubric that weighs trend, drawdown and news direction, with ABSTAIN allowed.
+**Cause, found on v1's failing calls (dev only):** the budget was never too small. LFM3 wrote a correct one-paragraph summary, then a bullet list restating every fact, then planning text, until the 256-token cap. v2 is v1 plus one change: the Data Analyst's reply ends at its first blank line. Expectation written before the run: fallbacks drop, accuracy may not move.
+
+| | v1 | v2 |
+| --- | --- | --- |
+| Data Analyst out of tokens | 51 of 72 | **0** |
+| Data Analyst summary passed the guards | 21 of 72 | **72 of 72** |
+| Team Lead answer passed the guards | 59 | 61 |
+| Team Lead out of tokens | 7 | 6 |
+| Median seconds per case | 38.7 | **28.9** |
+| System accuracy (all 72) | 41.7% | 43.1% |
+| System calls | 71 UP, 1 error | 71 UP, 1 error |
+
+**Verdict:** a clean pipeline win and no change in the call. The accuracy step is the error moving from one case to another (11/06 TSLA in v1, 11/04 GOOGL in v2), not a better decision: v2 is still exactly always-UP. The stop is now the live default for the Data Analyst (replay v1 passes no stop, so it stays reproducible). [v2 result file](replay-v2-2026-11-16.json)
+
+## Next levers (one at a time, same window)
+
+2. **Decision guidance:** a rubric that weighs trend, drawdown and news direction, with ABSTAIN allowed. Every Decision reply in v1 and v2 began with UP.
 3. **Parallel views:** a bull and a bear reader before Decision.
 
 ## Limits

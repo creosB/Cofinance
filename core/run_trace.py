@@ -349,7 +349,8 @@ def run_traced_team(orchestrator, query: str, trace: TraceRecorder, *, session_i
     bus.subscribe(observe)
     bus.subscribe(original.bus.publish)
     clone = TeamLeadOrchestrator(RouterTrace(),
-        AgentTrace(DataAnalystAgent(TracedLLM(original.data_agent.llm, trace, "Data Analyst"), TracedTools(original.data_agent.tools, trace)), "Data Analyst"),
+        AgentTrace(DataAnalystAgent(TracedLLM(original.data_agent.llm, trace, "Data Analyst"), TracedTools(original.data_agent.tools, trace),
+                                    stop=getattr(original.data_agent, "stop", None)), "Data Analyst"),
         AgentTrace(NewsResearcherAgent(TracedLLM(original.news_agent.llm, trace, "News Researcher"), TracedStore(original.news_agent.store, trace)), "News Researcher"),
         TracedLLM(original.lead_llm, trace, "Market Team Lead"), tools, bus)
     try:

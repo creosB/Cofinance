@@ -267,11 +267,12 @@ class DataAnalystAgent:
         "If the Fear and Greed index is above seventy-five, warn that sentiment may be overheated."
     )
 
-    def __init__(self, llm: SmallLLMBackend, tools: MarketDataTools, stop: Optional[Sequence[str]] = None) -> None:
+    def __init__(self, llm: SmallLLMBackend, tools: MarketDataTools, stop: Optional[Sequence[str]] = ("\n\n",)) -> None:
         self.llm = llm
         self.tools = tools
-        # Replay v2 lever 1: LFM3 writes its summary as the first paragraph, then keeps restating the facts until the
-        # token cap. A stop sequence ends the reply after that paragraph. Opt-in until the replay benchmark shows it helps.
+        # LFM3 writes its summary as the first paragraph, then keeps restating the facts until the token cap.
+        # Ending the reply at the first blank line took replay fallbacks from 51 of 72 to 0 (v1 vs v2, 2026-11-16).
+        # Pass stop=None for the old behaviour (replay v1 does, so it stays reproducible).
         self.stop = list(stop) if stop else None
 
     def run(self, tickers: Sequence[str], risk_mode: str, bus: EventBus, session_id: str) -> SpecialistReport:

@@ -9,7 +9,7 @@ class RecordingLLM:
     def __init__(self):
         self.prompts = []
 
-    def complete(self, system, prompt, *, max_tokens=256):
+    def complete(self, system, prompt, *, max_tokens=256, **options):
         self.prompts.append((system, prompt))
         if "[Data Analyst]" in system:
             return "NVDA trades at 138.5 with a P/E of 34.2.\n\nNVDA last price: 138.5; P/E: 34.2."
@@ -34,7 +34,7 @@ class TestFollowUpContext(unittest.TestCase):
 
     def test_context_numbers_are_not_allowed_back_out(self):
         class Echo(RecordingLLM):
-            def complete(self, system, prompt, *, max_tokens=256):
+            def complete(self, system, prompt, *, max_tokens=256, **options):
                 if "[Data Analyst]" in system or "[News Researcher]" in system:
                     return super().complete(system, prompt, max_tokens=max_tokens)
                 return "Earlier the price was 777.7."

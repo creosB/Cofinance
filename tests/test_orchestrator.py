@@ -58,7 +58,7 @@ class Stub1BLLM:
         self.hallucinate_lead = hallucinate_lead
         self.calls = []
 
-    def complete(self, system, prompt, *, max_tokens=256):
+    def complete(self, system, prompt, *, max_tokens=256, **options):
         self.calls.append(system)
         if "📊 [Data Analyst]" in system:
             if "62500.0" in prompt:

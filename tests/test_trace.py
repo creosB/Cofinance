@@ -98,6 +98,19 @@ class TestTeamTrace(unittest.TestCase):
         self.assertTrue(any(n["status"] == "fallback" for n in gates))
         self.assertNotIn("999%", result.final_synthesis)
 
+    def test_traced_live_run_keeps_the_analyst_stop_and_nobody_else_gets_one(self):
+        # Replay v2 (2026-11-16): the stop took Data Analyst fallbacks from 51 of 72 to 0; the traced clone must keep it.
+        orch, llm, _ = self.make()
+        seen, original = [], llm.complete
+        def spy(system, prompt, *, max_tokens=256, **options):
+            seen.append(("[Data Analyst]" in system, options.get("stop")))
+            return original(system, prompt, max_tokens=max_tokens, **options)
+        llm.complete = spy
+        run_traced_team(orch, "Review NVDA", TraceRecorder("Stop", mode="fixture"))
+        self.assertIn((True, ["\n\n"]), seen)
+        self.assertTrue(all(stop is None for analyst, stop in seen if not analyst))
+        self.assertIsNone(DataAnalystAgent(llm, StubTools(), stop=None).stop)
+
     def test_reused_orchestrator_cannot_mix_trace_runs(self):
         orch, _, bus = self.make()
         a, b = TraceRecorder("A", mode="fixture"), TraceRecorder("B", mode="fixture")
