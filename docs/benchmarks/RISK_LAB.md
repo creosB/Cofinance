@@ -46,9 +46,21 @@ Moves above two usual standard deviations (side number): 12.3% of flagged test c
 - **Known effect:** volatility clustering is long documented. This measures it on our cases; it is not a discovery.
 - **Overlap:** the test window overlaps the May to Nov 2026 period already viewed once by the first [historical benchmark](HISTORICAL.md), for direction only.
 
+## New-asset check (2026-11-16): not confirmed
+
+The same v2 rule, imported unchanged (`qualify/risk_assets.py`, committed in `c2c5b44` before any of these prices were fetched), on nine assets the lab never used: GOOGL, AMZN, JPM, XOM, KO, JNJ, WMT, CAT and SPY. Same Yahoo host, window and splits; 5,382 cases, no missing bars. Decision, fixed in advance: on the test window the pooled flag must pass **and** at least 6 of the 9 assets must point the same way. One look.
+
+| Split | Flagged cases | Bigger-than-usual, flagged | Bigger-than-usual, other | p |
+| --- | --- | --- | --- | --- |
+| Dev (context) | 1,287 | 38.9% | 22.8% | 0.0002 |
+| Validation (context) | 140 | 31.4% | 23.4% | 0.023 |
+| **Test (decides)** | **212** | **34.4%** | **27.0%** | **0.015** |
+
+The pooled flag passed, but only **5 of 9** assets agreed on the test window (needed 6): JPM 4 of 9 flagged vs 8 of 66 other, KO 10 of 18 vs 18 of 57, JNJ 13 of 29 vs 19 of 46, CAT 16 of 41 vs 10 of 34, SPY 2 of 6 vs 8 of 69. Against: GOOGL 12 of 37 vs 14 of 38, AMZN 3 of 21 vs 16 of 54, XOM 1 of 8 vs 20 of 67, WMT 12 of 43 vs 12 of 32. Several assets have few flagged weeks, so per-asset direction is noisy, but the rule was set before the look and is kept. As a level forecast, vol20 again did not beat usual risk on validation or test.
+
 ## What it means
 
-A pre-registered pass, not yet a robust product signal. Cofinance does not show a risk flag in chat. Next: the same frozen rule on more assets, or forward weeks, before any chat use.
+Volatility clustering is visible when many assets are pooled, but the flag is too uneven asset by asset to say "risk is elevated for this stock this week". **Not confirmed. Cofinance does not show a risk flag in chat, and this flag is closed.** A different risk measure would be a new hypothesis with its own frozen run.
 
 ## Reproduce
 
@@ -57,4 +69,10 @@ python -m qualify.risk_lab run --root data/lab_20261109
 python -m qualify.risk_lab run --root data/lab_20261109 --final   (refuses: the test was already opened once)
 ```
 
-Result file: [risk-lab-2026-11-16.json](risk-lab-2026-11-16.json).
+```text
+python -m qualify.risk_assets collect  --root data/risk_assets_20261116
+python -m qualify.risk_assets build    --root data/risk_assets_20261116
+python -m qualify.risk_assets evaluate --root data/risk_assets_20261116   (refuses: already evaluated once)
+```
+
+Result files: [risk-lab-2026-11-16.json](risk-lab-2026-11-16.json) and [risk-assets-2026-11-16.json](risk-assets-2026-11-16.json).

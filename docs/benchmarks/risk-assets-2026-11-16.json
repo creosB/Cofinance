@@ -1,0 +1,310 @@
+{
+  "format": "cofinance-risk-assets/1",
+  "warning": "Experimental risk measurement on past prices. Says nothing about direction. Not a trading signal or financial advice.",
+  "evaluated_at": "2026-11-16T15:55:30.649884+00:00",
+  "cases_sha256": "37381578796a932500a0d9288b975cbd81b3b4ebc042a75137bbb6dc2fb7cf98",
+  "code_sha256": "7e7e199d3aeb2b611224285f2066a1c674b012fb465ee8048f28459f81ba3eba",
+  "risk_lab_code_sha256": "7d4ed0e262b1ef8486fcb7e4a6e522927701ab2ecc9a5a7f52c8e590cf3aa60c",
+  "assets": [
+    "GOOGL",
+    "AMZN",
+    "JPM",
+    "XOM",
+    "KO",
+    "JNJ",
+    "WMT",
+    "CAT",
+    "SPY"
+  ],
+  "skipped_without_history": {
+    "AMZN": 52,
+    "CAT": 52,
+    "GOOGL": 52,
+    "JNJ": 52,
+    "JPM": 52,
+    "KO": 52,
+    "SPY": 52,
+    "WMT": 52,
+    "XOM": 52
+  },
+  "decision": {
+    "pooled_flag_passes": true,
+    "assets_agreeing": 5,
+    "assets_needed": 6,
+    "confirmed": false
+  },
+  "test_per_asset": {
+    "GOOGL": {
+      "flagged": 37,
+      "flagged_big": 12,
+      "other": 38,
+      "other_big": 14,
+      "agrees": false
+    },
+    "AMZN": {
+      "flagged": 21,
+      "flagged_big": 3,
+      "other": 54,
+      "other_big": 16,
+      "agrees": false
+    },
+    "JPM": {
+      "flagged": 9,
+      "flagged_big": 4,
+      "other": 66,
+      "other_big": 8,
+      "agrees": true
+    },
+    "XOM": {
+      "flagged": 8,
+      "flagged_big": 1,
+      "other": 67,
+      "other_big": 20,
+      "agrees": false
+    },
+    "KO": {
+      "flagged": 18,
+      "flagged_big": 10,
+      "other": 57,
+      "other_big": 18,
+      "agrees": true
+    },
+    "JNJ": {
+      "flagged": 29,
+      "flagged_big": 13,
+      "other": 46,
+      "other_big": 19,
+      "agrees": true
+    },
+    "WMT": {
+      "flagged": 43,
+      "flagged_big": 12,
+      "other": 32,
+      "other_big": 12,
+      "agrees": false
+    },
+    "CAT": {
+      "flagged": 41,
+      "flagged_big": 16,
+      "other": 34,
+      "other_big": 10,
+      "agrees": true
+    },
+    "SPY": {
+      "flagged": 6,
+      "flagged_big": 2,
+      "other": 69,
+      "other_big": 8,
+      "agrees": true
+    }
+  },
+  "splits": {
+    "dev": {
+      "n_cases": 3645,
+      "n_weeks": 405,
+      "from": "2015-12-09",
+      "through": "2023-12-19",
+      "mean_qlike_forecast": -5.9257,
+      "mean_qlike_baseline": -5.8564,
+      "mean_weekly_gain": 0.0693,
+      "p_value": 0.25443639090227443,
+      "passes": false,
+      "range90_coverage": {
+        "forecast": 0.9097,
+        "baseline": 0.8894
+      },
+      "elevated_case_share": 0.3531,
+      "big_move_rate": {
+        "elevated": 0.1228,
+        "other": 0.039
+      },
+      "flag": {
+        "outcome": "abs(return) > 1.0 x usual weekly sd",
+        "passes": true,
+        "elevated_cases": 1287,
+        "other_cases": 2358,
+        "elevated_rate": 0.3885,
+        "other_rate": 0.2277,
+        "difference": 0.1608,
+        "ratio": 1.706,
+        "p_value": 0.00024993751562109475
+      },
+      "per_asset": {
+        "AMZN": {
+          "n": 405,
+          "mean_gain": 0.0604
+        },
+        "CAT": {
+          "n": 405,
+          "mean_gain": -0.0641
+        },
+        "GOOGL": {
+          "n": 405,
+          "mean_gain": -0.1616
+        },
+        "JNJ": {
+          "n": 405,
+          "mean_gain": 0.0619
+        },
+        "JPM": {
+          "n": 405,
+          "mean_gain": -0.0306
+        },
+        "KO": {
+          "n": 405,
+          "mean_gain": 0.2051
+        },
+        "SPY": {
+          "n": 405,
+          "mean_gain": 0.2168
+        },
+        "WMT": {
+          "n": 405,
+          "mean_gain": 0.0235
+        },
+        "XOM": {
+          "n": 405,
+          "mean_gain": 0.312
+        }
+      }
+    },
+    "validation": {
+      "n_cases": 594,
+      "n_weeks": 66,
+      "from": "2024-01-04",
+      "through": "2025-04-23",
+      "mean_qlike_forecast": -5.9739,
+      "mean_qlike_baseline": -6.0221,
+      "mean_weekly_gain": -0.0482,
+      "p_value": 0.9150212446888278,
+      "passes": false,
+      "range90_coverage": {
+        "forecast": 0.8956,
+        "baseline": 0.9293
+      },
+      "elevated_case_share": 0.2357,
+      "big_move_rate": {
+        "elevated": 0.0929,
+        "other": 0.0264
+      },
+      "flag": {
+        "outcome": "abs(return) > 1.0 x usual weekly sd",
+        "passes": true,
+        "elevated_cases": 140,
+        "other_cases": 454,
+        "elevated_rate": 0.3143,
+        "other_rate": 0.2335,
+        "difference": 0.0808,
+        "ratio": 1.346,
+        "p_value": 0.023494126468382906
+      },
+      "per_asset": {
+        "AMZN": {
+          "n": 66,
+          "mean_gain": -0.0744
+        },
+        "CAT": {
+          "n": 66,
+          "mean_gain": -0.1562
+        },
+        "GOOGL": {
+          "n": 66,
+          "mean_gain": -0.2139
+        },
+        "JNJ": {
+          "n": 66,
+          "mean_gain": -0.1481
+        },
+        "JPM": {
+          "n": 66,
+          "mean_gain": -0.0951
+        },
+        "KO": {
+          "n": 66,
+          "mean_gain": -0.0631
+        },
+        "SPY": {
+          "n": 66,
+          "mean_gain": 0.2121
+        },
+        "WMT": {
+          "n": 66,
+          "mean_gain": 0.0088
+        },
+        "XOM": {
+          "n": 66,
+          "mean_gain": 0.0957
+        }
+      }
+    },
+    "test": {
+      "n_cases": 675,
+      "n_weeks": 75,
+      "from": "2025-05-07",
+      "through": "2026-10-27",
+      "mean_qlike_forecast": -5.7857,
+      "mean_qlike_baseline": -5.8019,
+      "mean_weekly_gain": -0.0162,
+      "p_value": 0.664833791552112,
+      "passes": false,
+      "range90_coverage": {
+        "forecast": 0.8948,
+        "baseline": 0.88
+      },
+      "elevated_case_share": 0.3141,
+      "big_move_rate": {
+        "elevated": 0.0943,
+        "other": 0.0562
+      },
+      "flag": {
+        "outcome": "abs(return) > 1.0 x usual weekly sd",
+        "passes": true,
+        "elevated_cases": 212,
+        "other_cases": 463,
+        "elevated_rate": 0.3443,
+        "other_rate": 0.27,
+        "difference": 0.0744,
+        "ratio": 1.275,
+        "p_value": 0.015496125968507872
+      },
+      "per_asset": {
+        "AMZN": {
+          "n": 75,
+          "mean_gain": -0.078
+        },
+        "CAT": {
+          "n": 75,
+          "mean_gain": -0.0101
+        },
+        "GOOGL": {
+          "n": 75,
+          "mean_gain": -0.1409
+        },
+        "JNJ": {
+          "n": 75,
+          "mean_gain": -0.0094
+        },
+        "JPM": {
+          "n": 75,
+          "mean_gain": 0.0399
+        },
+        "KO": {
+          "n": 75,
+          "mean_gain": 0.061
+        },
+        "SPY": {
+          "n": 75,
+          "mean_gain": 0.1199
+        },
+        "WMT": {
+          "n": 75,
+          "mean_gain": -0.1077
+        },
+        "XOM": {
+          "n": 75,
+          "mean_gain": -0.0206
+        }
+      }
+    }
+  }
+}
