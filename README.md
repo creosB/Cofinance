@@ -95,7 +95,7 @@ The 91-row training split has AI-generated labels, not human ground truth. Its h
 | Arm | Observed outcome | Meaning |
 | --- | --- | --- |
 | GLiNER alone | 72.5% materiality accuracy; macro-F1 0.667; AUC 0.790; 0 request errors | Provisional training baseline, not production accuracy |
-| MiniCPM5-2B-Jev | 91/91 requests timed out under the 10 s request budget. A 3-row probe on 2026-11-16 measured about 72 s per request (p95 89 s) on this CPU | Budget was far too short; the arm is a slow judge, and its quality is still unmeasured |
+| MiniCPM5-2B-Jev | First run: 91/91 requests timed out under a 10 s budget. Rerun 2026-11-16 with a 900 s budget: 0 errors; 76.9% accuracy; macro-F1 0.435; AUC 0.874; trap accuracy 100%; scores squeezed into 0.02 to 0.26 (best digest threshold on this set 0.05); about 48 s per row (p95 83 s) on this CPU | Ranks materiality a bit better than GLiNER (AUC 0.874 vs 0.790) but its probabilities are badly compressed, so the current gate lines would never fire, and it is far too slow for live news. Train split only, model-written labels. Not adopted; no cascade decision |
 | d1-2B | Load failed due to an incompatible Transformers import | Blocked before inference; no quality score |
 
 No judge replacement has been adopted. Downloaded model files are pinned and checksum-verified; that is not the same as a working, qualified model.
@@ -186,7 +186,7 @@ For frontend development, run the Python server, then `npm run dev` in `frontend
 The source of truth is [TODO.md](TODO.md), not a claim that v2 is finished. Main remaining gaps:
 
 - Human-reviewed labels, two additional real traps, reliable calibration and a fresh rule-urgency test on or after **2026-11-15**. Current rules are live, but not yet validated on that fresh corpus.
-- Repair the Jev timeout and d1 compatibility blockers before comparing optional judges or cascades.
+- Repair the d1 compatibility blocker (needs a newer Transformers, which needs approval) before comparing optional judges or cascades. Jev now has a valid train-split score, but it is too slow and its scores too compressed to adopt.
 - Broader narrator quality evaluation, and claim provenance beyond matching values, words and signs.
 - More primary news coverage (Bitcoin/regulatory) and a bounded ongoing scheduler. Both need approval.
 - Reproducible fresh installation, backup/recovery and production-readiness checks. CI is deliberately out of scope at Baris's request.

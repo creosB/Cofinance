@@ -65,7 +65,8 @@ feature or finance claim is validated. Local logs and traces remain in ignored d
 ### 2. Qualification: partial, not calibrated
 
 - [x] Narrator comparison, 2026-11-09: LFM3 1.7B, MiniCPM5-1B and MiniCPM5-2B (Q4_K_M, llama.cpp b12110, 2 repeats) all passed the 7-unique-case narrator gate. Scores and limits are recorded in README.md and the Models disclosure; no selection changed. Baris explicitly retained LFM3 for quality, not the fastest smoke-suite candidate.
-- [ ] Repair judge bake-off integration failures: MiniCPM5-2B-Jev hit the request timeout on 91/91 train rows; d1-2B failed before inference on an incompatible Transformers import. These are NOT valid model-quality scores; no judge or cascade adoption decision follows from them.
+- [x] Jev timeout repaired (2026-11-16): the 10 s request budget was the cause (about 48 to 72 s per row on this CPU). Rerun with 900 s on the 91 train rows (data/bakeoff_20261108/judge_jev_t900.json, model labels, train only): 0 errors, accuracy 0.769, macro-F1 0.435, AUC 0.874 (GLiNER 0.790), trap accuracy 1.0, material_p squeezed into 0.018 to 0.259, p50 48 s, p95 83 s. Not adopted: compressed scores never reach the current gate lines and the latency rules out live use. No cascade decision.
+- [ ] Repair d1-2B: it failed before inference on an incompatible Transformers import (needs transformers 5.19 or newer; upgrading needs approval). No quality score exists for d1.
 
 - [x] Collect a real, source-preserving candidate corpus and blank human-label workflow.
 - [x] Run pinned local narrator smoke gates before allowing selection.
