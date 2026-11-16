@@ -14,6 +14,7 @@ import { PriceChart } from './price-chart'
 import { CrowdOdds } from './crowd-odds'
 import { ago, evidenceUrl, statusLabel } from '@/lib/domain'
 import { canForget, contextLine, itemFor } from '@/lib/memory'
+import { refText, segments, targetId } from '@/lib/citations'
 import { MemoryPanel } from './memory-panel'
 import type { ChatController, Message, Snapshot } from '@/lib/use-chat'
 
@@ -53,6 +54,16 @@ function Facts({ticker,snap}:{ticker:string;snap:Snapshot}){
 export const memoryLine=(m:Message['payload']['memory'])=>contextLine(m)
 const kind=(m:Message)=>m.payload.kind!=='research'?'':m.payload.mode==='facts'?'Tool-only':m.payload.faithful_synthesis===false?'Narrator output replaced':'Narrated locally'
 
+/** The answer text with a numbered chip after each number a tool value backs. Python chose the citations. */
+function Cited({message}:{message:Message}){
+ const p=message.payload
+ const jump=(id:string)=>{const el=document.getElementById(id);if(el){el.scrollIntoView({block:'nearest',behavior:'smooth'});el.focus({preventScroll:true})}}
+ return <>{segments(message.content,p.citations,p.evidence?.length||0).map((s,i)=>!s.refs?<span key={i}>{s.text}</span>:
+  <span key={i} className="cited">{s.text}<Tooltip><TooltipTrigger asChild>
+   <button type="button" className="cite-chip" aria-label={'Source '+s.n+': '+s.refs.map(refText).join('; ')} onClick={()=>jump(targetId(message.id,s.refs![0]))}>{s.n}</button>
+  </TooltipTrigger><TooltipContent>{s.refs.map((r,j)=><div key={j}>{refText(r)}</div>)}</TooltipContent></Tooltip></span>)}</>
+}
+
 function Answer({message,inspect,chat}:{message:Message;inspect:(id:string,spanId?:string)=>void;chat:ChatController}){
  const p=message.payload
  if(message.role==='user')return <article className="msg msg-user" aria-label="Your question"><div className="bubble">{message.content}</div></article>
@@ -66,13 +77,13 @@ function Answer({message,inspect,chat}:{message:Message;inspect:(id:string,spanI
  const mem=p.kind==='research'?itemFor(chat.memory,chat.conversation?.id,message.run_id):undefined
  return <article className="msg msg-answer" aria-label="Research response">
   <div className="msg-meta"><span>{new Date(message.created*1000).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}</span>{label&&<span className="answer-kind">{label}</span>}</div>
-  {!structured&&!legacy&&<div className="msg-body">{message.content}</div>}
-  {snaps.map(([t,s])=><Facts key={t} ticker={t} snap={s}/>)}
+  {!structured&&!legacy&&<div className="msg-body"><Cited message={message}/></div>}
+  {snaps.map(([t,s])=><div key={t} id={'facts-'+message.id+'-'+t} tabIndex={-1} className="cite-target"><Facts ticker={t} snap={s}/></div>)}
   {structured&&p.reports?.news&&<p className="msg-body news-summary">{p.reports.news}</p>}
   {legacy&&legacyNews&&<p className="msg-body news-summary">{legacyNews}</p>}
   {(p.charts||[]).map(chart=><PriceChart key={chart.ticker} data={chart}/>)}
   {p.crowd_odds&&<CrowdOdds odds={p.crowd_odds}/>}
-  {!!p.evidence?.length&&<div className="sources" aria-label="Sources">{p.evidence.map((s,i)=>{const href=evidenceUrl(s.url),meta=[s.source,s.as_of==='Unknown'?'time unknown':when(s.as_of)].filter(Boolean).join(', ');return href?<a key={href+i} href={href} target="_blank" rel="noreferrer noopener"><span className="source-name">{s.title}</span><span className="source-meta">{meta}</span><ArrowUpRight size={14} aria-hidden="true"/></a>:<p key={i}><span className="source-name">{s.title}</span><span className="source-meta">link unavailable</span></p>})}</div>}
+  {!!p.evidence?.length&&<div className="sources" aria-label="Sources">{p.evidence.map((s,i)=>{const href=evidenceUrl(s.url),meta=[s.source,s.as_of==='Unknown'?'time unknown':when(s.as_of)].filter(Boolean).join(', ');return href?<a key={href+i} id={'source-'+message.id+'-'+i} href={href} target="_blank" rel="noreferrer noopener"><span className="source-name">{s.title}</span><span className="source-meta">{meta}</span><ArrowUpRight size={14} aria-hidden="true"/></a>:<p key={i} id={'source-'+message.id+'-'+i} tabIndex={-1} className="cite-target"><span className="source-name">{s.title}</span><span className="source-meta">link unavailable</span></p>})}</div>}
   {p.coverage_note&&<div className="coverage"><Newspaper size={14} aria-hidden="true"/><span>{p.coverage_note}</span>{news&&!news.health.collected&&news.phase!=='running'&&<Button variant="ghost" size="sm" disabled={chat.busy||!!chat.workspace?.active_job} onClick={()=>{void chat.collectNews().catch(()=>{})}}>Collect news</Button>}{news?.phase==='running'&&<span className="quiet">Collecting news now</span>}</div>}
   {memoryLine(p.memory)&&<div className="coverage" title={(p.memory?.recalled||[]).map(r=>'Recalled: '+r.question).join('\n')||undefined}><History size={14} aria-hidden="true"/><span>{memoryLine(p.memory)}</span></div>}
   {message.role==='assistant'&&p.kind==='research'&&<div className="msg-actions">{message.run_id&&<Button variant="ghost" size="sm" onClick={()=>inspect(message.run_id!)}><Activity size={14}/>Execution</Button>}{mem&&(canForget(mem)?<Button variant="ghost" size="sm" disabled={chat.busy||!!chat.workspace?.active_job} onClick={()=>{void chat.forget(message.run_id!).catch(()=>{})}}><Eraser size={14}/>Forget from memory</Button>:<Button variant="ghost" size="sm" disabled><Check size={14}/>{mem.state==='forgotten'?'Forgotten from memory':'Blocked from recall'}</Button>)}{(p.tickers||[]).map(ticker=>{const tracked=chat.workspace?.watchlist.some(w=>w.ticker===ticker);return <Button key={ticker} variant="ghost" size="sm" disabled={chat.busy||tracked} onClick={()=>{void chat.post('/api/watchlist',{ticker}).catch(()=>{})}}>{tracked?<Check size={14}/>:<Plus size={14}/>}{tracked?'Tracking '+ticker:'Track '+ticker}</Button>})}</div>}

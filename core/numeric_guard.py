@@ -10,14 +10,15 @@ qualify/scorers.py is deliberately left unchanged: it is part of the narrator qu
 from __future__ import annotations
 
 import re
-from typing import Iterable, List
+from typing import Iterable, List, Tuple
 
 SCALES = {"thousand": 1e3, "million": 1e6, "billion": 1e9, "trillion": 1e12}
 _NUM = re.compile(r"(?<![\w.])-?\d[\d,]*\.?\d*%?(?:\s+(thousand|million|billion|trillion)\b)?", re.I)
 
 
-def numbers_in(text: str) -> List[float]:
-    out: List[float] = []
+def number_spans(text: str) -> List[Tuple[int, int, float]]:
+    """(start, end, value) for every number the guards read, scale words included in the span and the value."""
+    out: List[Tuple[int, int, float]] = []
     for m in _NUM.finditer(text or ""):
         scale = m.group(1)
         raw = m.group(0)[: m.start(1) - m.start(0)] if scale else m.group(0)
@@ -26,8 +27,15 @@ def numbers_in(text: str) -> List[float]:
             value = float(raw)
         except ValueError:
             continue
-        out.append(value * SCALES[scale.lower()] if scale else value)
+        end = m.end()
+        while end > m.start() and text[end - 1] in ",.":
+            end -= 1
+        out.append((m.start(), end, value * SCALES[scale.lower()] if scale else value))
     return out
+
+
+def numbers_in(text: str) -> List[float]:
+    return [value for _, _, value in number_spans(text)]
 
 
 def matches(n: float, a: float, tol: float = 1e-9) -> bool:

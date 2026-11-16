@@ -14,6 +14,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 from .chat_store import ChatStore, ACTIVE, valid_id
+from .citations import cite
 from .entities import extract_tickers
 from .gliner_decide import DEFAULT_ALIASES, GlinerQueryRouter, GlinerOutputError
 from .local_models import LocalModels, MODEL_ID, ModelError, Cancelled
@@ -279,6 +280,7 @@ class ChatService:
             payload={'kind':'research','mode':job['model'],'tickers':tickers,'charts':list(tools.charts.values()),
                      'crowd_odds':odds if odds and (odds.get('markets') or odds.get('errors')) else None,
                      'snapshots':tools.snapshots,'evidence':tools.evidence+news.evidence,
+                     'citations':cite(answer[:16000],tools.snapshots,tools.evidence+news.evidence),
                      'faithful_synthesis':result.faithful_synthesis,'risk_mode':result.risk_mode,
                      'coverage_note':coverage_note(health,tickers),
                      'news_collected':bool(health.get('collected')),
