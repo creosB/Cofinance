@@ -9,7 +9,27 @@ import uuid
 from pathlib import Path
 
 ID=re.compile(r"[0-9a-f]{32}")
-ACTIVE={"queued","running","cancelling"}
+FINISHED=frozenset({"complete","degraded"})
+STOPPED=frozenset({"cancelled","error","interrupted"})
+NEXT={
+    "queued":frozenset({"running","cancelling"})|STOPPED,
+    "running":frozenset({"cancelling"})|FINISHED|STOPPED,
+    "cancelling":STOPPED,
+}
+ACTIVE=frozenset(NEXT)
+STATUSES=ACTIVE|FINISHED|STOPPED
+WHY={"running":"worker starts","cancelling":"user asks to stop","complete":"answer saved",
+     "degraded":"answer saved, a step fell back","cancelled":"stop honoured","error":"run failed",
+     "interrupted":"server restarted"}
+
+
+def statechart():
+    """The chat job lifecycle as a Mermaid state diagram, built from NEXT so the picture cannot drift from the code.
+    A run saves an answer only on the way to complete or degraded; every other end has none; no end ever moves."""
+    lines=["stateDiagram-v2","    [*] --> queued"]
+    lines+=[f"    {state} --> {to}: {WHY[to]}" for state,moves in NEXT.items() for to in sorted(moves)]
+    lines+=[f"    {end} --> [*]" for end in sorted(FINISHED|STOPPED)]
+    return "\n".join(lines)+"\n"
 
 
 def valid_id(value):
@@ -42,7 +62,7 @@ class ChatStore:
 
     def recover(self):
         with self.db() as db:
-            db.execute("UPDATE chat_jobs SET status='interrupted',stage='Server restarted',error='Run interrupted by server restart. Not automatically retried.',updated=? WHERE status IN ('queued','running','cancelling')",(time.time(),))
+            db.execute("UPDATE chat_jobs SET status='interrupted',stage='Server restarted',error='Run interrupted by server restart. Not automatically retried.',updated=? WHERE status IN (?,?,?)",(time.time(),*sorted(ACTIVE)))
 
     def sessions(self):
         with self.db() as db:
@@ -121,24 +141,31 @@ class ChatStore:
         return self.job(run_id)
 
     def progress(self,run_id,stage,status=None,error=""):
+        """Move a run along NEXT, or with no status update the stage text of a running run. A move NEXT does not allow
+        from the run's current status changes nothing, so a late or repeated update is harmless."""
+        if status in FINISHED:raise ValueError("A finished status needs its answer: use finish().")
+        sources=sorted(s for s,moves in NEXT.items() if status in moves)
+        if status is not None and not sources:raise ValueError("Unknown run status.")
         with self.db() as db:
-            if status == 'running':
-                db.execute("UPDATE chat_jobs SET stage=?,status='running',updated=?,error=? WHERE id=? AND status='queued'",(stage[:160],time.time(),error[:300],run_id))
-            elif status == 'cancelling':
-                db.execute("UPDATE chat_jobs SET stage=?,status='cancelling',updated=?,error=? WHERE id=? AND status IN ('queued','running')",(stage[:160],time.time(),error[:300],run_id))
-            elif status:
-                db.execute("UPDATE chat_jobs SET stage=?,status=?,updated=?,error=? WHERE id=? AND status IN ('queued','running','cancelling')",(stage[:160],status,time.time(),error[:300],run_id))
-            else:db.execute("UPDATE chat_jobs SET stage=?,updated=? WHERE id=? AND status='running'",(stage[:160],time.time(),run_id))
+            if status is None:
+                db.execute("UPDATE chat_jobs SET stage=?,updated=? WHERE id=? AND status='running'",(stage[:160],time.time(),run_id))
+            else:
+                db.execute(f"UPDATE chat_jobs SET stage=?,status=?,updated=?,error=? WHERE id=? AND status IN ({','.join('?'*len(sources))})",
+                           (stage[:160],status,time.time(),error[:300],run_id,*sources))
 
     def finish(self,run_id,answer,payload,tickers,status):
+        """Save the answer and end the run in one transaction. Only a running run can finish, so a stopped, failed or
+        interrupted run never gains an answer and no run is finished twice."""
+        if status not in FINISHED:raise ValueError("A run with an answer ends as complete or degraded.")
         encoded=json.dumps(payload,ensure_ascii=True,allow_nan=False)
         if len(encoded)>2*1024*1024:raise ValueError("Research result exceeded the storage limit.")
         with self.db() as db:
             job=db.execute("SELECT * FROM chat_jobs WHERE id=?",(run_id,)).fetchone()
             if not job:raise KeyError("Run not found.")
             now=time.time()
+            if db.execute("UPDATE chat_jobs SET status=?,stage='Finished',updated=? WHERE id=? AND status='running'",(status,now,run_id)).rowcount!=1:
+                raise ValueError("The run is no longer running, so its answer was not saved.")
             db.execute("INSERT INTO chat_messages(id,session_id,role,content,created,run_id,payload) VALUES (?,?,'assistant',?,?,?,?)",(uuid.uuid4().hex,job['session_id'],answer[:16000],now,run_id,encoded))
-            db.execute("UPDATE chat_jobs SET status=?,stage='Finished',updated=? WHERE id=?",(status,now,run_id))
             db.execute("UPDATE chat_sessions SET tickers=?,updated=? WHERE id=?",(json.dumps(tickers),now,job['session_id']))
 
     def watchlist(self):
