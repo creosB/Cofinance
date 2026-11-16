@@ -4,7 +4,10 @@
   python dev.py test --bg       same, detached, log in data/_logs/suite.log (survives a 60 s bridge timeout)
   python dev.py run --bg NAME -- python -m qualify.btc_crowd evaluate --root data/x
                                 any long job, detached, log in data/_logs/NAME.log
-  python dev.py status          last result of every log in data/_logs (suite pass/fail, age, last line)
+  python dev.py status          every log in data/_logs: age, running/done/failed, last result
+  python dev.py wait NAME [--max S]
+                                block until a background job ends (default 50 s, fits one tool call): exit 0 done, 1 failed, 2 running.
+                                Use this instead of sleep-and-status loops; on 2, stop and check once later
   python dev.py news [--bg]     one Clock 1 collection over the official feeds (same path as the Collect button)
   python dev.py forward record|score [--bg]
                                 weekly forward benchmark; record publishes docs/benchmarks/forward-ledger.jsonl
@@ -48,9 +51,50 @@ def detached_command(argv, log):
     return f'cmd /c cd /d {quote(str(ROOT))} && set PYTHONPATH=.&& set PYTHONIOENCODING=utf-8&& {inner} > {quote(str(log))} 2>&1'
 
 
+EXIT = 'dev.py exit '
+PY = sys.executable if ' ' not in sys.executable else 'python'
+WAIT_MAX = 280      # under the bridge's 300 s process limit
+WAIT_DEFAULT = 50   # under the ~60 s a ClickUp tool call survives (measured 11/16), so a wait reports instead of dying
+
+
+def child(argv):
+    """Run a background job and end its log with an exit marker, so 'finished' is a fact, not a guess from age."""
+    ignore_console_breaks()
+    sys.stdout.flush()
+    code = subprocess.call(argv, cwd=ROOT, env=env())
+    print(f'{EXIT}{code}', flush=True)
+    return code
+
+
+def job_state(text):
+    """(state, exit code): ('done', 0), ('failed', n) or ('running', None) when the log has no exit marker yet."""
+    marks = re.findall(r'^' + re.escape(EXIT) + r'(-?\d+)\s*$', text, flags=re.M)
+    if not marks:
+        return 'running', None
+    code = int(marks[-1])
+    return ('done' if code == 0 else 'failed'), code
+
+
+def wait(name, max_s=WAIT_DEFAULT, tick=2.0):
+    """Block until a background job finishes or max_s passes. This is the loop guard for polling: one call, a hard cap,
+    and a plain answer (exit 0 done, 1 failed, 2 still running) instead of repeated sleep-and-status calls."""
+    log, started = log_path(name), time.monotonic()
+    max_s = min(max_s, WAIT_MAX)
+    while True:
+        text = log.read_text(encoding='utf-8', errors='replace') if log.exists() else ''
+        state, code = job_state(text)
+        if state != 'running':
+            print(f'{name} {state}: {summarize(text)}')
+            return 0 if code == 0 else 1
+        if time.monotonic() - started >= max_s:
+            print(f'{name} still running after {max_s:.0f} s. Stop polling; run "python dev.py wait {name}" once later.')
+            return 2
+        time.sleep(tick)
+
+
 def start_detached(argv, log):
     log.write_text(f'started {time.strftime("%Y-%m-%d %H:%M:%S")}: {" ".join(argv)}\n', encoding='utf-8')
-    line = detached_command(argv, log)
+    line = detached_command([PY, 'dev.py', 'child', '--', *argv], log)
     if os.name == 'nt':
         # WMI starts the process outside the bridge's process tree, so a request timeout cannot kill it.
         r = subprocess.run(['wmic', 'process', 'call', 'create', line], capture_output=True, text=True)
@@ -63,6 +107,7 @@ def start_detached(argv, log):
 
 
 def summarize(text):
+    text = '\n'.join(l for l in text.splitlines() if not l.startswith(EXIT))
     ran = re.findall(r'Ran (\d+) tests? in ([\d.]+)s', text)
     result = re.findall(r'^(OK.*|FAILED.*)$', text, flags=re.M)
     if ran and result:
@@ -77,7 +122,8 @@ def status():
         return
     for p in sorted(LOGS.glob('*.log'), key=lambda p: p.stat().st_mtime, reverse=True):
         age = int(time.time() - p.stat().st_mtime)
-        print(f'{p.stem:22s} {age // 60:4d} min ago  {summarize(p.read_text(encoding="utf-8", errors="replace"))}')
+        text = p.read_text(encoding='utf-8', errors='replace')
+        print(f'{p.stem:22s} {age // 60:4d} min ago  {job_state(text)[0]:8s} {summarize(text)}')
 
 
 FORWARD = {'record': ['record', '--root', 'data/forward_benchmark', '--publish', 'docs/benchmarks/forward-ledger.jsonl'],
@@ -177,9 +223,18 @@ def main(argv=None):
     f.add_argument('--bg', action='store_true')
     sub.add_parser('dashboard')
     sub.add_parser('features')
+    w = sub.add_parser('wait')
+    w.add_argument('name')
+    w.add_argument('--max', type=float, default=WAIT_DEFAULT)
+    c = sub.add_parser('child')
+    c.add_argument('argv', nargs=argparse.REMAINDER)
     a = ap.parse_args(argv)
     if a.cmd == 'status':
         return status()
+    if a.cmd == 'wait':
+        raise SystemExit(wait(a.name, a.max))
+    if a.cmd == 'child':
+        raise SystemExit(child(a.argv[1:] if a.argv[:1] == ['--'] else a.argv))
     if a.cmd == 'features':
         return features()
     if a.cmd == 'dashboard':
