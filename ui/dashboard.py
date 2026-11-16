@@ -13,6 +13,7 @@ import argparse
 import hashlib
 import json
 import re
+import time
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -25,6 +26,22 @@ CSP = ("default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline';
        "frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'")
 MIME = {".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
         ".woff2": "font/woff2", ".woff": "font/woff", ".svg": "image/svg+xml"}
+
+
+EVENT_TICK_S = 0.5      # how often the server looks for a change; the browser sleeps until told
+EVENT_KEEPALIVE_S = 15.0
+EVENT_LIFE_S = 600.0    # one stream per connection lifetime; the browser's EventSource reconnects by itself
+
+
+def event_mark(service, session_id: str) -> str:
+    """Short fingerprint of what the chat view shows: workspace state plus the selected conversation."""
+    parts = [service.snapshot()]
+    if session_id:
+        try:
+            parts.append(service.store.session(session_id))
+        except (ValueError, KeyError):
+            parts.append(None)
+    return hashlib.sha256(json.dumps(parts, sort_keys=True, default=str).encode()).hexdigest()[:16]
 
 
 def make_dashboard_handler(dist: Path, trace_dir: Path, corpus_dir: Path, service=None):
@@ -50,14 +67,16 @@ def make_dashboard_handler(dist: Path, trace_dir: Path, corpus_dir: Path, servic
 
         def interactive_get(self):
             parsed = urlsplit(self.path)
-            if not service or parsed.path not in {'/api/state', '/api/conversation', '/api/job', '/api/labels', '/api/memory'}:
+            if not service or parsed.path not in {'/api/state', '/api/conversation', '/api/job', '/api/labels', '/api/memory', '/api/events'}:
                 return False
             if not self.api_origin():
                 self.reply(403, {'error':'Local origin required.'})
                 return True
             try:
                 query = parse_qs(parsed.query, keep_blank_values=True)
-                if parsed.path == '/api/state' and not query:
+                if parsed.path == '/api/events' and set(query) <= {'session_id'} and len(query.get('session_id', [''])) == 1:
+                    self.stream_events(query.get('session_id', [''])[0])
+                elif parsed.path == '/api/state' and not query:
                     self.reply(200, {**service.snapshot(), 'csrf':csrf})
                 elif parsed.path == '/api/labels' and not query:
                     self.reply(200, labels.snapshot())
@@ -71,6 +90,32 @@ def make_dashboard_handler(dist: Path, trace_dir: Path, corpus_dir: Path, servic
             except (ValueError, KeyError):
                 self.reply(404, {'error':'Local record not found.'})
             return True
+
+        def stream_events(self, session_id):
+            """Server-sent events: `change` whenever the chat view's data changes, a comment line as keep-alive.
+            Read-only: carries a fingerprint, never the data itself. The browser fetches the data as before."""
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/event-stream; charset=utf-8')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('X-Content-Type-Options', 'nosniff')
+            self.end_headers()
+            self.close_connection = True
+            last, quiet, started = None, 0.0, time.monotonic()
+            try:
+                self.wfile.write(b'retry: 3000\n\n')
+                while not getattr(service, 'closed', False) and time.monotonic() - started < EVENT_LIFE_S:
+                    mark = event_mark(service, session_id)
+                    if mark != last:
+                        last, quiet = mark, 0.0
+                        self.wfile.write(f'event: change\ndata: {mark}\n\n'.encode())
+                    elif quiet >= EVENT_KEEPALIVE_S:
+                        quiet = 0.0
+                        self.wfile.write(b': keep-alive\n\n')
+                    self.wfile.flush()
+                    time.sleep(EVENT_TICK_S)
+                    quiet += EVENT_TICK_S
+            except OSError:
+                return
 
         def discard_body(self):
             # Drain a small declared body before an early rejection. Closing a socket with unread

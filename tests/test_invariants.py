@@ -156,7 +156,7 @@ class TestCodeHygiene(unittest.TestCase):
                 if '.test.' not in p.name)
         self.assertLessEqual(n, TIMER_BUDGET, f'{n} timer calls in frontend/src (budget {TIMER_BUDGET}). Timers used to '
                              'patch ordering bugs cause jank and GC churn. Use an event, an effect cleanup or the existing '
-                             'polling hooks in lib/use-chat.ts and lib/use-dashboard.ts.')
+                             'refresh loops: lib/live-sync.ts (stream first, timer only as fallback) and lib/use-dashboard.ts.')
 
 
 class TestWriting(unittest.TestCase):

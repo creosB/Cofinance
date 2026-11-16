@@ -3,9 +3,9 @@
   "about": "Every user-visible feature: where a user reaches it, the API routes and code behind it, and what proves it works. tests/test_feature_map.py fails when a route, view or UI component has no entry, or an entry points at a missing file.",
   "features": [
     {"id": "chat", "name": "Ask about an asset", "view": "chat", "reach": "Chat view: type a question and send",
-     "api": ["/api/chat", "/api/job", "/api/jobs/cancel", "/api/conversation"],
-     "code": ["core/chat_service.py", "core/orchestrator.py", "frontend/src/components/chat-workspace.tsx", "frontend/src/lib/use-chat.ts"],
-     "proof": ["tests/test_chat.py", "tests/test_ui_new_chat.py", "tests/test_followup_context.py", "tests/test_orchestrator.py"]},
+     "api": ["/api/chat", "/api/job", "/api/jobs/cancel", "/api/conversation", "/api/events"],
+     "code": ["core/chat_service.py", "core/orchestrator.py", "frontend/src/components/chat-workspace.tsx", "frontend/src/lib/use-chat.ts", "frontend/src/lib/live-sync.ts"],
+     "proof": ["tests/test_chat.py", "tests/test_ui_new_chat.py", "tests/test_followup_context.py", "tests/test_orchestrator.py", "tests/test_events_stream.py", "frontend/src/lib/live-sync.test.ts"]},
     {"id": "guards", "name": "Answer guards (numbers, wording, risks)", "view": "chat", "reach": "Inside every chat answer; rejected text shows in the run map",
      "api": [], "code": ["core/numeric_guard.py", "core/claims.py", "core/risk_cues.py"],
      "proof": ["tests/test_readable_numbers.py", "tests/test_guard_boundaries.py", "tests/test_claims.py", "tests/test_risk_cues.py"]},

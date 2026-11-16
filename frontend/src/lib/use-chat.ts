@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { object, text, numeric } from './domain'
 import { parseMemory } from './memory'
 import type { MemoryState } from './memory'
+import { liveSync } from './live-sync'
+import type { Connect } from './live-sync'
 
 export interface Job {id:string;session_id:string;query:string;model:string;status:string;stage:string;error:string;created:number;updated:number}
 export interface SessionMeta {id:string;title:string;created:number;updated:number}
@@ -65,7 +67,7 @@ export function useChat(){
  const refresh=useCallback(()=>setVersion(v=>v+1),[])
  const select=useCallback((value:string)=>{selectedRef.current=value;setSelected(value);setConversation(null);setMemory(null);try{localStorage.setItem('cofinance.chat',value)}catch{}},[])
  useEffect(()=>{
-  let disposed=false,timer:ReturnType<typeof setTimeout>|undefined
+  let disposed=false
   const stop=new AbortController()
   async function poll(){
    const controller=new AbortController(),abort=()=>controller.abort();stop.signal.addEventListener('abort',abort,{once:true});const timeout=setTimeout(abort,10000)
@@ -88,9 +90,15 @@ export function useChat(){
     }
     if(!disposed)setError('')
    }catch(e){if(!disposed)setError(e instanceof Error&&e.name!=='AbortError'?e.message:'The local server did not respond. Your saved conversations are unchanged.')}
-   finally{clearTimeout(timeout);stop.signal.removeEventListener('abort',abort);if(!disposed)timer=setTimeout(poll,1200)}
+   finally{clearTimeout(timeout);stop.signal.removeEventListener('abort',abort)}
   }
-  void poll();return()=>{disposed=true;stop.abort();clearTimeout(timer)}
+  const url='/api/events'+(selectedRef.current?'?session_id='+encodeURIComponent(selectedRef.current):'')
+  const connect:Connect|undefined=typeof EventSource==='undefined'?undefined:on=>{
+   const events=new EventSource(url);events.onopen=on.open;events.onerror=on.error;events.addEventListener('change',on.change)
+   return()=>events.close()
+  }
+  const dispose=liveSync(poll,{connect})
+  return()=>{disposed=true;stop.abort();dispose()}
  },[selected,version,select])
  const post=useCallback(async(path:string,body:unknown,timeoutMs=15000)=>{
   if(!workspace)throw Error('Wait for the local workspace to connect.')
