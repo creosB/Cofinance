@@ -1,0 +1,46 @@
+{
+  "warning": "Experimental grounding check on sealed dev replay outputs. Not a trading signal or advice.",
+  "variant": "v2",
+  "predictions_sha256": "ec32e2fa32db281d631e4a3da5ced5da27eeb2da594843a60298eadc5c6495dc",
+  "cases": 72,
+  "fields": {
+    "answer": {
+      "texts": 72,
+      "numbers": 393,
+      "untraced": 0,
+      "examples": []
+    },
+    "data_summary": {
+      "texts": 72,
+      "numbers": 533,
+      "untraced": 0,
+      "examples": []
+    },
+    "news_summary": {
+      "texts": 72,
+      "numbers": 80,
+      "untraced": 0,
+      "examples": []
+    }
+  },
+  "guards": {
+    "answer_accepted": 61,
+    "answer_fallback": 11,
+    "reasons": {
+      "numbers_matched": 61,
+      "empty_candidate": 5,
+      "unsupported_risk": 2,
+      "unsupported_terms": 4
+    },
+    "data_summary_accepted": 72,
+    "news_summary_accepted": 17
+  },
+  "tool_data_unavailable": {
+    "fundamentals": 63
+  },
+  "limits": [
+    "Value matching, not meaning: a number matching the wrong field counts as traced",
+    "Same matcher the guards use, so this checks the rule holds end to end, not an independent judge",
+    "Dev replay window, 72 correlated cases"
+  ]
+}

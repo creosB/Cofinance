@@ -1,0 +1,264 @@
+{
+ "format": "cofinance-decision-window-public/1",
+ "warning": "Experimental sealed forecast on an unseen window, scored once after it matures. Not a trading signal or financial advice.",
+ "candidate": "headline-v1",
+ "window": [
+  "2026-11-09",
+  "2026-11-13"
+ ],
+ "rule": "one look; success needs AUC above 0.50 with the origin-cluster interval excluding 0.50",
+ "sealed_at": "2026-11-17T06:37:55.164096+00:00",
+ "seal": {
+  "plan.json": "676bde91e26f200784bf7cc09c4f4ec57208fbb110389f6b5122551b42bd45df",
+  "judgments.jsonl": "c15c9f4e12edd5110a451fbdb47003c80ea918bf731572b5328676c12c6ad5fc",
+  "calls.jsonl": "4cb7d963e1e0e6e5b242868617be0fd710d52b9a8880e979af0af20a96a6d0a6"
+ },
+ "headlines": 34,
+ "labels": {
+  "ABSTAIN": 18,
+  "DOWN": 12,
+  "UP": 10
+ },
+ "calls": [
+  {
+   "id": "2026-11-09:NVDA",
+   "score": 0.045578,
+   "label": "ABSTAIN",
+   "headlines": 5
+  },
+  {
+   "id": "2026-11-09:AAPL",
+   "score": 0.224586,
+   "label": "ABSTAIN",
+   "headlines": 3
+  },
+  {
+   "id": "2026-11-09:MSFT",
+   "score": -0.992822,
+   "label": "DOWN",
+   "headlines": 2
+  },
+  {
+   "id": "2026-11-09:AMZN",
+   "score": 0,
+   "label": "ABSTAIN",
+   "headlines": 0
+  },
+  {
+   "id": "2026-11-09:TSLA",
+   "score": -3.889698,
+   "label": "DOWN",
+   "headlines": 5
+  },
+  {
+   "id": "2026-11-09:AMD",
+   "score": 3.988846,
+   "label": "UP",
+   "headlines": 5
+  },
+  {
+   "id": "2026-11-09:GOOGL",
+   "score": 0,
+   "label": "ABSTAIN",
+   "headlines": 0
+  },
+  {
+   "id": "2026-11-09:BTC",
+   "score": 0,
+   "label": "ABSTAIN",
+   "headlines": 0
+  },
+  {
+   "id": "2026-11-10:NVDA",
+   "score": 1.007595,
+   "label": "UP",
+   "headlines": 5
+  },
+  {
+   "id": "2026-11-10:AAPL",
+   "score": 1.011481,
+   "label": "UP",
+   "headlines": 3
+  },
+  {
+   "id": "2026-11-10:MSFT",
+   "score": -0.992822,
+   "label": "DOWN",
+   "headlines": 2
+  },
+  {
+   "id": "2026-11-10:AMZN",
+   "score": 0.110704,
+   "label": "ABSTAIN",
+   "headlines": 1
+  },
+  {
+   "id": "2026-11-10:TSLA",
+   "score": -3.889698,
+   "label": "DOWN",
+   "headlines": 5
+  },
+  {
+   "id": "2026-11-10:AMD",
+   "score": 3.094549,
+   "label": "UP",
+   "headlines": 5
+  },
+  {
+   "id": "2026-11-10:GOOGL",
+   "score": 0,
+   "label": "ABSTAIN",
+   "headlines": 0
+  },
+  {
+   "id": "2026-11-10:BTC",
+   "score": 0,
+   "label": "ABSTAIN",
+   "headlines": 0
+  },
+  {
+   "id": "2026-11-11:NVDA",
+   "score": -0.360856,
+   "label": "ABSTAIN",
+   "headlines": 5
+  },
+  {
+   "id": "2026-11-11:AAPL",
+   "score": 1.011481,
+   "label": "UP",
+   "headlines": 3
+  },
+  {
+   "id": "2026-11-11:MSFT",
+   "score": -0.993002,
+   "label": "DOWN",
+   "headlines": 1
+  },
+  {
+   "id": "2026-11-11:AMZN",
+   "score": 0.110704,
+   "label": "ABSTAIN",
+   "headlines": 1
+  },
+  {
+   "id": "2026-11-11:TSLA",
+   "score": -3.889698,
+   "label": "DOWN",
+   "headlines": 5
+  },
+  {
+   "id": "2026-11-11:AMD",
+   "score": 3.08323,
+   "label": "UP",
+   "headlines": 5
+  },
+  {
+   "id": "2026-11-11:GOOGL",
+   "score": 0,
+   "label": "ABSTAIN",
+   "headlines": 0
+  },
+  {
+   "id": "2026-11-11:BTC",
+   "score": 0,
+   "label": "ABSTAIN",
+   "headlines": 0
+  },
+  {
+   "id": "2026-11-12:NVDA",
+   "score": -1.357452,
+   "label": "DOWN",
+   "headlines": 5
+  },
+  {
+   "id": "2026-11-12:AAPL",
+   "score": 1.011481,
+   "label": "UP",
+   "headlines": 3
+  },
+  {
+   "id": "2026-11-12:MSFT",
+   "score": -0.993002,
+   "label": "DOWN",
+   "headlines": 1
+  },
+  {
+   "id": "2026-11-12:AMZN",
+   "score": 0.110704,
+   "label": "ABSTAIN",
+   "headlines": 1
+  },
+  {
+   "id": "2026-11-12:TSLA",
+   "score": -3.889698,
+   "label": "DOWN",
+   "headlines": 5
+  },
+  {
+   "id": "2026-11-12:AMD",
+   "score": 1.094579,
+   "label": "UP",
+   "headlines": 4
+  },
+  {
+   "id": "2026-11-12:GOOGL",
+   "score": 0,
+   "label": "ABSTAIN",
+   "headlines": 0
+  },
+  {
+   "id": "2026-11-12:BTC",
+   "score": 0,
+   "label": "ABSTAIN",
+   "headlines": 0
+  },
+  {
+   "id": "2026-11-13:NVDA",
+   "score": -1.357452,
+   "label": "DOWN",
+   "headlines": 5
+  },
+  {
+   "id": "2026-11-13:AAPL",
+   "score": 1.011481,
+   "label": "UP",
+   "headlines": 3
+  },
+  {
+   "id": "2026-11-13:MSFT",
+   "score": -3.388938,
+   "label": "DOWN",
+   "headlines": 5
+  },
+  {
+   "id": "2026-11-13:AMZN",
+   "score": 0.056499,
+   "label": "ABSTAIN",
+   "headlines": 2
+  },
+  {
+   "id": "2026-11-13:TSLA",
+   "score": -3.889698,
+   "label": "DOWN",
+   "headlines": 5
+  },
+  {
+   "id": "2026-11-13:AMD",
+   "score": 1.094579,
+   "label": "UP",
+   "headlines": 4
+  },
+  {
+   "id": "2026-11-13:GOOGL",
+   "score": 0,
+   "label": "ABSTAIN",
+   "headlines": 0
+  },
+  {
+   "id": "2026-11-13:BTC",
+   "score": 0,
+   "label": "ABSTAIN",
+   "headlines": 0
+  }
+ ]
+}
