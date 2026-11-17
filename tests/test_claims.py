@@ -61,19 +61,23 @@ class TestFinanceShorthand(unittest.TestCase):
 
 
 class TestPipelineUsesWordingCheck(unittest.TestCase):
-    def test_news_narration_with_invented_category_falls_back(self):
+    def test_news_report_is_a_python_digest_that_never_calls_the_narrator(self):
+        # Since 2026-11-17 the News Researcher quotes headlines; the narrator below would invent "chips" if called.
         class Store:
             def get_gated_signals(self, ticker, limit=5):
                 return [Outcome(Item(ticker, "nvidia_newsroom", "https://nvidianews.nvidia.com/x",
                                      "How Companies Are Using NVIDIA DSX to Break the Power Bottleneck"),
                                 Action.DIGEST, "material_not_urgent", Judgment(0.7, 0.4, "bullish", 0.6))]
         class Narrator:
+            calls = 0
             def complete(self, *a, **k):
+                Narrator.calls += 1
                 return "New DSX chips break the power bottleneck."
         report = NewsResearcherAgent(Narrator(), Store()).run(["NVDA"], EventBus(), "t")
-        self.assertFalse(report.faithful_numbers)
-        self.assertEqual(report.validation["validation_reason"], "unsupported_terms")
-        self.assertIn("chips", report.validation["unsupported_terms"])
+        self.assertEqual(Narrator.calls, 0)
+        self.assertTrue(report.faithful_numbers)
+        self.assertEqual(report.validation["validation_reason"], "python_digest")
+        self.assertNotIn("chips", report.summary)
         self.assertIn("How Companies Are Using NVIDIA DSX", report.summary)
 
     def test_clean_data_narration_still_passes(self):

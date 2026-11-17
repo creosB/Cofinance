@@ -92,8 +92,9 @@ class TestMultiAgentOrchestrator(unittest.TestCase):
         self.assertEqual(tools.watchlist, [])  # research is not permission to track assets
         self.assertEqual(tools.charts, ["chart://NVDA", "chart://TSLA"])
         self.assertTrue(res.faithful_synthesis)
-        # Verify all 3 agents ran with their own isolated system prompts
-        self.assertEqual(len(llm.calls), 3)
+        # Data Analyst and Team Lead narrate; the News Researcher is a Python digest (2026-11-17)
+        self.assertEqual(len(llm.calls), 2)
+        self.assertIn("NVDA raises Q4 revenue guidance by 12%", res.news_report.summary)
         event_types = [e.event_type for e in res.events]
         self.assertIn("EXECUTIVE_ROUTE", event_types)
         self.assertIn("AGENT_DELEGATION", event_types)

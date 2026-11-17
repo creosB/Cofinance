@@ -35,9 +35,9 @@ class Narrator:
         return reply
 
 
-def run(rows, *replies, retry=True):
+def run(rows, *replies):
     llm = Narrator(*replies)
-    return NewsResearcherAgent(llm, Store(rows), retry=retry).run(["NVDA"], EventBus(), "t"), llm
+    return NewsResearcherAgent(llm, Store(rows)).run(["NVDA"], EventBus(), "t"), llm
 
 
 class TestNumberScales(unittest.TestCase):
@@ -138,50 +138,47 @@ class TestWordingEquivalents(unittest.TestCase):
         self.assertIn("earnings", unsupported_terms("Nvidia earnings are coming.", "Nvidia announces new GeForce drivers"))
 
 
-class TestNewsResearcher(unittest.TestCase):
+class TestNewsDigest(unittest.TestCase):
+    """Since 2026-11-17 the News Researcher is a Python digest: grounded-v1 to v4 narration failed (Work log)."""
     ROWS = [outcome("NVIDIA Unveils Minerva for AI Factories", "nvidia_newsroom"),
             outcome("Nvidia chips pile up in Hong Kong as China withholds import approval", "hackernews", direction="bearish")]
 
-    def test_prompt_names_one_source_per_headline_without_gate_labels(self):
-        report, llm = run(self.ROWS, "NVIDIA announced Minerva for AI Factories.")
-        prompt = llm.prompts[0]
-        self.assertIn("- NVDA, NVIDIA Newsroom, company announcement: NVIDIA Unveils Minerva", prompt)
-        self.assertIn("Hacker News, shared link", prompt)
-        for label in ("digest", "alert", "bullish", "bearish", "neutral"):
-            self.assertNotIn(label, prompt.lower())
-        self.assertTrue(report.faithful_numbers, report.validation)
+    def test_digest_quotes_headlines_by_source_and_never_calls_the_narrator(self):
+        report, llm = run(self.ROWS)
+        self.assertEqual(llm.prompts, [])
+        self.assertEqual(report.summary,
+                         "NVDA, from NVIDIA Newsroom (company announcement): NVIDIA Unveils Minerva for AI Factories. "
+                         "NVDA, from Hacker News (shared link): Nvidia chips pile up in Hong Kong as China withholds import approval.")
+        self.assertTrue(report.faithful_numbers)
+        self.assertEqual(report.validation["validation_reason"], "python_digest")
+        for label in ("digest", "alert", "bullish", "bearish", "neutral", "consensus"):
+            self.assertNotIn(label, report.summary.lower())
         self.assertEqual(report.raw_facts["NVDA"][1]["direction"], "bearish")  # labels stay in Python's facts
 
-    def test_one_feedback_retry_then_fallback(self):
-        report, llm = run(self.ROWS, "The consensus is bullish on Minerva.", "NVIDIA announced Minerva.")
+    def test_groups_keep_served_order_numbers_and_no_dashes(self):
+        rows = [outcome("RTX 5090 Street Prices Top $9k as Nvidia GPU Costs Climb"),
+                outcome("AMD Q3 2026 Earnings Drive Record Quarter \u2014 ServeTheHome"),
+                outcome("US agency approves Amazon Leo's $11.5B acquisition of Globalstar")]
+        report, _ = run(rows)
+        self.assertEqual(report.summary, "NVDA, from Hacker News (shared links): RTX 5090 Street Prices Top $9k as Nvidia GPU Costs "
+                         "Climb; AMD Q3 2026 Earnings Drive Record Quarter, ServeTheHome; US agency approves Amazon Leo's "
+                         "$11.5B acquisition of Globalstar.")
         self.assertTrue(report.faithful_numbers)
-        self.assertEqual(report.summary, "NVIDIA announced Minerva.")
-        self.assertEqual(report.validation["guard_retry"]["used"], "retry")
-        self.assertIn("consensus", llm.prompts[1])
-        report, llm = run(self.ROWS, "The consensus is bullish.", "Multiple outlets are bullish.")
+        self.assertEqual(report.validation["rejected_numbers"], [])
+
+    def test_the_number_check_still_runs_on_the_digest(self):
+        from unittest import mock
+        with mock.patch("core.orchestrator.news_digest", return_value="NVDA rose 999%."):
+            report, _ = run(self.ROWS)
         self.assertFalse(report.faithful_numbers)
-        self.assertEqual(report.validation["validation_reason"], "unsupported_attribution")
-        self.assertEqual(report.validation["guard_retry"]["used"], "fallback")
-        self.assertEqual(len(llm.prompts), 2)
+        self.assertEqual(report.validation["validation_reason"], "unsupported_numeric_tokens")
+        self.assertEqual(report.validation["rejected_numbers"], [999.0])
 
-    def test_a_shared_link_is_never_the_company_speaking(self):
-        rows = [outcome("Tesla caught altering specs following rear suspension collapse reports", "hackernews", "TSLA")]
-        report, llm = run(rows, "Tesla reported it has altered specifications.", "A shared link says Tesla was caught altering specs.")
-        self.assertEqual(report.validation["guard_retry"]["reason"], "unsupported_attribution")
-        self.assertEqual(report.summary, "A shared link says Tesla was caught altering specs.")
-
-    def test_fallback_lists_sources_not_gate_labels(self):
-        report, _ = run(self.ROWS, "Media say the outlook is strong.", retry=False)
-        self.assertIn("NVIDIA Unveils Minerva for AI Factories (NVIDIA Newsroom, company announcement)", report.summary)
-        for label in ("digest", "bullish", "bearish"):
-            self.assertNotIn(label, report.summary)
-
-    def test_each_failure_keeps_its_own_reason(self):
-        self.assertEqual(run([])[0].validation["validation_reason"], "no_news")
-        self.assertEqual(run(self.ROWS, "I'm sorry, I can't help with that.")[0].validation["validation_reason"], "refusal")
-        self.assertEqual(run(self.ROWS, RuntimeError("down"))[0].validation["validation_reason"], "model_error")
-        self.assertEqual(run(self.ROWS, "NVIDIA sold 7 chips.", "NVIDIA sold 7.")[0].validation["validation_reason"],
-                         "unsupported_numeric_tokens")
+    def test_no_news_keeps_its_reason(self):
+        report, _ = run([])
+        self.assertFalse(report.faithful_numbers)
+        self.assertEqual(report.validation["validation_reason"], "no_news")
+        self.assertIn("does not establish that no catalysts exist", report.summary)
 
     def test_every_official_feed_is_an_issuer(self):
         self.assertTrue(set(OFFICIAL) <= ISSUER_SOURCES)

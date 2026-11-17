@@ -23,7 +23,7 @@ One page, every measurement side by side. Direction skill is reported as **ranki
 | Median seconds per full-team case, CPU | 38.7 | 28.9 | [Replay v1 to v2](benchmarks/REPLAY.md) |
 | Screening a Decision change, 72 cases | about 35 minutes (full team) | 1 to 10 minutes (cached reports) | [Fast screening](benchmarks/REPLAY.md) |
 
-News Researcher summaries pass the guards in only 17 of 72 cases; the rest are Python-built lists. That is the weakest live step.
+News Researcher summaries passed the guards in only 17 of 72 cases, and accepted ones still misattributed sources. Since 2026-11-17 the News Researcher is a Python digest: the served headlines, quoted and grouped by their source (company announcements, shared links), with no model narration. Four prompt and guard variants were tried first; none met a rule written before its data. The Team Lead still narrates the final answer under the number, wording and risk guards.
 
 ## Does the decision have skill?
 

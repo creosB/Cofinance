@@ -23,7 +23,7 @@ from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Proto
 
 import re
 
-from .claims import attribution_problems, direction_conflicts, is_refusal, unsupported_terms
+from .claims import direction_conflicts, unsupported_terms
 from .urgency import OFFICIAL
 from .risk_cues import cue_block, risk_cues, unsupported_risks
 from .gliner_decide import ExtractorBackend, GlinerQueryRouter, RoutedQuery
@@ -376,40 +376,20 @@ def source_label(source: str) -> str:
 
 
 class NewsResearcherAgent:
-    """Specialist Agent 2: Market News & Catalyst Researcher (1B over GLiNER-gated signals)."""
+    """Specialist Agent 2: News Researcher. A Python digest of the gated headlines, never model narration.
+
+    grounded-v1 to v4 (2026-11-17, Work log): every prompt and wording-guard variant still let the 1.7B narrator
+    mislabel sources ("Tesla reported", "Amazon says") or reverse a headline, under rules frozen before their data.
+    Headlines quoted as served, grouped by their one source, are faithful by construction (Baris chose this, 11/17).
+    `llm` stays in the signature so callers and traces keep working; this agent never calls it.
+    """
 
     NAME = "News Researcher"
-    SYSTEM = (
-        "You are 📰 [News Researcher], a financial catalyst specialist. "
-        "In at most two sentences and under sixty words, say what the headlines report. "
-        "Group similar headlines instead of listing each one. Use product and company names exactly as the headlines do. "
-        "Only a line marked company announcement is the company's own statement. For a shared link, say the link reports it; "
-        "never say the company announced or reported it. Allegations stay allegations. Write plain sentences, not the list. "
-        "Each headline has exactly one source: never mention outlets, media, analysts, consensus, sentiment, or tone. "
-        "Do not add causes, implications, product categories, or claims about momentum, volume, or price. "
-        "Never invent facts, dates, or numbers."
-    )
-    # One source per headline, named for what it is. No gate tier or direction labels: the narrator read them as
-    # reporting ("digest and bearish outlets", "the consensus is bullish", 2026-11-17). Python keeps them in raw facts.
-    HEADER = "Headlines from the local news store, each with its one source:\n"
-    RETRY_REASONS = {"unsupported_terms", "unsupported_numeric_tokens", "unsupported_attribution"}
+    METHOD = "python_digest"
 
-    def __init__(self, llm: SmallLLMBackend, store: NewsStorePort, retry: bool = True) -> None:
-        self.llm = llm
+    def __init__(self, llm: Optional[SmallLLMBackend], store: NewsStorePort) -> None:
+        self.llm = llm  # unused on purpose: Python writes the news report
         self.store = store
-        self.retry = retry
-
-    @staticmethod
-    def feedback(validation: Mapping[str, Any]) -> str:
-        reason = validation.get("validation_reason")
-        if reason == "unsupported_numeric_tokens":
-            return "\nStrict: copy every number exactly as a headline writes it, or leave it out."
-        key = "unsupported_terms" if reason == "unsupported_terms" else "unsupported_attribution"
-        items = "; ".join(str(x)[:60] for x in (validation.get(key) or [])[:6])
-        if reason == "unsupported_terms":
-            return f"\nStrict: these words are not in the headlines, so do not use them: {items}. Use the headlines' own words."
-        return (f"\nStrict: do not use these words: {items}. Each headline has one source; "
-                "name only the company or the source listed with it.")
 
     def run(self, tickers: Sequence[str], bus: EventBus, session_id: str) -> SpecialistReport:
         facts: Dict[str, Any] = {}
@@ -435,57 +415,16 @@ class NewsResearcherAgent:
                 allowed.extend(numbers_in(row["title"]))
                 allowed.append(float(row["material_p"]))
 
-        # Headlines and their one source only. Tier, direction, scores and dates stay in the trace and UI.
-        rows_all = [row for rows in facts.values() for row in rows]
-        lines = [f"- {tkr}, {source_label(row['source'])}: {row['title']}" for tkr, rows in facts.items() for row in rows]
-        prompt = self.HEADER + "\n".join(lines)
-        titles = [row["title"] for row in rows_all]
-        independent = sum(row["source"] not in ISSUER_SOURCES for row in rows_all)
-
-        def narrate(user_prompt: str) -> Optional[str]:
-            try:
-                return clean_narration(final_answer(self.llm.complete(self.SYSTEM, user_prompt, max_tokens=320)) or "")
-            except Exception:
-                return None
-
-        def judge(text: Optional[str]) -> Tuple[bool, Dict[str, Any]]:
-            """Each failure keeps its own reason: model_error, empty_candidate, refusal, unsupported_numeric_tokens,
-            unsupported_terms, unsupported_attribution. Wording evidence is the headline prompt, never the feedback."""
-            text = text or ""
-            ok = bool(text) and ((not numbers_in(text)) or score_numbers_faithful(text, allowed))
-            val = number_review(text, allowed, ok)
-            val["unsupported_attribution"] = []
-            if is_refusal(text):
-                val.update(unsupported_terms=[], validation_reason="refusal")
-                return False, val
-            ok = check_wording(text, prompt, ok, val)
-            problems = attribution_problems(text, titles, independent, len(rows_all) - independent) if ok else []
-            if problems:
-                val.update(unsupported_attribution=problems, validation_reason="unsupported_attribution")
-            return ok and not problems, val
-
-        if not rows_all:
-            clean, faithful = "", False
-            validation = {**number_review("", allowed, False), "unsupported_terms": [], "unsupported_attribution": [],
-                          "validation_reason": "no_news"}
-        else:
-            draft = narrate(prompt)
-            faithful, validation = judge(draft)
-            if draft is None:
-                validation["validation_reason"] = "model_error"
-            clean = draft or ""
-            # One feedback retry naming what was rejected, like the Team Lead's. Same guards; then the fallback.
-            reason = validation.get("validation_reason")
-            if not faithful and self.retry and clean and reason in self.RETRY_REASONS:
-                second = narrate(prompt + self.feedback(validation))
-                second_ok, second_val = judge(second)
-                summary = {"reason": reason, "retry_passed_guards": second_ok, "used": "retry" if second_ok else "fallback",
-                           **({} if second_ok else {"retry_reason": second_val.get("validation_reason")})}
-                if second_ok:
-                    clean, faithful, validation = second or "", True, second_val
-                validation["guard_retry"] = summary
-        if not faithful:
-            clean = self._deterministic_fallback(facts)
+        has_news = any(facts.values())
+        summary = news_digest(facts)
+        observed = numbers_in(summary)
+        rejected = [n for n in observed if not any(abs(n - a) <= max(1e-9, abs(a) * 1e-9) for a in allowed)]
+        # Built from the served titles, so every number is a title's own; the check stays as a runtime proof.
+        faithful = has_news and not rejected
+        validation = {"allowed_numbers": allowed, "observed_numbers": observed, "rejected_numbers": rejected,
+                      "unsupported_terms": [], "method": self.METHOD,
+                      "validation_reason": ("no_news" if not has_news else "python_digest" if faithful
+                                            else "unsupported_numeric_tokens")}
 
         report = SpecialistReport(
             agent_name=self.NAME,
@@ -493,7 +432,7 @@ class NewsResearcherAgent:
             raw_facts=facts,
             allowed_numbers=allowed,
             chart_refs=[],
-            summary=clean,
+            summary=summary,
             faithful_numbers=faithful,
             validation=validation,
         )
@@ -502,19 +441,32 @@ class NewsResearcherAgent:
                 session_id,
                 "AGENT_RESULT",
                 self.NAME,
-                {"tickers": list(tickers), "faithful_numbers": faithful, "summary": clean},
+                {"tickers": list(tickers), "faithful_numbers": faithful, "summary": summary, "method": self.METHOD},
             )
         )
         return report
 
-    @staticmethod
-    def _deterministic_fallback(facts: Mapping[str, Any]) -> str:
-        items = []
-        for tkr, rows in facts.items():
-            for r in rows:
-                items.append(f"{tkr}: {r['title']} ({source_label(r['source'])})")
-        return ("Accepted news: " + "; ".join(items) + ".") if items else (
-            "No accepted news is available in the local store. This does not establish that no catalysts exist.")
+
+NO_NEWS = "No accepted news is available in the local store. This does not establish that no catalysts exist."
+
+
+def news_digest(facts: Mapping[str, Sequence[Mapping[str, Any]]]) -> str:
+    """Served headlines verbatim (dashes cleaned), grouped by ticker and by their one source, in served order.
+    Company feeds are labelled company announcements, Hacker News items shared links. No gate labels, no scores."""
+    parts: List[str] = []
+    for tkr, rows in facts.items():
+        groups: Dict[str, List[str]] = {}
+        for row in rows:
+            title = plain_text(str(row["title"])).strip().rstrip(".")
+            if title:
+                groups.setdefault(row["source"], []).append(title)
+        for source, titles in groups.items():
+            one = len(titles) == 1
+            kind = ("company announcement" if one else "company announcements") if source in ISSUER_SOURCES else (
+                ("shared link" if one else "shared links") if source == "hackernews" else ("headline" if one else "headlines"))
+            name = SOURCE_NAMES.get(source, str(source).replace("_", " "))
+            parts.append(f"{tkr}, from {name} ({kind}): " + "; ".join(titles) + ".")
+    return " ".join(parts) if parts else NO_NEWS
 
 
 @dataclass(frozen=True)

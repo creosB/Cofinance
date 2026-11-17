@@ -77,10 +77,10 @@ class TestTeamTrace(unittest.TestCase):
         original = (orch.router, orch.data_agent, orch.news_agent, orch.lead_llm, orch.tools, orch.bus)
         trace = TraceRecorder("Fixture thesis", mode="fixture")
         result = run_traced_team(orch, "Review Tesla and NVDA", trace)
-        self.assertEqual(len(llm.calls), 3)
+        self.assertEqual(len(llm.calls), 2)  # the News Researcher is a Python digest since 2026-11-17
         models = [n for n in trace.data["spans"] if n["kind"] == "model"]
-        self.assertEqual(len(models), 5)  # intent + entity resolution + three narrators
-        self.assertEqual({n["actor"] for n in models}, {"Routing executive", "Data Analyst", "News Researcher", "Market Team Lead"})
+        self.assertEqual(len(models), 4)  # intent + entity resolution + Data Analyst + Team Lead
+        self.assertEqual({n["actor"] for n in models}, {"Routing executive", "Data Analyst", "Market Team Lead"})
         self.assertTrue(result.faithful_synthesis)
         self.assertTrue(any(n["kind"] == "gate" for n in trace.data["spans"]))
         self.assertTrue(any(n["kind"] == "handoff" for n in trace.data["spans"]))
