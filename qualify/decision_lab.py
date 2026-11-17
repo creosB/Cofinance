@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import random
 import statistics
 import time
@@ -44,6 +45,19 @@ INPUTS = {'signals-v1': 'card'}
 SHORTLIST = ('Full cached window only. Shortlisted when at most 2 replies are malformed or failed and balanced accuracy '
              'is above 0.500 (always-UP) overall and in both halves of the origins. A shortlisted candidate becomes a '
              'replay variant judged on the next completed window; nothing is adopted from dev results.')
+# prob-v1 (readout and policy), written before any prob-v1 output: the signals-v1 prompt unchanged, but the runtime
+# returns the label-position log-probabilities. The model weighs the evidence; Python owns the call and abstention.
+CANDIDATES['prob-v1'] = CANDIDATES['signals-v1']
+INPUTS['prob-v1'] = 'card'
+READOUTS = {'prob-v1': 'logprobs'}
+TOP_LOGPROBS = 20
+MARGIN = 0.6
+PROB_SHORTLIST = ('Full cached window only. Shortlisted when at most 2 replies fail or are malformed and the ranking '
+                  'skill (AUC of log P(UP) minus log P(DOWN) against the outcome, errors scored 0) is above 0.55 over '
+                  'all scored cases and above 0.50 in both halves of the origins; 0.50 is no skill whatever the market '
+                  'did. Python calls UP when P(UP) / (P(UP) + P(DOWN)) is at least 0.6, DOWN when at most 0.4, '
+                  'otherwise ABSTAIN. References (20-session return, net headline labels) are context, not targets. '
+                  'A shortlisted candidate becomes a replay variant; nothing is adopted from dev results.')
 
 
 def cached_prompt(row):
@@ -128,15 +142,72 @@ def parse_json_label(text):
     return 'ERROR'
 
 
+def label_probs(choice):
+    """Log-probability of each label at the label token, from the runtime's top list (raw scores before the schema).
+    Returns ({label: logprob or None}, floor); a label missing from the list is None, floor is the lowest listed."""
+    toks = (choice.get('logprobs') or {}).get('content') or []
+    names = [t.get('token', '') for t in toks]
+    if 'label' not in names:
+        raise ValueError('No label token in the reply')
+    for tok in toks[names.index('label') + 1:]:
+        body = tok['token'].lstrip(' "')
+        if body.strip(' ":\n'):
+            prefix = tok['token'][:len(tok['token']) - len(body)]
+            break
+    else:
+        raise ValueError('No label value in the reply')
+    alts = tok.get('top_logprobs') or []
+    mass = {k: 0.0 for k in ('UP', 'DOWN', 'ABSTAIN')}
+    for alt in alts:
+        rest = alt['token'][len(prefix):] if alt['token'].startswith(prefix) else ''
+        hits = [k for k in mass if rest and k.startswith(rest)]
+        if len(hits) == 1:
+            mass[hits[0]] += math.exp(alt['logprob'])
+    floor = min((a['logprob'] for a in alts), default=None)
+    return {k: (math.log(v) if v > 0 else None) for k, v in mass.items()}, floor
+
+
+def direction(lps, floor):
+    """(score, q_up, floored): log P(UP) - log P(DOWN) and P(UP) among the two directions. A label missing from the
+    top list takes the floor, an upper bound on its true value."""
+    floored = [k for k in ('UP', 'DOWN') if lps.get(k) is None]
+    up = lps['UP'] if lps.get('UP') is not None else floor
+    down = lps['DOWN'] if lps.get('DOWN') is not None else floor
+    if up is None or down is None:
+        return None, None, floored
+    s = up - down
+    return round(s, 6), round(1 / (1 + math.exp(-s)), 6), floored
+
+
+def policy(q):
+    """Python owns the call: UP at q >= MARGIN, DOWN at q <= 1 - MARGIN, otherwise ABSTAIN; no score is an error."""
+    if q is None:
+        return 'ERROR'
+    return 'UP' if q >= MARGIN else 'DOWN' if q <= 1 - MARGIN else 'ABSTAIN'
+
+
+def auc(pairs):
+    """Mann-Whitney AUC of (score, rose) pairs; ties count half; None without both outcomes."""
+    pos = [s for s, y in pairs if y]
+    neg = [s for s, y in pairs if not y]
+    if not pos or not neg:
+        return None
+    wins = sum((p > n) + 0.5 * (p == n) for p in pos for n in neg)
+    return round(wins / (len(pos) * len(neg)), 4)
+
+
 def run(root, out, source, candidate, sample, call, model_meta, *, clock=time.monotonic):
     rows, source_sha = load_source(root, source)
     chosen = select_cases(rows, sample)
     kind = INPUTS.get(candidate, 'reports')
+    readout = READOUTS.get(candidate, 'label')
     market = R.load_market(root) if kind == 'card' else None
     plan = {'format': 'cofinance-decision-screen/1', 'stage': 'cached-decision-only', 'window_kind': 'dev',
-            'source': source, 'source_sha256': source_sha, 'candidate': candidate, 'input': kind,
+            'source': source, 'source_sha256': source_sha, 'candidate': candidate, 'input': kind, 'readout': readout,
             'system': CANDIDATES[candidate], 'response_format': SCHEMA, 'max_tokens': 24,
-            'sample': sample, 'ids': [r['id'] for r in chosen], 'model': model_meta, 'shortlist_rule': SHORTLIST,
+            'sample': sample, 'ids': [r['id'] for r in chosen], 'model': model_meta,
+            'shortlist_rule': PROB_SHORTLIST if readout == 'logprobs' else SHORTLIST,
+            **({'top_logprobs': TOP_LOGPROBS, 'margin': MARGIN} if readout == 'logprobs' else {}),
             'code_sha256': digest(Path(__file__).read_bytes()),
             'created_at': datetime.now(timezone.utc).isoformat()}
     out.mkdir(parents=True, exist_ok=False)
@@ -149,8 +220,17 @@ def run(root, out, source, candidate, sample, call, model_meta, *, clock=time.mo
             t0 = clock()
             rec = {'id': row['id'], 'label': 'ERROR', 'prompt_sha256': digest(prompt.encode('utf-8'))}
             try:
-                text = call(plan['system'], prompt, max_tokens=24, response_format=SCHEMA, timeout=30)
-                rec.update(label=parse_json_label(text), response=text)
+                if readout == 'logprobs':
+                    choice = call(plan['system'], prompt, max_tokens=24, response_format=SCHEMA, timeout=30,
+                                  top_logprobs=TOP_LOGPROBS, return_choice=True)
+                    text = choice['message']['content']
+                    rec.update(label=parse_json_label(text), response=text, python_label='ERROR')
+                    lps, floor = label_probs(choice)
+                    s, q, floored = direction(lps, floor)
+                    rec.update(logprobs=lps, floor=floor, score=s, q_up=q, floored=floored, python_label=policy(q))
+                else:
+                    text = call(plan['system'], prompt, max_tokens=24, response_format=SCHEMA, timeout=30)
+                    rec.update(label=parse_json_label(text), response=text)
             except Exception as exc:
                 rec['error'] = f'{type(exc).__name__}: {exc}'[:240]
             rec['seconds'] = round(clock() - t0, 3)
@@ -212,6 +292,51 @@ def shortlisted(report):
                 and all(h is not None and h > .5 for h in halves))
 
 
+def ranking(rows, series, early):
+    """Skill that ignores market direction: AUC of the model score (errors score 0), the Python call, references."""
+    spy = [b['date'] for b in series['SPY']]
+    scored = [r for r in rows if r['return'] != 0]
+    model = lambda r: r['score'] if r.get('score') is not None else 0.0
+
+    def momentum(r):
+        closes = R.calendar_closes(series[r['symbol']], spy, r['origin'])
+        return closes[-1] / closes[0] - 1 if len(closes) == 21 else 0.0
+
+    def net(r):
+        news = r.get('news_served') or []
+        return sum(n.get('direction') == 'bullish' for n in news) - sum(n.get('direction') == 'bearish' for n in news)
+
+    part = lambda rs, f: auc([(f(r), r['return'] > 0) for r in rs])
+    groups = {}
+    for r in scored:
+        groups.setdefault(r['origin'], []).append(r)
+    rng, values, draws = random.Random(0), list(groups.values()), []
+    for _ in range(2000):
+        a = part([r for _ in values for r in rng.choice(values)], model)
+        if a is not None:
+            draws.append(a)
+    draws.sort()
+    call = lambda rs: R.arm_metrics([{**r, 'label': r.get('python_label', 'ERROR')} for r in rs], 'system')
+    return {'ranking': {'auc': part(scored, model),
+                        'early': part([r for r in scored if r['origin'] in early], model),
+                        'late': part([r for r in scored if r['origin'] not in early], model),
+                        'origin_cluster_bootstrap_95': [draws[int(.025 * len(draws))], draws[int(.975 * len(draws)) - 1]] if draws else None,
+                        'flat_outcomes_excluded': len(rows) - len(scored),
+                        'floored': {k: sum(k in (r.get('floored') or []) for r in rows) for k in ('UP', 'DOWN')},
+                        'references_context_only': {'momentum20_return': part(scored, momentum),
+                                                    'net_headline_labels': part(scored, net)}},
+            'python_call': {'all': call(rows), 'early': call([r for r in rows if r['origin'] in early]),
+                            'late': call([r for r in rows if r['origin'] not in early])},
+            'failures': sum(r.get('python_label', 'ERROR') == 'ERROR' or r['label'] == 'ERROR' for r in rows)}
+
+
+def prob_shortlisted(report):
+    """The frozen PROB_SHORTLIST rule."""
+    rk = report['ranking']
+    return bool(report['failures'] <= 2 and rk['auc'] is not None and rk['auc'] > .55
+                and all(rk[h] is not None and rk[h] > .5 for h in ('early', 'late')))
+
+
 def score(root, out):
     plan, predictions, source, seal = verified(root, out)
     series, _, _ = R.load_market(root)
@@ -243,7 +368,11 @@ def score(root, out):
                          'Same source/revision/news-availability limits as the replay benchmark',
                          'No second-source cross-check added; date audit is not a complete leakage proof']}
     report['shortlist_rule'] = plan.get('shortlist_rule')
-    report['shortlist'] = shortlisted(report) if plan['sample'] == 'full' and plan.get('shortlist_rule') else None
+    if plan.get('readout') == 'logprobs':
+        report.update(ranking(rows, series, origins[:midpoint]))
+        report['shortlist'] = prob_shortlisted(report) if plan['sample'] == 'full' else None
+    else:
+        report['shortlist'] = shortlisted(report) if plan['sample'] == 'full' and plan.get('shortlist_rule') else None
     dump(out / 'report.json', report)
     return report
 

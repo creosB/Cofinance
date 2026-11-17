@@ -201,5 +201,80 @@ class TestFactCard(unittest.TestCase):
         self.assertFalse(D.shortlisted(rep(0, .56, None, .6)))
 
 
+def choice(label, alts, prefix=''):
+    """A runtime reply shaped like llama-server's: JSON label tokens, top log-probabilities at the label token."""
+    first = {'UP': 'UP', 'DOWN': 'D', 'ABSTAIN': 'AB'}[label]
+    tok = lambda t, top=(): {'token': t, 'logprob': 0.0, 'top_logprobs': [{'token': a, 'logprob': lp} for a, lp in top]}
+    content = [tok('{\n'), tok(' "'), tok('label'), tok('":'), tok('' if prefix else ' "'), tok(prefix + first, alts)]
+    return {'message': {'content': json.dumps({'label': label})}, 'logprobs': {'content': content}}
+
+
+class TestProbReadout(unittest.TestCase):
+    def test_label_probs_reads_the_label_token_and_ignores_invalid_tokens(self):
+        lps, floor = D.label_probs(choice('UP', [('UP', -0.1), ('AB', -2.5), ('D', -4.0), (' UP', -1.0), ('ST', -6.0)]))
+        self.assertAlmostEqual(lps['UP'], -0.1)
+        self.assertAlmostEqual(lps['DOWN'], -4.0)
+        self.assertAlmostEqual(lps['ABSTAIN'], -2.5)
+        self.assertEqual(floor, -6.0)
+        s, q, floored = D.direction(lps, floor)
+        self.assertAlmostEqual(s, 3.9)
+        self.assertEqual((D.policy(q), floored), ('UP', []))
+        lps, floor = D.label_probs(choice('DOWN', [(' "D', -0.2), (' "UP', -1.9), ('UP', -3.0)], prefix=' "'))
+        self.assertAlmostEqual(lps['DOWN'], -0.2)
+        self.assertAlmostEqual(lps['UP'], -1.9, msg='A token without the chosen prefix is not a valid label start.')
+        self.assertEqual(D.policy(D.direction(lps, floor)[1]), 'DOWN')
+
+    def test_missing_labels_take_the_floor_and_python_owns_abstention(self):
+        lps, floor = D.label_probs(choice('UP', [('UP', -0.01), ('AB', -5.0), ('U', -9.0)]))
+        self.assertIsNone(lps['DOWN'])
+        s, q, floored = D.direction(lps, floor)
+        self.assertEqual(floored, ['DOWN'])
+        self.assertGreater(s, 8.9)
+        s, q, floored = D.direction({'UP': None, 'DOWN': None, 'ABSTAIN': -0.01}, -8.0)
+        self.assertEqual((s, q, D.policy(q), floored), (0, 0.5, 'ABSTAIN', ['UP', 'DOWN']))
+        self.assertEqual([D.policy(x) for x in (None, .6, .4, .55, .45)], ['ERROR', 'UP', 'DOWN', 'ABSTAIN', 'ABSTAIN'])
+        with self.assertRaises(ValueError):
+            D.label_probs({'logprobs': {'content': []}})
+
+    def test_auc_is_ranking_skill_with_half_credit_for_ties(self):
+        self.assertEqual(D.auc([(3, True), (1, False)]), 1.0)
+        self.assertEqual(D.auc([(1, True), (3, False)]), 0.0)
+        self.assertEqual(D.auc([(2, True), (2, False), (5, True), (0, False)]), 0.875)
+        self.assertEqual(D.auc([(0, True), (0, False)]), 0.5, 'A constant score (always-UP) has no skill.')
+        self.assertIsNone(D.auc([(1, True)]))
+
+    def test_prob_shortlist_needs_skill_in_both_halves(self):
+        rep = lambda f, a, e, l: {'failures': f, 'ranking': {'auc': a, 'early': e, 'late': l}}
+        self.assertTrue(D.prob_shortlisted(rep(2, .56, .51, .6)))
+        self.assertFalse(D.prob_shortlisted(rep(3, .56, .51, .6)))
+        self.assertFalse(D.prob_shortlisted(rep(0, .55, .51, .6)))
+        self.assertFalse(D.prob_shortlisted(rep(0, .6, .49, .7)))
+        self.assertFalse(D.prob_shortlisted(rep(0, .6, None, .7)))
+
+    def test_prob_run_records_probabilities_and_scores_the_python_call(self):
+        TestFactCard.setUp(self)
+        for r in self.rows:
+            r.update(entry_date='2026-10-29', exit_date='2026-10-30',
+                     baselines={'always_up': 'UP', 'momentum20': 'DOWN', 'news_rule': 'ABSTAIN'})
+        write_lines(self.source, self.rows)
+        dump(self.root / 'predictions_v2.seal.json', {'cases': len(self.rows), 'predictions_sha256': digest(self.source.read_bytes())})
+        replies = iter([choice('UP', [('UP', -0.1), ('D', -3.0)]), choice('DOWN', [('D', -0.2), ('UP', -2.0)]),
+                        {'message': {'content': '{"label":"UP"}'}, 'logprobs': {'content': []}}])
+        def call(system, prompt, **kw):
+            self.assertEqual((kw['top_logprobs'], kw['return_choice']), (20, True))
+            return next(replies)
+        D.run(self.root, self.out, 'v2', 'prob-v1', 'full', call, {'test': True})
+        preds = lines(self.out / 'predictions.jsonl')
+        self.assertEqual([p['python_label'] for p in preds], ['UP', 'DOWN', 'ERROR'])
+        self.assertIn('No label token', preds[2]['error'])
+        plan = json.loads((self.out / 'plan.json').read_text())
+        self.assertEqual((plan['readout'], plan['shortlist_rule']), ('logprobs', D.PROB_SHORTLIST))
+        report = D.score(self.root, self.out)
+        self.assertEqual(report['failures'], 1)
+        self.assertEqual(sum(report['python_call']['all']['labels'].values()), 3)
+        self.assertIn('auc', report['ranking'])
+        self.assertIsInstance(report['shortlist'], bool)
+
+
 if __name__ == '__main__':
     unittest.main()
