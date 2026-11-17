@@ -541,9 +541,101 @@ def score(root, out):
     return report
 
 
+def window_cases(root, first, last):
+    """Cases at SPY origins first..last on disk, with the headlines the live gate would have served at each cutoff.
+    Uses only the session calendar and the gated corpus: no prices enter the prediction."""
+    series, _, _ = R.load_market(root)
+    rows = lines(root / 'news_gated.jsonl')
+    out = []
+    for origin in [b['date'] for b in series['SPY'] if first <= b['date'] <= last]:
+        cutoff = R.cutoff_of(origin)
+        for t in R.ASSETS:
+            news = R.ReplayNews(rows, cutoff)
+            news.get_gated_signals(t)
+            out.append({'id': f'{origin}:{t}', 'symbol': t, 'origin': origin, 'news_served': news.served,
+                        'audit': {'cutoff': cutoff, 'leak': any(n['available_at'] > cutoff for n in news.served)}})
+    return out
+
+
+def seal_window(root, out, first, last, candidate, call, model_meta, *, clock=time.monotonic):
+    """Prospective use of a frozen headline candidate on an unseen window: judge, aggregate and seal every call
+    before any outcome exists on disk. Scored once, later, against freshly downloaded prices."""
+    if INPUTS.get(candidate) != 'headline':
+        raise ValueError('Window sealing supports headline candidates only')
+    cases = window_cases(root, first, last)
+    if any(c['audit']['leak'] for c in cases):
+        raise ValueError('A served headline is newer than its cutoff')
+    items = headline_items(cases)
+    out.mkdir(parents=True, exist_ok=False)
+    plan = {'format': 'cofinance-decision-window/1', 'candidate': candidate, 'system': CANDIDATES[candidate],
+            'window': [first, last], 'window_kind': 'unseen', 'rule': 'one look; success needs AUC above 0.50 with the '
+            'origin-cluster interval excluding 0.50', 'call_rule': HEADLINE_SHORTLIST, 'model': model_meta,
+            'news_gated_sha256': digest((root / 'news_gated.jsonl').read_bytes()),
+            'code_sha256': digest(Path(__file__).read_bytes()), 'created_at': datetime.now(timezone.utc).isoformat()}
+    dump(out / 'plan.json', plan)
+    judged = {}
+    with (out / 'judgments.jsonl').open('x', encoding='utf-8') as fh:
+        for item in items:
+            prompt = headline_prompt(item)
+            rec = {'id': item['key'], 'label': 'ERROR', 'impact': 0.0, 'ok': False}
+            try:
+                choice = call(plan['system'], prompt, max_tokens=24, response_format=SCHEMA, timeout=30,
+                              top_logprobs=TOP_LOGPROBS, return_choice=True)
+                rec.update(label=parse_json_label(choice['message']['content']))
+                lps, floor = label_probs(choice)
+                rec.update(logprobs=lps, impact=impact(lps), ok=True)
+            except Exception as exc:
+                rec['error'] = f'{type(exc).__name__}: {exc}'[:240]
+            judged[item['key']] = rec
+            fh.write(json.dumps(rec, allow_nan=False) + '\n')
+    with (out / 'calls.jsonl').open('x', encoding='utf-8') as fh:
+        for c in cases:
+            s = round(sum(judged[f"{c['symbol']}|{n['title']}"]['impact'] for n in c['news_served']), 6)
+            label = 'UP' if s >= .5 else 'DOWN' if s <= -.5 else 'ABSTAIN'
+            fh.write(json.dumps({**c, 'score': s, 'label': label, 'python_label': label}, allow_nan=False) + '\n')
+    dump(out / 'seal.json', {k: digest((out / k).read_bytes()) for k in ('plan.json', 'judgments.jsonl', 'calls.jsonl')}
+         | {'cases': len(cases), 'headlines': len(items), 'sealed_at': datetime.now(timezone.utc).isoformat()})
+    return {'cases': len(cases), 'headlines': len(items), 'failures': sum(not r['ok'] for r in judged.values())}
+
+
+def score_window(prices_root, out):
+    """One look: verify the seal, then score the sealed calls on prices downloaded after the window matured."""
+    seal = json.loads((out / 'seal.json').read_text(encoding='utf-8'))
+    if any(digest((out / k).read_bytes()) != seal[k] for k in ('plan.json', 'judgments.jsonl', 'calls.jsonl')):
+        raise ValueError('Window predictions changed after sealing')
+    if (out / 'report.json').exists():
+        raise ValueError('This window was already scored once; it is not rescored')
+    series, _, _ = R.load_market(prices_root)
+    spy = [b['date'] for b in series['SPY']]
+    rows, missing = [], []
+    for c in lines(out / 'calls.jsonl'):
+        i = spy.index(c['origin']) if c['origin'] in spy else None
+        bars = {b['date']: b for b in series[c['symbol']]}
+        if i is None or i + R.HORIZON >= len(spy) or spy[i + 1] not in bars or spy[i + R.HORIZON] not in bars:
+            missing.append(c['id'])
+            continue
+        rows.append({**c, 'entry_date': spy[i + 1], 'exit_date': spy[i + R.HORIZON],
+                     'return': bars[spy[i + R.HORIZON]]['close'] / bars[spy[i + 1]]['open'] - 1})
+    origins = sorted({r['origin'] for r in rows})
+    report = {'warning': 'Experimental one-look result on an unseen window. Not a trading signal or financial advice.',
+              'cases': seal['cases'], 'scored': len(rows), 'missing_outcomes': missing, 'up_rate':
+              round(sum(r['return'] > 0 for r in rows) / len(rows), 4) if rows else None}
+    report.update(ranking(rows, series, origins[:max(1, len(origins) // 2)]))
+    judged = lines(out / 'judgments.jsonl')
+    report['failures'] = sum(not j['ok'] for j in judged)
+    rk = report['ranking']
+    report['confirmed'] = bool(rk['auc'] is not None and rk['auc'] > .5 and rk['origin_cluster_bootstrap_95']
+                               and rk['origin_cluster_bootstrap_95'][0] > .5)
+    dump(out / 'report.json', report)
+    return report
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('action', choices=['run', 'score'])
+    ap.add_argument('action', choices=['run', 'score', 'seal-window', 'score-window'])
+    ap.add_argument('--first')
+    ap.add_argument('--last')
+    ap.add_argument('--prices-root', type=Path)
     ap.add_argument('--root', type=Path, required=True)
     ap.add_argument('--out', type=Path, required=True)
     ap.add_argument('--source', choices=sorted(R.VARIANTS), default='v2')
@@ -551,6 +643,16 @@ def main():
     ap.add_argument('--sample', choices=['smoke', 'full'], default='smoke')
     ap.add_argument('--model-root', type=Path, default=Path('data/local_models'))
     a = ap.parse_args()
+    if a.action == 'score-window':
+        print(json.dumps(score_window(a.prices_root, a.out), indent=2))
+        return
+    if a.action == 'seal-window':
+        if a.out.exists():
+            raise ValueError('Window directory already exists; a sealed window is never redone.')
+        from .history_runtime import narrator
+        with narrator(a.model_root, a.root / 'decision-window-runtime.log', alias='lfm3-decision-window') as (call, meta):
+            print(json.dumps(seal_window(a.root, a.out, a.first, a.last, a.candidate, call, meta)))
+        return
     if a.action == 'score':
         report = score(a.root, a.out)
         print(json.dumps({k: v for k, v in report.items() if k not in ('by_asset', 'halves')}, indent=2))

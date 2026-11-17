@@ -353,5 +353,51 @@ class TestHeadlineAndPair(unittest.TestCase):
         self.assertTrue(D.skill_shortlisted(rep(.56, None)))
 
 
+class TestWindow(unittest.TestCase):
+    def setUp(self):
+        from tests.test_replay import make_root
+        self.tmp, self.root = make_root()
+        self.addCleanup(self.tmp.cleanup)
+        self.out = self.root / 'window'
+
+    def judge(self, system, prompt, **kw):
+        up = 'contract' in prompt
+        return choice('UP' if up else 'DOWN', [('UP', math.log(.8 if up else .1)), ('D', math.log(.1 if up else .8)),
+                                               ('AB', math.log(.1))])
+
+    def seal(self):
+        return D.seal_window(self.root, self.out, '2026-10-29', '2026-10-29', 'headline-v1', self.judge, {'test': True})
+
+    def test_window_serves_only_news_before_each_cutoff_and_seals_calls(self):
+        self.assertEqual(self.seal()['cases'], len(D.R.ASSETS))
+        calls = {c['id']: c for c in lines(self.out / 'calls.jsonl')}
+        nvda = calls['2026-10-29:NVDA']
+        self.assertEqual([n['title'] for n in nvda['news_served']], ['Nvidia wins a contract'],
+                         'A headline published after the cutoff must never be judged for that case.')
+        self.assertAlmostEqual(nvda['score'], .7)
+        self.assertEqual([calls[f'2026-10-29:{t}']['label'] for t in ('NVDA', 'AAPL', 'MSFT')], ['UP', 'DOWN', 'ABSTAIN'])
+
+    def test_window_is_sealed_and_scored_once(self):
+        self.seal()
+        with self.assertRaises(FileExistsError):
+            self.seal()
+        report = D.score_window(self.root, self.out)
+        self.assertEqual(report['cases'], len(D.R.ASSETS))
+        self.assertIn('confirmed', report)
+        with self.assertRaisesRegex(ValueError, 'already scored'):
+            D.score_window(self.root, self.out)
+
+    def test_tampered_calls_are_refused(self):
+        self.seal()
+        path = self.out / 'calls.jsonl'
+        path.write_text(path.read_text().replace('"label": "DOWN"', '"label": "UP"', 1))
+        with self.assertRaisesRegex(ValueError, 'changed after sealing'):
+            D.score_window(self.root, self.out)
+
+    def test_only_headline_candidates_can_seal_a_window(self):
+        with self.assertRaises(ValueError):
+            D.seal_window(self.root, self.out, '2026-10-29', '2026-10-29', 'prob-v1', self.judge, {})
+
+
 if __name__ == '__main__':
     unittest.main()
