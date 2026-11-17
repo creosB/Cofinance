@@ -71,6 +71,13 @@ class LiveTrace(TraceRecorder):
                 self.progress_fn(running[-1]['actor']+': '+running[-1]['name'])
 
 
+class _NoTrace:
+    """Trace stand-in for work that belongs to no chat run (the startup router warm-up)."""
+    def span(self,*args,**kwargs):
+        import contextlib
+        return contextlib.nullcontext()
+
+
 class ChatService:
     def __init__(self,repo,root=None,models=None,market_factory=MarketTools,router_factory=None,news_backend_factory=None,feed_fetch=None,
                  crowd_odds=None):
@@ -99,6 +106,8 @@ class ChatService:
         self.ledger=MemoryLedger(self.root/'memory_v2.db');self.semantic_retry_after=0.0
         self._semantic_inflight=set()  # run ids whose vector copy is being written outside the ledger lock
         self.lock=threading.RLock();self.active=None;self.events={};self.threads={};self.extractor=None;self.closed=False
+        # One router start at a time: the startup warm-up and a first chat must never launch two GLiNER processes.
+        self.router_lock=threading.Lock();self.warm_thread=None;self.warm_cancel=threading.Event();self.warm={'state':'idle','seconds':None,'error':''}
         self.deleting=set()  # conversations being deleted: no run, note or forget may start in them
         # One explicit Clock 1 collection at a time. No scheduler: a person starts every run.
         self.news={'phase':'idle','stage':'','run_id':None,'error':'','started':None,'finished':None,'request_id':None}
@@ -160,16 +169,37 @@ class ChatService:
     def local_extractor(self,trace,cancel):
         """Shared offline GLiNER subprocess for routing and headline judging."""
         from .router_worker import RouterProcess
-        if self.extractor is None:
-            if not self.gliner_path().exists():raise ModelError('The pinned GLiNER cache is missing. No unapproved download was attempted.')
-            self.extractor=RouterProcess(self.repo,self.root/'local_models',cancel)
-        self.extractor.cancel=cancel
-        if not self.extractor.process or self.extractor.process.poll() is not None:
-            self.models.update(router='loading')
-            with trace.span('Load cached routing model','tool',actor='Local runtime',inputs={'model':'fastino/GLiNER2.5-Decide','revision':GLINER_REVISION,'network':False}):
-                self.extractor.start()
-            self.models.update(router='loaded')
-        return self.extractor
+        with self.router_lock:
+            if self.extractor is None:
+                if not self.gliner_path().exists():raise ModelError('The pinned GLiNER cache is missing. No unapproved download was attempted.')
+                self.extractor=RouterProcess(self.repo,self.root/'local_models',cancel)
+            self.extractor.cancel=cancel
+            if not self.extractor.process or self.extractor.process.poll() is not None:
+                self.models.update(router='loading')
+                try:
+                    with trace.span('Load cached routing model','tool',actor='Local runtime',inputs={'model':'fastino/GLiNER2.5-Decide','revision':GLINER_REVISION,'network':False}):
+                        self.extractor.start()
+                except BaseException:
+                    self.models.update(router='cached');raise  # never left showing 'loading' after a failed start
+                self.models.update(router='loaded')
+            return self.extractor
+
+    def warm_router(self):
+        """Start the GLiNER routing process in the background at dashboard startup (live 2026-11-17: the first question
+        after a restart spent 51 s of 57 loading it). Offline cache only, never a download; a later chat waits on
+        router_lock instead of starting a second process. COFINANCE_ROUTER_WARMUP=off disables it."""
+        if (os.environ.get('COFINANCE_ROUTER_WARMUP','on').lower()=='off' or self.router_factory or self.closed
+                or not self.gliner_path().exists() or (self.warm_thread and self.warm_thread.is_alive())):
+            self.warm['state']='skipped';return None
+        def run():
+            started=time.monotonic();self.warm['state']='loading'
+            try:
+                self.local_extractor(_NoTrace(),self.warm_cancel)
+                self.warm.update(state='loaded',seconds=round(time.monotonic()-started,1))
+            except BaseException as error:  # a failed warm-up only means the first chat loads it, as before
+                self.warm.update(state='failed',error=type(error).__name__,seconds=round(time.monotonic()-started,1))
+        self.warm_thread=threading.Thread(target=run,name='router-warmup',daemon=True);self.warm_thread.start()
+        return self.warm_thread
 
     def router(self,query,trace,cancel):
         if self.router_factory:return self.router_factory()
@@ -807,7 +837,8 @@ class ChatService:
                 except Exception:pass
 
     def close(self):
-        self.closed=True
+        self.closed=True;self.warm_cancel.set()
+        if self.warm_thread:self.warm_thread.join(timeout=2)
         if self.news_cancel:self.news_cancel.set()
         if self.news_thread:self.news_thread.join(timeout=2)
         with self.lock:
