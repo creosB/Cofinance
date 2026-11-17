@@ -276,9 +276,19 @@ class ChatService:
                                     inputs={'tickers':tickers,'source':'Polymarket public API, read-only','trading':False})
                 except Exception:odds=None  # an aid, never a blocker
                 check()
+            headline=None
+            if result.news_report and os.environ.get('COFINANCE_HEADLINE_SIGNAL','on').strip().lower()!='off':
+                # headline-v1, experimental. Python sums the stored judgments of exactly the headlines the News Researcher
+                # was served, as in the screen. Shown as computed, like crowd odds: never narrated or guarded.
+                from .headline_signal import card as headline_card
+                served={t:[r['title'] for r in rows] for t,rows in result.news_report.raw_facts.items()}
+                try:headline=trace.call('Score served headlines (headline-v1, experimental)','tool',lambda:headline_card(self.root/'news.db',served),
+                                        actor='Python',inputs={'served':{t:len(v) for t,v in served.items()}})
+                except Exception:headline=None  # an aid, never a blocker
             health=news_health(self.root/'news.db')
             payload={'kind':'research','mode':job['model'],'tickers':tickers,'charts':list(tools.charts.values()),
                      'crowd_odds':odds if odds and (odds.get('markets') or odds.get('errors')) else None,
+                     'headline_signal':headline,
                      'snapshots':tools.snapshots,'evidence':tools.evidence+news.evidence,
                      'citations':cite(answer[:16000],tools.snapshots,tools.evidence+news.evidence),
                      'faithful_synthesis':result.faithful_synthesis,'risk_mode':result.risk_mode,
@@ -759,12 +769,40 @@ class ChatService:
             store=NewsStore(str(self.root/'news.db'))
             summary=run_traced_clock1(feed_tickers(),fetch,GlinerDecideClassifier(backend),trace,store=store)
             stage='Collected '+str(summary.fetched)+' items'+(' with source errors' if summary.errors or any(str(v).startswith('error') for s in summary.source_status.values() for v in s.values()) else '')
-            with self.lock:self.news.update(phase='idle',stage=stage,finished=time.time())
+            headlines=self.judge_headlines(store,check)
+            if headlines.get('judged'):stage+='; judged '+str(headlines['judged'])+' headlines'
+            with self.lock:self.news.update(phase='idle',stage=stage,finished=time.time(),headlines=headlines)
         except Exception as exc:
             if trace.data.get('status')=='running':trace.finish(error=True)
             with self.lock:self.news.update(phase='error',stage='Collection failed',error=f'{type(exc).__name__}: {str(exc)[:200]}',finished=time.time())
         finally:
             if store:store.close()
+
+    def judge_headlines(self,store,check):
+        """headline-v1 at ingestion, after the Clock 1 transaction committed (never inside it). Experimental: runs only
+        with a qualified narrator, and a failure never fails the collection. COFINANCE_HEADLINE_SIGNAL=off disables it."""
+        from .headline_signal import VERSION,judge_pending
+        if os.environ.get('COFINANCE_HEADLINE_SIGNAL','on').strip().lower()=='off':return {'version':VERSION,'status':'off'}
+        if not self.models.qualified():return {'version':VERSION,'status':'narrator_not_qualified'}
+        proc=getattr(self.models,'process',None)
+        was_loaded=bool(getattr(self.models,'ready',False) and proc and proc.poll() is None)
+        trace=LiveTrace('Headline judgments: '+VERSION+' (experimental)',directory=self.root/'traces',progress=self.news_progress)
+        try:
+            self.news_progress('Judging served headlines')
+            self.models.load()
+            result=trace.call('Judge served headlines','model',lambda:judge_pending(store.conn,self.models.choice,model=self.models.model_id+' '+self.models.active_backend,check=check),
+                              actor='Headline Judge',model=self.models.model_id,inputs={'version':VERSION,'inputs':'asset and title only','gate_label_hidden':True})
+            trace.finish(summary=result)
+            return {**result,'status':'complete' if not result['failed'] else 'partial','backend':self.models.active_backend}
+        except Cancelled:
+            trace.finish(error=True);raise
+        except Exception as exc:
+            trace.finish(error=True)
+            return {'version':VERSION,'status':'error','error':f'{type(exc).__name__}: {str(exc)[:160]}'}
+        finally:
+            if not was_loaded and not getattr(self.models,'busy',False):
+                try:self.models.unload(keep_choice=True)
+                except Exception:pass
 
     def close(self):
         self.closed=True

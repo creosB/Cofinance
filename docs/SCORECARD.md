@@ -38,7 +38,7 @@ Dev window: nine overlapping origins (2026-10-27 to 2026-11-06), eight assets, 7
 | Gate's own headline labels, context | 0.556 | reference |
 | 20-session return, context | 0.406 | reference |
 
-The shortlisted technique is sealed on the unseen window 2026-11-09 to 2026-11-13 and scored once after it matures. [Method and every candidate](benchmarks/REPLAY.md) · [Compact results](benchmarks/decision-screen-2026-11-17.json)
+The shortlisted technique is sealed on the unseen window 2026-11-09 to 2026-11-13 and scored once after it matures. It also runs live as a labeled experimental line under chat answers: headlines are judged after each news collection with the same code as the screen, and Python sums the judgments of exactly the headlines that answer was served. It is not narrated and not confirmed. [Method and every candidate](benchmarks/REPLAY.md) · [Compact results](benchmarks/decision-screen-2026-11-17.json)
 
 ## Other measurements
 

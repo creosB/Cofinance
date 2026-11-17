@@ -22,10 +22,9 @@ from types import SimpleNamespace
 
 from . import replay as R
 from .historical import digest, dump, lines
+from core import headline_signal as H
 
-SCHEMA = {'type': 'json_schema', 'json_schema': {'name': 'direction', 'strict': True, 'schema': {
-    'type': 'object', 'properties': {'label': {'type': 'string', 'enum': ['UP', 'DOWN', 'ABSTAIN']}},
-    'required': ['label'], 'additionalProperties': False}}}
+SCHEMA = H.SCHEMA  # one schema for every candidate; headline-v1 lives in core so the live app runs the same code
 CANDIDATES = {
     'contract-v1': R.VARIANTS['v2']['decision_system'].replace(
         'Reply with exactly UP, DOWN, or ABSTAIN.', 'Return a JSON object with one key, label: UP, DOWN, or ABSTAIN.'),
@@ -51,7 +50,7 @@ SHORTLIST = ('Full cached window only. Shortlisted when at most 2 replies are ma
 CANDIDATES['prob-v1'] = CANDIDATES['signals-v1']
 INPUTS['prob-v1'] = 'card'
 READOUTS = {'prob-v1': 'logprobs'}
-TOP_LOGPROBS = 20
+TOP_LOGPROBS = H.TOP_LOGPROBS
 MARGIN = 0.6
 PROB_SHORTLIST = ('Full cached window only. Shortlisted when at most 2 replies fail or are malformed and the ranking '
                   'skill (AUC of log P(UP) minus log P(DOWN) against the outcome, errors scored 0) is above 0.55 over '
@@ -61,11 +60,7 @@ PROB_SHORTLIST = ('Full cached window only. Shortlisted when at most 2 replies f
                   'A shortlisted candidate becomes a replay variant; nothing is adopted from dev results.')
 # headline-v1 (structure), written before any headline-v1 output: the model judges each served headline alone, from
 # the asset and the title only (no gate label); Python sums the judgments per case. Unique headlines are judged once.
-CANDIDATES['headline-v1'] = (
-    'You are [Headline Judge]. You get one accepted news headline about one asset. Judge its likely effect on that '
-    'asset\'s price over the next five US market sessions. Return a JSON object with one key, label: UP if it is '
-    'likely to push the price up, DOWN if it is likely to push it down, ABSTAIN if it has no clear price effect. '
-    'Company announcements are claims, not proof. No explanation.')
+CANDIDATES['headline-v1'] = H.SYSTEM
 INPUTS['headline-v1'] = 'headline'
 READOUTS['headline-v1'] = 'logprobs'
 HEADLINE_SHORTLIST = (
@@ -176,15 +171,9 @@ def headline_items(rows):
 
 
 def headline_prompt(item):
-    return f"Asset: {item['symbol']}\nHeadline: {item['title']}"
+    return H.prompt(item['symbol'], item['title'])
 
-
-def impact(lps):
-    """(P(UP) - P(DOWN)) over all listed label mass, so a no-effect judgment counts near 0; 0 when nothing is listed."""
-    p = {k: math.exp(v) if v is not None else 0.0 for k, v in lps.items()}
-    total = sum(p.values())
-    return round((p['UP'] - p['DOWN']) / total, 6) if total > 0 else 0.0
-
+impact = H.impact
 
 def parse_json_label(text, labels=None):
     labels = R.LABELS if labels is None else set(labels)
@@ -197,30 +186,7 @@ def parse_json_label(text, labels=None):
     return 'ERROR'
 
 
-def label_probs(choice, labels=('UP', 'DOWN', 'ABSTAIN')):
-    """Log-probability of each label at the label token, from the runtime's top list (raw scores before the schema).
-    Returns ({label: logprob or None}, floor); a label missing from the list is None, floor is the lowest listed."""
-    toks = (choice.get('logprobs') or {}).get('content') or []
-    names = [t.get('token', '') for t in toks]
-    if 'label' not in names:
-        raise ValueError('No label token in the reply')
-    for tok in toks[names.index('label') + 1:]:
-        body = tok['token'].lstrip(' "')
-        if body.strip(' ":\n'):
-            prefix = tok['token'][:len(tok['token']) - len(body)]
-            break
-    else:
-        raise ValueError('No label value in the reply')
-    alts = tok.get('top_logprobs') or []
-    mass = {k: 0.0 for k in labels}
-    for alt in alts:
-        rest = alt['token'][len(prefix):] if alt['token'].startswith(prefix) else ''
-        hits = [k for k in mass if rest and k.startswith(rest)]
-        if len(hits) == 1:
-            mass[hits[0]] += math.exp(alt['logprob'])
-    floor = min((a['logprob'] for a in alts), default=None)
-    return {k: (math.log(v) if v > 0 else None) for k, v in mass.items()}, floor
-
+label_probs = H.label_probs
 
 def direction(lps, floor):
     """(score, q_up, floored): log P(UP) - log P(DOWN) and P(UP) among the two directions. A label missing from the

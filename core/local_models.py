@@ -435,6 +435,25 @@ class LocalModels:
             raise ModelError("Invalid narrator output.")
         return content
 
+    def choice(self, system, prompt, *, max_tokens=24, response_format=None, top_logprobs=0, timeout=30):
+        """A short structured call that returns the runtime's choice (with label log-probabilities when asked).
+        Same request fields as the benchmark runtime, so live and lab readouts match."""
+        if not self.ready or not self.process or self.process.poll() is not None:
+            raise ModelError("Local narrator is not loaded.")
+        self.check_cancel()
+        body = {"model": MODEL_ID, "messages": [{"role":"system","content":system},{"role":"user","content":prompt}],
+                "temperature": 0, "max_tokens": min(64, int(max_tokens)), "chat_template_kwargs": {"enable_thinking": False}}
+        if response_format:
+            body["response_format"] = response_format
+        if top_logprobs:
+            body["logprobs"] = True
+            body["top_logprobs"] = int(top_logprobs)
+        response = local_json(self.url + "/v1/chat/completions", body, key=self.key, timeout=timeout)
+        choices = response.get("choices", [])
+        if not choices or choices[0].get("finish_reason") != "stop":
+            raise ModelError("Structured reply was incomplete; rejected.")
+        return choices[0]
+
     @property
     def model_id(self):
         return "LiquidAI/LFM3-1.7B-GGUF:Q4_K_M@" + REVISION[:12]
