@@ -165,7 +165,13 @@ def status():
         mtime = p.stat().st_mtime
         age = int(time.time() - mtime)
         text = p.read_text(encoding='utf-8', errors='replace')
-        print(f'{p.stem:22s} {age // 60:4d} min ago  {job_state(text, mtime, boot, expected_run(p))[0]:8s} {summarize(text)}')
+        run = expected_run(p)
+        state = job_state(text, mtime, boot, run)[0]
+        if state == 'running' and run is None:
+            # No run id: dev.py did not start it (a model server's own log, or a job from before run ids), so no
+            # exit marker is coming. 11/17: dead llama-server logs were listed as "running" for 13 hours.
+            state = 'untracked'
+        print(f'{p.stem:22s} {age // 60:4d} min ago  {state:9s} {summarize(text)}')
 
 
 FORWARD = {'record': ['record', '--root', 'data/forward_benchmark', '--publish', 'docs/benchmarks/forward-ledger.jsonl'],

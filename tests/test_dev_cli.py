@@ -113,6 +113,25 @@ class TestBackgroundJobs(unittest.TestCase):
         dev.run_file(log).write_text('bbbb', encoding='ascii')
         self.assertEqual(dev.wait(name, 1, tick=.2), 2)  # still running, not "done: OK (528 tests)"
 
+    def test_status_never_calls_an_untracked_log_running(self):
+        import io, tempfile
+        from contextlib import redirect_stdout
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as t:
+            logs = Path(t)
+            (logs / 'tps_gpu.server.log').write_text('I slot release: id 0\n', encoding='utf-8')  # a model server's log
+            (logs / 'job.log').write_text('started\ndev.py run abc\n....\n', encoding='utf-8')
+            (logs / 'job.run').write_text('abc', encoding='ascii')
+            (logs / 'done.log').write_text('dev.py run d1\nOK\ndev.py exit 0\n', encoding='utf-8')
+            (logs / 'done.run').write_text('d1', encoding='ascii')
+            out = io.TextIOWrapper(io.BytesIO(), encoding='utf-8')  # status() reconfigures stdout, as on the PC
+            with mock.patch.object(dev, 'LOGS', logs), mock.patch.object(dev, 'boot_time', return_value=None), \
+                    redirect_stdout(out):
+                dev.status()
+            out.flush()
+        rows = {line.split()[0]: line.split()[4] for line in out.buffer.getvalue().decode('utf-8').splitlines()}
+        self.assertEqual(rows, {'tps_gpu.server': 'untracked', 'job': 'running', 'done': 'done'})
+
     def test_detached_command_carries_the_run_id(self):
         line = dev.detached_command(['python', '-c', 'pass'], Path('C:/x/data/_logs/j.log'), 'abc123')
         self.assertIn('set DEV_RUN_ID=abc123&& python -c pass', line)
