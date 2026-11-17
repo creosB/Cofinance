@@ -394,6 +394,62 @@ class TestWindow(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'changed after sealing'):
             D.score_window(self.root, self.out)
 
+    def register(self):
+        with patch.object(D, 'exits_on_disk', return_value=[]):
+            return D.register_addendum(self.root, self.out, 'headline-v1-mean', now='2026-11-17T09:00:00+00:00')
+
+    def test_addendum_is_registered_before_outcomes_and_scored_in_the_one_look(self):
+        self.seal()
+        reg = self.register()
+        doc = json.loads((self.out / 'addendum-headline-v1-mean.json').read_text())
+        judged = {j['id']: j['impact'] for j in lines(self.out / 'judgments.jsonl')}
+        for c in lines(self.out / 'calls.jsonl'):
+            imps = [judged[f"{c['symbol']}|{n['title']}"] for n in c['news_served']]
+            mine = [x for x in doc['calls'] if x['id'] == c['id']][0]
+            self.assertAlmostEqual(mine['score'], sum(imps) / len(imps) if imps else 0.0, places=6)
+        self.assertEqual(reg['cases'], len(D.R.ASSETS))
+        with self.assertRaisesRegex(ValueError, 'already registered'):
+            self.register()
+        with patch.object(D, 'PUBLIC_DIR', self.root):
+            report = D.score_window(self.root, self.out)
+        self.assertIn('headline-v1-mean', report['addenda'])
+        self.assertIn('confirmed', report['addenda']['headline-v1-mean'])
+        self.assertIn('adopt_mean_live', report)
+        with self.assertRaisesRegex(ValueError, 'already scored'):
+            self.register()
+
+    def test_addendum_is_refused_once_any_outcome_is_on_disk(self):
+        self.seal()
+        with self.assertRaisesRegex(ValueError, 'already on disk'):
+            D.register_addendum(self.root, self.out, 'headline-v1-mean')
+        self.assertFalse((self.out / 'addendum-headline-v1-mean.json').exists())
+        series = {'SPY': [{'date': d} for d in ('2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13', '2026-11-16')]}
+        calls = [{'id': 'a', 'origin': '2026-11-09'}, {'id': 'b', 'origin': '2026-11-10'}]
+        self.assertEqual(D.exits_on_disk(series, calls), ['a'], 'origin 11/09 exits 5 sessions later, on 11/16')
+
+    def test_tampered_or_republished_addendum_is_refused(self):
+        self.seal()
+        self.register()
+        path = self.out / 'addendum-headline-v1-mean.json'
+        original = path.read_text()
+        path.write_text(original.replace('"label": "ABSTAIN"', '"label": "UP"', 1))
+        with patch.object(D, 'PUBLIC_DIR', self.root), self.assertRaisesRegex(ValueError, 'changed after registration'):
+            D.score_window(self.root, self.out)
+        path.write_text(original)
+        public = self.root / 'window-2026-11-09-headline-mean-addendum.json'
+        public.write_text(original.replace('2026-11-17T09:00:00', '2026-11-18T09:00:00'))
+        with patch.object(D, 'PUBLIC_DIR', self.root), self.assertRaisesRegex(ValueError, 'published copy'):
+            D.score_window(self.root, self.out)
+        public.write_bytes(original.replace('\n', '\r\n').encode('utf-8'))
+        with patch.object(D, 'PUBLIC_DIR', self.root):
+            report = D.score_window(self.root, self.out)  # a checkout that only changed line endings is the same copy
+        self.assertIn('headline-v1-mean', report['addenda'])
+
+    def test_aggregations(self):
+        self.assertEqual((D.aggregate([.5, -.1, .2], 'mean'), D.aggregate([], 'mean'), D.aggregate([.5, -.1], 'sum')), (.2, 0.0, .4))
+        with self.assertRaises(ValueError):
+            D.aggregate([1], 'max')
+
     def test_only_headline_candidates_can_seal_a_window(self):
         with self.assertRaises(ValueError):
             D.seal_window(self.root, self.out, '2026-10-29', '2026-10-29', 'prob-v1', self.judge, {})

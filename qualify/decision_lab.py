@@ -89,6 +89,23 @@ PAIR_SHORTLIST = (
     'more, DOWN at 0.4 or less, otherwise ABSTAIN. Nothing is adopted from dev results.')
 
 
+# headline-v1-mean (aggregation), registered 2026-11-17 as an addendum to the sealed 11/09 to 11/13 window, after a
+# dev-only analysis and before any exit price of a window case existed on disk. Same sealed judgments, averaged instead
+# of summed, so many company announcements cannot outrank one strong headline by count alone. Dev evidence is post hoc
+# on known outcomes: AUC 0.666 (halves 0.716 / 0.689) versus 0.585 for the sum; the 0.4 lean line was chosen on dev.
+ADDENDA = {'headline-v1-mean': {
+    'aggregation': 'mean', 'call_line': 0.4, 'public_copy': 'window-2026-11-09-headline-mean-addendum.json',
+    'rule': ('Secondary hypothesis, registered after the primary seal and before any outcome: case score = mean impact '
+             'over the served headlines (0 without news; a failed judgment counts 0). Success uses the primary rule: '
+             'AUC above 0.50 with the origin-cluster interval excluding 0.50. Adoption: the live headline signal '
+             'switches from the sum to the mean only if the mean succeeds and its AUC is at least the sum AUC on the same '
+             'cases; otherwise the live signal stays on the sum and the next unseen window decides.'),
+    'dev_evidence': {'screen': 'decision_screen_20261117_headline (dev window, outcomes known, post hoc)',
+                     'auc_mean': 0.6664, 'auc_sum': 0.5846, 'halves_mean': [0.7159, 0.6892],
+                     'news_only_auc_mean': 0.6613, 'news_only_auc_sum': 0.5333,
+                     'balanced_covered_at_line': 0.636, 'covered_at_line': '34 of 72'}}}
+
+
 def cached_prompt(row):
     """Reconstruct exactly the report-based Decision input; never expose stored labels/outcomes/baselines."""
     report = lambda value: None if value is None else SimpleNamespace(summary=value)
@@ -564,6 +581,96 @@ def seal_window(root, out, first, last, candidate, call, model_meta, *, clock=ti
     return {'cases': len(cases), 'headlines': len(items), 'failures': sum(not r['ok'] for r in judged.values())}
 
 
+PUBLIC_DIR = Path(__file__).resolve().parents[1] / 'docs' / 'benchmarks'
+
+
+def aggregate(impacts, how):
+    impacts = list(impacts)
+    if how == 'sum':
+        return round(sum(impacts), 6)
+    if how == 'mean':
+        return round(sum(impacts) / len(impacts), 6) if impacts else 0.0
+    raise ValueError('Unknown aggregation')
+
+
+def addendum_calls(out, spec):
+    """Recompute an addendum's calls from the sealed judgments and calls; used to seal and again to verify."""
+    judged = {j['id']: j for j in lines(out / 'judgments.jsonl')}
+    calls = []
+    for c in lines(out / 'calls.jsonl'):
+        s = aggregate((judged[f"{c['symbol']}|{n['title']}"].get('impact', 0.0) for n in c['news_served']), spec['aggregation'])
+        label = 'UP' if s >= spec['call_line'] else 'DOWN' if s <= -spec['call_line'] else 'ABSTAIN'
+        calls.append({'id': c['id'], 'score': s, 'label': label})
+    return calls
+
+
+def exits_on_disk(series, calls):
+    """Window cases whose exit bar (HORIZON sessions after the origin) is already in the given price data."""
+    spy = [b['date'] for b in series['SPY']]
+    return [c['id'] for c in calls if c['origin'] in spy and spy.index(c['origin']) + R.HORIZON < len(spy)]
+
+
+def sealed_window(out):
+    seal = json.loads((out / 'seal.json').read_text(encoding='utf-8'))
+    if any(digest((out / k).read_bytes()) != seal[k] for k in ('plan.json', 'judgments.jsonl', 'calls.jsonl')):
+        raise ValueError('Window predictions changed after sealing')
+    return seal
+
+
+def register_addendum(root, out, name, *, now=None):
+    """Register a secondary aggregation over a sealed window: same judgments, new calls, before the one look and before
+    any exit price exists in the price data on disk."""
+    if name not in ADDENDA:
+        raise ValueError('Unknown addendum')
+    if (out / 'report.json').exists():
+        raise ValueError('This window was already scored; an addendum must come before the one look')
+    path = out / f'addendum-{name}.json'
+    if path.exists():
+        raise ValueError('Addendum already registered; it is never redone')
+    seal = sealed_window(out)
+    series, _, _ = R.load_market(root)
+    seen = exits_on_disk(series, lines(out / 'calls.jsonl'))
+    if seen:
+        raise ValueError(f'Outcomes already on disk for {len(seen)} window cases; too late to register')
+    spec = ADDENDA[name]
+    doc = {'format': 'cofinance-decision-window-addendum/1', 'name': name, **spec,
+           'binds': {k: seal[k] for k in ('plan.json', 'judgments.jsonl', 'calls.jsonl')},
+           'latest_price_on_disk': series['SPY'][-1]['date'] if series.get('SPY') else None,
+           'registered_at': now or datetime.now(timezone.utc).isoformat(), 'calls': addendum_calls(out, spec)}
+    with path.open('x', encoding='utf-8') as fh:
+        fh.write(json.dumps(doc, indent=2, allow_nan=False) + '\n')
+    return {'addendum': name, 'cases': len(doc['calls']), 'sha256': digest(path.read_bytes()),
+            'labels': {k: sum(c['label'] == k for c in doc['calls']) for k in ('UP', 'DOWN', 'ABSTAIN')}}
+
+
+def score_addenda(out, seal, rows, series, early):
+    """Score every registered addendum in the same one look, on the same cases and returns as the primary calls."""
+    results = {}
+    docs = PUBLIC_DIR
+    for path in sorted(out.glob('addendum-*.json')):
+        doc = json.loads(path.read_text(encoding='utf-8'))
+        spec = ADDENDA.get(doc.get('name'))
+        if spec is None or any(doc.get(k) != spec[k] for k in ('aggregation', 'call_line', 'rule')):
+            raise ValueError('Addendum differs from its registered rule')
+        if doc['binds'] != {k: seal[k] for k in ('plan.json', 'judgments.jsonl', 'calls.jsonl')}:
+            raise ValueError('Addendum is bound to a different seal')
+        if doc['calls'] != addendum_calls(out, spec):
+            raise ValueError('Addendum calls changed after registration')
+        public = docs / spec['public_copy']
+        if public.exists() and json.loads(public.read_text(encoding='utf-8')) != doc:  # content, not line endings
+            raise ValueError('Addendum differs from its published copy')
+        mine = {c['id']: c for c in doc['calls']}
+        arm = [{**r, 'score': mine[r['id']]['score'], 'label': mine[r['id']]['label'],
+                'python_label': mine[r['id']]['label']} for r in rows]
+        res = ranking(arm, series, early)
+        rk = res['ranking']
+        res['confirmed'] = bool(rk['auc'] is not None and rk['auc'] > .5 and rk['origin_cluster_bootstrap_95']
+                                and rk['origin_cluster_bootstrap_95'][0] > .5)
+        res.update(sha256=digest(path.read_bytes()), registered_at=doc['registered_at'])
+        results[doc['name']] = res
+    return results
+
+
 def score_window(prices_root, out):
     """One look: verify the seal, then score the sealed calls on prices downloaded after the window matured."""
     seal = json.loads((out / 'seal.json').read_text(encoding='utf-8'))
@@ -592,13 +699,21 @@ def score_window(prices_root, out):
     rk = report['ranking']
     report['confirmed'] = bool(rk['auc'] is not None and rk['auc'] > .5 and rk['origin_cluster_bootstrap_95']
                                and rk['origin_cluster_bootstrap_95'][0] > .5)
+    addenda = score_addenda(out, seal, rows, series, origins[:max(1, len(origins) // 2)])
+    if addenda:
+        report['addenda'] = addenda
+        mean = addenda.get('headline-v1-mean')
+        if mean:
+            report['adopt_mean_live'] = bool(mean['confirmed'] and rk['auc'] is not None
+                                             and mean['ranking']['auc'] >= rk['auc'])
     dump(out / 'report.json', report)
     return report
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('action', choices=['run', 'score', 'seal-window', 'score-window'])
+    ap.add_argument('action', choices=['run', 'score', 'seal-window', 'score-window', 'register-addendum'])
+    ap.add_argument('--addendum', choices=sorted(ADDENDA))
     ap.add_argument('--first')
     ap.add_argument('--last')
     ap.add_argument('--prices-root', type=Path)
@@ -609,6 +724,9 @@ def main():
     ap.add_argument('--sample', choices=['smoke', 'full'], default='smoke')
     ap.add_argument('--model-root', type=Path, default=Path('data/local_models'))
     a = ap.parse_args()
+    if a.action == 'register-addendum':
+        print(json.dumps(register_addendum(a.root, a.out, a.addendum), indent=2))
+        return
     if a.action == 'score-window':
         print(json.dumps(score_window(a.prices_root, a.out), indent=2))
         return
