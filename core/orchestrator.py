@@ -149,7 +149,8 @@ ROLE_TAG = re.compile(r"^\s*(?:[^\w\s\[]{1,3}\s*)?\[(?:Data Analyst|News Researc
 # Removed, never added (2026-11-17 news diagnostic): the base narrator appended word counts such as "(28 words)" to 21
 # of 35 summaries, which then failed the number check; reasoning-tag leftovers; em and en dashes, which the UI must not
 # show (Rules page). A dash between digits becomes a hyphen ("2025-2026"), any other becomes a comma.
-WORD_COUNT = re.compile(r"\s*[\(\[]\s*(?:about\s+|approx\.?\s+|~\s*)?\d+\s+words?\s*[\)\]]", re.I)
+# Also "(1 sentence, 22 words)" and "(Two headlines grouped.)": a parenthetical about the reply's own length or form.
+WORD_COUNT = re.compile(r"\s*[\(\[][^()\[\]]*\b(?:words?|sentences?|headlines grouped)\b[^()\[\]]*[\)\]]", re.I)
 THINK = re.compile(r"<think>.*?</think>|</?think>", re.S | re.I)
 _DIGIT_DASH = re.compile(r"(?<=\d)\s*[\u2013\u2014]\s*(?=\d)")
 _DASH = re.compile(r"\s*[\u2013\u2014]+\s*")
@@ -382,7 +383,8 @@ class NewsResearcherAgent:
         "You are 📰 [News Researcher], a financial catalyst specialist. "
         "In at most two sentences and under sixty words, say what the headlines report. "
         "Group similar headlines instead of listing each one. Use product and company names exactly as the headlines do. "
-        "A company announcement is the company's own claim; say the company announced it. Allegations stay allegations. "
+        "Only a line marked company announcement is the company's own statement. For a shared link, say the link reports it; "
+        "never say the company announced or reported it. Allegations stay allegations. Write plain sentences, not the list. "
         "Each headline has exactly one source: never mention outlets, media, analysts, consensus, sentiment, or tone. "
         "Do not add causes, implications, product categories, or claims about momentum, volume, or price. "
         "Never invent facts, dates, or numbers."
@@ -457,7 +459,7 @@ class NewsResearcherAgent:
                 val.update(unsupported_terms=[], validation_reason="refusal")
                 return False, val
             ok = check_wording(text, prompt, ok, val)
-            problems = attribution_problems(text, titles, independent) if ok else []
+            problems = attribution_problems(text, titles, independent, len(rows_all) - independent) if ok else []
             if problems:
                 val.update(unsupported_attribution=problems, validation_reason="unsupported_attribution")
             return ok and not problems, val

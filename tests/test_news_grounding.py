@@ -93,6 +93,38 @@ class TestAttribution(unittest.TestCase):
         self.assertFalse(is_refusal("Example Bank says prosecutors allege fraud; it denies wrongdoing."))
 
 
+class TestMisattribution(unittest.TestCase):
+    """grounded-v1 audit failures (2026-11-17), all from summaries that passed every other guard."""
+    TSLA = ["Tesla caught altering specs following rear suspension collapse reports"]
+
+    def test_company_verbs_need_a_company_source(self):
+        self.assertIn("reported", attribution_problems("Tesla reported it has altered specifications.", self.TSLA, 1, 0))
+        self.assertEqual(attribution_problems("Tesla reported it has altered specifications.", self.TSLA, 0, 1), [])
+        # the headline's own verb is fine: "Alphabet Announces Third Quarter 2026 Results"
+        self.assertEqual(attribution_problems("Alphabet announced its results, a link reports.",
+                                              ["Alphabet Announces Third Quarter 2026 Results [pdf]"], 1, 0), [])
+
+    def test_hacker_news_is_where_a_link_was_shared_not_where_news_was_announced(self):
+        self.assertIn("on Hacker News", attribution_problems("Bitcoin Core disclosed a flaw on Hacker News.",
+                                                             ["Bitcoin Core discloses TCP out-of-memory vulnerability"], 1, 0))
+        self.assertEqual(attribution_problems("A link shared on Hacker News reports a flaw.", ["flaw"], 1, 0), [])
+
+    def test_prompt_list_echo_is_rejected(self):
+        self.assertTrue(attribution_problems("- EXM, company release, company announcement: Example says so.", ["Example says so"], 0, 1))
+        self.assertTrue(attribution_problems("AMZN, Hacker News: deal approved.", ["deal approved"], 1, 0))
+
+    def test_a_results_date_is_not_results(self):
+        titles = ["NVIDIA Sets Conference Call for Third-Quarter Financial Results"]
+        self.assertIn("results", attribution_problems("NVIDIA announced its third-quarter results.", titles, 0, 1))
+        self.assertEqual(attribution_problems("NVIDIA set a call for its third-quarter results.", titles, 0, 1), [])
+        both = titles + ["NVIDIA Announces Financial Results for Third Quarter"]
+        self.assertEqual(attribution_problems("NVIDIA announced its third-quarter results.", both, 0, 2), [])
+
+    def test_length_notes_are_removed(self):
+        self.assertEqual(clean_narration("Microsoft fixed an annoyance. (1 sentence, 22 words)"), "Microsoft fixed an annoyance.")
+        self.assertEqual(clean_narration("Alphabet fell. (Two headlines grouped.)"), "Alphabet fell.")
+
+
 class TestWordingEquivalents(unittest.TestCase):
     def test_seen_false_rejections_now_pass(self):
         self.assertEqual(unsupported_terms("Amazon released earnings.", "Amazon.com Announces Q3 2026 Results [pdf]"), [])
@@ -131,6 +163,12 @@ class TestNewsResearcher(unittest.TestCase):
         self.assertEqual(report.validation["validation_reason"], "unsupported_attribution")
         self.assertEqual(report.validation["guard_retry"]["used"], "fallback")
         self.assertEqual(len(llm.prompts), 2)
+
+    def test_a_shared_link_is_never_the_company_speaking(self):
+        rows = [outcome("Tesla caught altering specs following rear suspension collapse reports", "hackernews", "TSLA")]
+        report, llm = run(rows, "Tesla reported it has altered specifications.", "A shared link says Tesla was caught altering specs.")
+        self.assertEqual(report.validation["guard_retry"]["reason"], "unsupported_attribution")
+        self.assertEqual(report.summary, "A shared link says Tesla was caught altering specs.")
 
     def test_fallback_lists_sources_not_gate_labels(self):
         report, _ = run(self.ROWS, "Media say the outlook is strong.", retry=False)

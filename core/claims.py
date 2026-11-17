@@ -172,10 +172,38 @@ REFUSAL = re.compile(r"\b(?:I can(?:no|')t|I(?: am|'m) (?:sorry|unable|not able)
                      r"I (?:do not|don't) feel comfortable|(?:cannot|can't) (?:help|assist) with)", re.I)
 
 
-def attribution_problems(candidate: str, titles: List[str], independent: int) -> List[str]:
-    """`titles`: the served headlines; `independent`: how many of them come from a non-issuer source.
+# grounded-v1 screen (2026-11-17, failed its audit): with no company source the narrator still wrote "Tesla reported
+# it has altered specifications" for a Hacker News link, "announced its results on Hacker News", echoed the prompt's
+# list format, and turned "Sets Conference Call for Third-Quarter Financial Results" into "announced its results".
+ISSUER_VERBS = re.compile(r"\b(?:announc(?:ed|es|e|ing|ement)|disclos(?:ed|es|e)|unveil(?:ed|s)?|reveal(?:ed|s)?|"
+                          r"confirm(?:ed|s)?|admit(?:ted|s)?|report(?:ed|s))\b", re.I)
+CHANNEL = re.compile(r"(?<!shared )(?<!linked )\bon Hacker News\b", re.I)
+ECHO = re.compile(r"(?:company announcement|shared link)\s*:|^\s*-\s|^[A-Z]{1,5},\s", re.M)
+RESULTS_DATE = re.compile(r"\b(?:conference call|to discuss|sets? (?:a )?date|will report)\b", re.I)
+TIMING = re.compile(r"\b(?:call|date|will|upcoming|scheduled|sets?|set)\b", re.I)
+
+
+_LINK_SUBJECT = re.compile(r"\b(?:link|links|hacker news|headline|headlines|story|post)\b[^.;,]{0,30}$", re.I)
+
+
+def _verb_supported(m: "re.Match[str]", text: str, titles: List[str]) -> bool:
+    """A company verb is fine when a link is its subject ("a shared link reports") or the headline uses the same verb
+    ("Alphabet Announces ... Results" supports "announced"). "report" must match exactly: "collapse reports" in a
+    title never supports "Tesla reported"."""
+    if _LINK_SUBJECT.search(text[:m.start()]):
+        return True
+    word = m.group(0).lower()
+    if word.startswith("report"):
+        return any(re.search(rf"\b{word}\b", t, re.I) for t in titles)
+    root = re.match(r"announc|disclos|unveil|reveal|confirm|admit", word).group(0)
+    return any(re.search(rf"\b{root}", t, re.I) for t in titles)
+
+
+def attribution_problems(candidate: str, titles: List[str], independent: int, issuer: int = 1) -> List[str]:
+    """`titles`: the served headlines; `independent` / `issuer`: how many come from a non-issuer / issuer source.
     Returns the offending phrases. Tone words need the headlines' own wording; press words need at least one
-    non-issuer headline; plural-source claims need at least two."""
+    non-issuer headline; plural-source claims need at least two; announcement verbs need a company source or the
+    headline's own verb; a results-date headline never supports results without the timing."""
     if not candidate:
         return []
     text = candidate.replace("\u2019", "'")
@@ -185,6 +213,13 @@ def attribution_problems(candidate: str, titles: List[str], independent: int) ->
         found += [m.group(0) for m in PRESS.finditer(text) if f" {m.group(0).lower()} " not in evidence]
     if independent < 2:
         found += [m.group(0) for m in MANY_SOURCES.finditer(text)]
+    if issuer < 1:
+        found += [m.group(0) for m in ISSUER_VERBS.finditer(text) if not _verb_supported(m, text, titles)]
+    found += [m.group(0) for m in CHANNEL.finditer(text)] + [m.group(0).strip() for m in ECHO.finditer(text)]
+    dated = any(RESULTS_DATE.search(t) for t in titles)
+    reported = any(re.search(r"\bresults\b", t, re.I) and not RESULTS_DATE.search(t) for t in titles)
+    if dated and not reported and re.search(r"\bresults\b", text, re.I) and not TIMING.search(text):
+        found.append("results")
     return list(dict.fromkeys(found))
 
 
