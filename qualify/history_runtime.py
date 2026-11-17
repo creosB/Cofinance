@@ -11,16 +11,26 @@ import subprocess
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from core.local_models import FILENAME,MODEL_SHA,REVISION,RUNTIME_TAG,digest,local_json
+from core.local_models import BACKENDS,FILENAME,MODEL_SHA,REVISION,RUNTIME_TAG,digest,local_json,server_command,server_flags
 from .historical import predict,evaluate
 
-MODEL_META={'id':'lfm3-1.7b-q4km','revision':REVISION,'model_sha256':MODEL_SHA,'runtime':RUNTIME_TAG,'threads':6,'cpu_only':True}
+MODEL_META={'id':'lfm3-1.7b-q4km','revision':REVISION,'model_sha256':MODEL_SHA,'runtime':RUNTIME_TAG}
+
+
+def default_backend(model_root:Path):
+    """Same order as the live narrator: the Vulkan GPU build when installed, else CPU. COFINANCE_BACKEND overrides."""
+    chosen=os.environ.get('COFINANCE_BACKEND','')
+    if chosen:
+        if chosen not in BACKENDS:raise ValueError('Unknown COFINANCE_BACKEND')
+        return chosen
+    return next((b for b in BACKENDS if (model_root/BACKENDS[b]['dir']).is_dir()),'cpu')
 
 
 @contextmanager
-def narrator(model_root:Path,log_path:Path,alias:str='lfm3-history'):
+def narrator(model_root:Path,log_path:Path,alias:str='lfm3-history',backend:str|None=None):
     """Own a private llama-server for a benchmark. Yields (call, model_meta); always stops the server."""
-    model=(model_root/FILENAME).resolve();runtime=(model_root/RUNTIME_TAG).resolve()
+    backend=backend or default_backend(model_root)
+    model=(model_root/FILENAME).resolve();runtime=(model_root/BACKENDS[backend]['dir']).resolve()
     if digest(model)!=MODEL_SHA:raise ValueError('Narrator checksum mismatch')
     servers=list(runtime.rglob('llama-server.exe'))
     if len(servers)!=1:raise ValueError('Expected one managed llama-server executable')
@@ -29,8 +39,7 @@ def narrator(model_root:Path,log_path:Path,alias:str='lfm3-history'):
     env={k:v for k,v in os.environ.items() if k.upper() in {'PATH','SYSTEMROOT','WINDIR','TEMP','TMP','USERPROFILE','LOCALAPPDATA','APPDATA','COMSPEC'}}
     log_path.parent.mkdir(parents=True,exist_ok=True)
     with log_path.open('w',encoding='utf-8') as log:
-        proc=subprocess.Popen([str(servers[0]),'--model',str(model),'--alias',alias,'--host','127.0.0.1','--port',str(port),
-            '--ctx-size','4096','--threads','6','--parallel','1','--n-gpu-layers','0','--reasoning','off','--jinja','--no-webui','--api-key',key],
+        proc=subprocess.Popen(server_command(servers[0],model,alias,port,key,backend),
             cwd=runtime,env=env,stdin=subprocess.DEVNULL,stdout=log,stderr=log,
             creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0)|getattr(subprocess,'CREATE_NEW_PROCESS_GROUP',0))
         try:
@@ -50,7 +59,7 @@ def narrator(model_root:Path,log_path:Path,alias:str='lfm3-history'):
                 choice=res['choices'][0]
                 if choice.get('finish_reason')!='stop' and not kwargs.get('allow_length'):raise ValueError('Incomplete forecast')
                 return choice if kwargs.get('return_choice') else choice['message']['content']
-            yield call,dict(MODEL_META)
+            yield call,dict(MODEL_META,backend=backend,flags=server_flags(backend),cpu_only=backend=='cpu')
         finally:
             if proc.poll() is None:
                 proc.terminate()

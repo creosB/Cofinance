@@ -32,6 +32,38 @@ RUNTIME_TAG = "b12110"
 RUNTIME_SHA = "98901e327c252875accaf2d1bf364e10e868843b0b63468baad1aa945cdc5da2"
 RUNTIME_SIZE = 24708445
 RUNTIME_URL = f"https://github.com/ggml-org/llama.cpp/releases/download/{RUNTIME_TAG}/llama-{RUNTIME_TAG}-bin-win-cpu-x64.zip"
+COMMON_FLAGS = ("--ctx-size", "4096", "--parallel", "1", "--reasoning", "off", "--jinja")
+# Speed lab 11/17 on the target PC (Ryzen 5 3600X, Radeon RX 5700 XT): full Vulkan offload reads prompts at about
+# 1,500 tok/s and writes about 158 tok/s, versus 128 and 25 on the CPU. Same release, same model file. GPU first;
+# the CPU build stays as the qualified fallback. Server flags are part of the qualification fingerprint, so any
+# flag change forces a new qualification. "--device Vulkan0" makes a missing GPU fail loudly instead of silently
+# running the Vulkan build on the CPU.
+BACKENDS = {
+    "vulkan": {"label": "Vulkan GPU", "archive": f"llama-{RUNTIME_TAG}-vulkan.zip", "dir": f"{RUNTIME_TAG}-vulkan",
+               "url": f"https://github.com/ggml-org/llama.cpp/releases/download/{RUNTIME_TAG}/llama-{RUNTIME_TAG}-bin-win-vulkan-x64.zip",
+               "sha": "9732a5e48887ca54d0bfe4af4324dc85fd56cd8cda19b52df3542fa6ebe6874f", "size": 37661146,
+               "flags": ("--device", "Vulkan0", "--n-gpu-layers", "99", "--flash-attn", "on", "--threads", "6")},
+    "cpu": {"label": "CPU", "archive": f"llama-{RUNTIME_TAG}-cpu.zip", "dir": RUNTIME_TAG, "url": RUNTIME_URL,
+            "sha": RUNTIME_SHA, "size": RUNTIME_SIZE,
+            "flags": ("--n-gpu-layers", "0", "--threads", "6", "--threads-batch", "12", "--flash-attn", "on")},
+}
+RUNTIMES_SIZE = sum(b["size"] for b in BACKENDS.values())
+
+
+def server_flags(backend):
+    return [*COMMON_FLAGS, *BACKENDS[backend]["flags"]]
+
+
+def server_command(executable, model_path, alias, port, key, backend):
+    """The one llama-server command line, shared by the live narrator and every benchmark."""
+    return [str(executable), "--model", str(model_path), "--alias", alias, "--host", "127.0.0.1", "--port", str(port),
+            *server_flags(backend), "--no-webui", "--api-key", key]
+
+
+def runtime_fingerprint(backend):
+    """Everything that can change the narrator's output: weights, runtime build and server flags."""
+    b = BACKENDS[backend]
+    return "|".join([MODEL_SHA, b["sha"], " ".join(server_flags(backend)), "greedy-thinking-off-v1"])
 
 
 class ModelError(RuntimeError):
@@ -108,14 +140,14 @@ class LocalModels:
         self.key = ""
         self.ready = False
         self.busy = False
-        self.state = {"phase": "not_downloaded", "stage": "", "downloaded_bytes": 0, "total_bytes": MODEL_SIZE + RUNTIME_SIZE,
+        self.state = {"phase": "not_downloaded", "stage": "", "downloaded_bytes": 0, "total_bytes": MODEL_SIZE + RUNTIMES_SIZE,
                       "speed_bps": 0, "error": "", "qualification": None, "selected": "facts", "router": "not_loaded",
                       "preferred": "facts", "selection_note": ""}
         path = self.root / "state.json"
         if path.exists():
             try:
                 saved = json.loads(path.read_text(encoding="utf-8"))
-                for key in ("phase", "qualification", "downloaded_bytes", "preferred"):
+                for key in ("phase", "qualification", "qualifications", "backend", "downloaded_bytes", "preferred"):
                     if key in saved:
                         self.state[key] = saved[key]
                 if self.state["phase"] in {"downloading", "verifying", "loading", "qualifying", "ready"}:
@@ -156,7 +188,22 @@ class LocalModels:
 
     @property
     def runtime_dir(self):
-        return self.root / RUNTIME_TAG
+        return self.backend_dir(self.active_backend)
+
+    def backend_dir(self, backend):
+        return self.root / BACKENDS[backend]["dir"]
+
+    def installed_backends(self):
+        """Runtimes whose pinned archive is on disk, fastest first."""
+        return [b for b in BACKENDS if (self.root / BACKENDS[b]["archive"]).is_file()]
+
+    @property
+    def active_backend(self):
+        chosen = self.state.get("backend")
+        if chosen in BACKENDS:
+            return chosen
+        installed = self.installed_backends()
+        return installed[0] if installed else "cpu"
 
     def update(self, **values):
         with self.lock:
@@ -167,18 +214,23 @@ class LocalModels:
         with self.lock:
             result = dict(self.state)
             result.update(id=MODEL_ID, name="LFM3 1.7B", quantization="Q4_K_M", size_bytes=MODEL_SIZE,
-                          revision=REVISION, runtime="llama.cpp " + RUNTIME_TAG + " / CPU", loaded=self.ready and self.process is not None and self.process.poll() is None,
+                          revision=REVISION, runtime="llama.cpp " + RUNTIME_TAG + " / " + BACKENDS[self.active_backend]["label"],
+                          backend=self.active_backend, loaded=self.ready and self.process is not None and self.process.poll() is None,
                           license="LFM Open License v1.0", license_note="Commercial use is limited by the $10M annual-revenue threshold.",
                           source="https://huggingface.co/LiquidAI/LFM3-1.7B-GGUF", router_model="fastino/GLiNER2.5-Decide",
                           can_select=self.qualified(), busy=self.busy)
             return result
 
-    def qualified(self):
-        q = self.state.get("qualification")
-        return bool(q and q.get("passed") and q.get("fingerprint") == self.fingerprint())
+    def qualified(self, backend=None):
+        """With no backend: can any runtime narrate. A report counts only for the exact weights, build and flags."""
+        if backend is None:
+            return any(self.qualified(b) for b in BACKENDS)
+        reports = [self.state.get("qualification"), *(self.state.get("qualifications") or {}).values()]
+        target = self.fingerprint(backend)
+        return any(bool(q and q.get("passed") and q.get("fingerprint") == target) for q in reports)
 
-    def fingerprint(self):
-        h = hashlib.sha256((MODEL_SHA + RUNTIME_SHA + "greedy-thinking-off-v1").encode())
+    def fingerprint(self, backend=None):
+        h = hashlib.sha256(runtime_fingerprint(backend or self.active_backend).encode())
         for name in ("qualify/cases.jsonl", "qualify/gates_narrator.json", "qualify/scorers.py"):
             h.update((self.repo / name).read_bytes())
         return h.hexdigest()
@@ -261,11 +313,18 @@ class LocalModels:
         if hashlib.sha1(b"blob " + str(len(license_data)).encode() + b"\0" + license_data).hexdigest() != LICENSE_BLOB:
             raise ModelError("Pinned license verification failed.")
         (self.root / "LICENSE-LFM.txt").write_bytes(license_data)
-        archive = self.root / f"llama-{RUNTIME_TAG}-cpu.zip"
-        self.fetch(RUNTIME_URL, archive, RUNTIME_SIZE, RUNTIME_SHA, 0)
-        self.fetch(MODEL_URL, self.model_path, MODEL_SIZE, MODEL_SHA, RUNTIME_SIZE)
+        base = 0
+        for b in BACKENDS.values():
+            self.fetch(b["url"], self.root / b["archive"], b["size"], b["sha"], base)
+            base += b["size"]
+        self.fetch(MODEL_URL, self.model_path, MODEL_SIZE, MODEL_SHA, base)
         self.update(phase="verifying", stage="Runtime files")
-        receipts = {}
+        receipts = {name: self.extract(name) for name in BACKENDS}
+        atomic(self.root / "runtime-receipt.json", receipts)
+        self.update(phase="downloaded", stage="SHA-256 verified", downloaded_bytes=MODEL_SIZE+RUNTIMES_SIZE, speed_bps=0, error="")
+
+    def extract(self, backend):
+        archive, target, receipts = self.root / BACKENDS[backend]["archive"], self.backend_dir(backend), {}
         with zipfile.ZipFile(archive) as z:
             files = z.infolist()
             if len(files) > 300 or sum(f.file_size for f in files) > 250*1024*1024:
@@ -276,49 +335,71 @@ class LocalModels:
                     raise ModelError("Unsafe runtime archive member.")
                 if entry.is_dir(): continue
                 data = z.read(entry)
-                path = self.runtime_dir.joinpath(*name.parts)
+                path = target.joinpath(*name.parts)
                 path.parent.mkdir(parents=True, exist_ok=True)
                 if path.is_symlink(): raise ModelError("Runtime symlink refused.")
                 path.write_bytes(data)
                 receipts[str(name)] = hashlib.sha256(data).hexdigest()
-        atomic(self.root / "runtime-receipt.json", receipts)
-        self.update(phase="downloaded", stage="SHA-256 verified", downloaded_bytes=MODEL_SIZE+RUNTIME_SIZE, speed_bps=0, error="")
+        return receipts
 
-    def verify(self):
+    def verify(self, backend=None):
+        backend = backend or self.active_backend
         self.update(phase="verifying", stage="Model and runtime integrity", error="")
         if not self.model_path.is_file() or self.model_path.is_symlink() or digest(self.model_path) != MODEL_SHA:
             raise ModelError("Download and verify the pinned model first.")
-        archive = self.root / f"llama-{RUNTIME_TAG}-cpu.zip"
-        if not archive.is_file() or digest(archive) != RUNTIME_SHA:
+        archive = self.root / BACKENDS[backend]["archive"]
+        if not archive.is_file() or digest(archive) != BACKENDS[backend]["sha"]:
             raise ModelError("Pinned runtime archive failed verification.")
         # Compare extracted bytes directly to the verified archive, not a mutable receipt alone.
         with zipfile.ZipFile(archive) as z:
             for entry in z.infolist():
                 if entry.is_dir(): continue
-                path = self.runtime_dir / entry.filename
+                path = self.backend_dir(backend) / entry.filename
                 if path.is_symlink() or not path.is_file() or digest(path) != hashlib.sha256(z.read(entry)).hexdigest():
                     raise ModelError("Extracted runtime integrity check failed.")
         self.check_cancel()
 
-    def load(self, for_qualification=False):
+    def stop_process(self):
+        self.ready = False
+        if self.process and self.process.poll() is None:
+            self.process.terminate()
+            try: self.process.wait(timeout=8)
+            except subprocess.TimeoutExpired: self.process.kill(); self.process.wait(timeout=3)
+
+    def load(self, for_qualification=False, backend=None):
+        """Start the fastest qualified runtime; if it cannot start (for example no GPU), fall back to the next one."""
         if not for_qualification and not self.qualified():
             raise ModelError("The narrator must pass qualification before it can be loaded for research.")
-        if self.process and self.process.poll() is None and self.ready:
+        if self.process and self.process.poll() is None and self.ready and backend in (None, self.state.get("backend")):
             return
-        self.verify()
-        executables = list(self.runtime_dir.rglob("llama-server.exe"))
+        order = [backend] if backend else [b for b in self.installed_backends() if self.qualified(b)]
+        failures = []
+        for name in order:
+            try:
+                self.start(name, for_qualification, failures)
+                return
+            except Cancelled:
+                self.stop_process()
+                raise
+            except ModelError as exc:
+                self.stop_process()
+                failures.append(f"{BACKENDS[name]['label']}: {exc}")
+        raise ModelError("; ".join(failures) or "No qualified runtime is installed.")
+
+    def start(self, backend, for_qualification, failures):
+        self.verify(backend)
+        executables = list(self.backend_dir(backend).rglob("llama-server.exe"))
         if len(executables) != 1: raise ModelError("Managed llama-server executable not found.")
         with socket.socket() as sock:
             sock.bind(("127.0.0.1", 0)); port = sock.getsockname()[1]
         self.key = secrets.token_urlsafe(32)
         self.url = f"http://127.0.0.1:{port}"
-        command = [str(executables[0]), "--model", str(self.model_path), "--alias", MODEL_ID, "--host", "127.0.0.1", "--port", str(port),
-                   "--ctx-size", "4096", "--threads", "6", "--parallel", "1", "--n-gpu-layers", "0", "--reasoning", "off", "--jinja",
-                   "--no-webui", "--api-key", self.key]
+        command = server_command(executables[0], self.model_path, MODEL_ID, port, self.key, backend)
         env = {k:v for k,v in os.environ.items() if k.upper() in {"SYSTEMROOT","WINDIR","PATH","TEMP","TMP","USERPROFILE","LOCALAPPDATA","APPDATA","COMSPEC","PROCESSOR_ARCHITECTURE"}}
-        self.update(phase="loading", stage="Starting local CPU narrator", error="")
+        label = BACKENDS[backend]["label"]
+        self.update(phase="loading", stage=f"Starting local {label} narrator", error="")
         with (self.root / "llama-server.log").open("a", encoding="utf-8") as log:
-            self.process = subprocess.Popen(command, cwd=self.runtime_dir, env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+            self.process = subprocess.Popen(command, cwd=self.backend_dir(backend), env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
                                             creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
         for _ in range(180):
             self.check_cancel()
@@ -326,7 +407,9 @@ class LocalModels:
             try:
                 local_json(self.url + "/health", key=self.key, timeout=2)
                 self.ready = True
-                self.update(phase="qualifying" if for_qualification else "ready", stage="Local narrator loaded")
+                note = ("Fell back to " + label + " (" + "; ".join(failures) + ")") if failures else ""
+                self.update(phase="qualifying" if for_qualification else "ready", backend=backend,
+                            stage=f"Local narrator loaded on {label}", runtime_note=note)
                 return
             except (OSError, ValueError):
                 time.sleep(.5)
@@ -357,29 +440,50 @@ class LocalModels:
         return "LiquidAI/LFM3-1.7B-GGUF:Q4_K_M@" + REVISION[:12]
 
     def qualify(self):
+        """Qualify every installed runtime on the same frozen gates: CPU fallback first, GPU last so it stays loaded."""
         from qualify.run import load_cases, run_cases, check_gates
-        self.load(for_qualification=True)
+        installed = self.installed_backends()
+        if not installed:
+            raise ModelError("Download and verify the pinned model first.")
         cases = [c for c in load_cases(str(self.repo/"qualify/cases.jsonl")) if c["category"] in {"narration","number_faithfulness"}]
-        self.update(phase="qualifying", stage="Narrator smoke qualification", qualification=None)
-        done = 0
-        def call(body):
-            nonlocal done
-            self.check_cancel()
-            result = local_json(self.url+"/v1/chat/completions", {**body,"chat_template_kwargs":{"enable_thinking":False}}, key=self.key)
-            done += 1
-            self.update(stage=f"Checked {done} of {len(cases)} qualification cases")
-            return result
-        report = run_cases(cases, call, MODEL_ID, max_tokens=256)
         gates = json.loads((self.repo/"qualify/gates_narrator.json").read_text())
-        report["gates"] = check_gates(report,gates)
-        report.update(fingerprint=self.fingerprint(), model_sha256=MODEL_SHA, revision=REVISION, runtime=RUNTIME_TAG,
-                      quantization="Q4_K_M", thinking=False, evaluated_at=time.time(), passed=all(g["passed"] for g in report["gates"].values()))
-        atomic(self.root/"qualification.json",report)
-        self.update(qualification=report, phase="ready" if report["passed"] else "qualification_failed", stage="Smoke gates passed" if report["passed"] else "Narrator remains disabled")
-        if not report["passed"]:
-            self.ready = False
-            if self.process and self.process.poll() is None:
-                self.process.terminate(); self.process.wait(timeout=8)
+        reports = {}
+        self.update(qualification=None, qualifications={})
+        for backend in reversed(installed):
+            label = BACKENDS[backend]["label"]
+            self.stop_process()
+            try:
+                self.load(for_qualification=True, backend=backend)
+            except Cancelled:
+                raise
+            except ModelError as exc:
+                reports[backend] = {"passed": False, "backend": backend, "error": str(exc)[:250], "fingerprint": self.fingerprint(backend)}
+                continue
+            self.update(phase="qualifying", stage=f"Narrator smoke qualification on {label}")
+            done = 0
+            def call(body):
+                nonlocal done
+                self.check_cancel()
+                result = local_json(self.url+"/v1/chat/completions", {**body,"chat_template_kwargs":{"enable_thinking":False}}, key=self.key)
+                done += 1
+                self.update(stage=f"{label}: checked {done} of {len(cases)} qualification cases")
+                return result
+            report = run_cases(cases, call, MODEL_ID, max_tokens=256)
+            report["gates"] = check_gates(report,gates)
+            report.update(fingerprint=self.fingerprint(backend), backend=backend, flags=server_flags(backend),
+                          model_sha256=MODEL_SHA, revision=REVISION, runtime=f"{RUNTIME_TAG} {label}", quantization="Q4_K_M",
+                          thinking=False, evaluated_at=time.time(), passed=all(g["passed"] for g in report["gates"].values()))
+            reports[backend] = report
+            self.update(qualifications=dict(reports))
+        atomic(self.root/"qualification.json", reports)
+        best = next((reports[b] for b in BACKENDS if reports.get(b, {}).get("passed")), None)
+        loaded = self.state.get("backend")
+        if self.ready and reports.get(loaded, {}).get("passed"):
+            self.update(qualification=best, phase="ready", stage=f"Smoke gates passed on {BACKENDS[loaded]['label']}")
+        else:
+            self.stop_process()
+            self.update(qualification=best, phase="downloaded" if best else "qualification_failed",
+                        stage="Smoke gates passed; loads on the next run" if best else "Narrator remains disabled")
 
     def select(self, model):
         if model not in {"facts",MODEL_ID}: raise ValueError("Unknown narrator choice.")

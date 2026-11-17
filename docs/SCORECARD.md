@@ -44,6 +44,7 @@ The shortlisted technique is sealed on the unseen window 2026-11-09 to 2026-11-1
 
 | Benchmark | Result | Source |
 | --- | --- | --- |
+| Narrator speed, Vulkan GPU vs CPU | Decision call 0.56 s vs 5.3 s; headline labels 39 of 40 identical, AUC 0.574 vs 0.585 | [Speed](benchmarks/SPEED.md) |
 | Price-only LFM3 forecast, 125 cases | UP every time, balanced accuracy 50% | [Historical](benchmarks/HISTORICAL.md) |
 | Strategy lab, 2,826 cases, 2014 to 2026 | no direction rule passes; dual momentum cut dev drawdown 59% to 20% | [Lab](benchmarks/LAB.md) |
 | Risk flag on new assets | not confirmed: 5 of 9 assets agreed, 6 needed | [Risk lab](benchmarks/RISK_LAB.md) |
