@@ -17,7 +17,7 @@ from .chat_store import ChatStore, ACTIVE, valid_id
 from .citations import cite
 from .entities import extract_tickers
 from .gliner_decide import DEFAULT_ALIASES, GlinerQueryRouter, GlinerOutputError
-from .local_models import LocalModels, MODEL_ID, ModelError, Cancelled
+from .local_models import LocalModels, MODEL_ID, ModelError, Cancelled, narrators
 from .market import MarketTools
 from .news_service import coverage_note, feed_tickers, news_health
 from .memory import HybridMemory, LocalKeywordMemory, MemoryHit, context_from
@@ -185,7 +185,7 @@ class ChatService:
         if not isinstance(query,str) or not 1<=len(query.strip())<=3000:raise ValueError('Enter a question of up to 3000 characters.')
         query=query.strip()
         if any(ord(c)<32 and c not in '\n\t' for c in query):raise ValueError('Control characters are not allowed.')
-        if model not in {'facts',MODEL_ID}:raise ValueError('Select a supported local model.')
+        if model not in {'facts',*narrators()}:raise ValueError('Select a supported local model.')
         with self.lock,self.models.lock:
             existing=self.store.by_request(request_id,session_id,query,model)
             if existing:return existing
@@ -280,9 +280,10 @@ class ChatService:
             if result.news_report and os.environ.get('COFINANCE_HEADLINE_SIGNAL','on').strip().lower()!='off':
                 # headline-v1, experimental. Python sums the stored judgments of exactly the headlines the News Researcher
                 # was served, as in the screen. Shown as computed, like crowd odds: never narrated or guarded.
-                from .headline_signal import card as headline_card
+                from .headline_signal import card as headline_card,version_for
                 served={t:[r['title'] for r in rows] for t,rows in result.news_report.raw_facts.items()}
-                try:headline=trace.call('Score served headlines (headline-v1, experimental)','tool',lambda:headline_card(self.root/'news.db',served),
+                version=version_for(self.models.narrator_id)  # only the current judge's judgments, never a mix
+                try:headline=trace.call('Score served headlines (headline-v1, experimental)','tool',lambda:headline_card(self.root/'news.db',served,version=version),
                                         actor='Python',inputs={'served':{t:len(v) for t,v in served.items()}})
                 except Exception:headline=None  # an aid, never a blocker
             health=news_health(self.root/'news.db')
@@ -781,17 +782,18 @@ class ChatService:
     def judge_headlines(self,store,check):
         """headline-v1 at ingestion, after the Clock 1 transaction committed (never inside it). Experimental: runs only
         with a qualified narrator, and a failure never fails the collection. COFINANCE_HEADLINE_SIGNAL=off disables it."""
-        from .headline_signal import VERSION,judge_pending
+        from .headline_signal import VERSION,judge_pending,version_for
         if os.environ.get('COFINANCE_HEADLINE_SIGNAL','on').strip().lower()=='off':return {'version':VERSION,'status':'off'}
         if not self.models.qualified():return {'version':VERSION,'status':'narrator_not_qualified'}
+        version=version_for(self.models.narrator_id)
         proc=getattr(self.models,'process',None)
         was_loaded=bool(getattr(self.models,'ready',False) and proc and proc.poll() is None)
         trace=LiveTrace('Headline judgments: '+VERSION+' (experimental)',directory=self.root/'traces',progress=self.news_progress)
         try:
             self.news_progress('Judging served headlines')
             self.models.load()
-            result=trace.call('Judge served headlines','model',lambda:judge_pending(store.conn,self.models.choice,model=self.models.model_id+' '+self.models.active_backend,check=check),
-                              actor='Headline Judge',model=self.models.model_id,inputs={'version':VERSION,'inputs':'asset and title only','gate_label_hidden':True})
+            result=trace.call('Judge served headlines','model',lambda:judge_pending(store.conn,self.models.choice,model=self.models.model_id+' '+self.models.active_backend,check=check,version=version),
+                              actor='Headline Judge',model=self.models.model_id,inputs={'version':version,'inputs':'asset and title only','gate_label_hidden':True})
             trace.finish(summary=result)
             return {**result,'status':'complete' if not result['failed'] else 'partial','backend':self.models.active_backend}
         except Cancelled:

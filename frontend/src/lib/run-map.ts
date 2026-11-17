@@ -26,7 +26,7 @@ export function interactiveStages(run:Run):MapStage[]{
  const finalGate=spans.filter(s=>s.name==='Synthesis faithfulness')
  const root=spans.filter(s=>s.kind==='run'),results=root.filter(s=>text(object(s.outputs).answer))
  const modelIds=[...new Set(spans.filter(s=>s.kind==='model'&&s.actor!=='Routing executive').map(s=>s.model).filter(Boolean))]
- const narrator=modelIds.length===1?(modelIds[0].includes('LiquidAI/LFM3')?'LFM3 1.7B / shared narrator':modelIds[0]):modelIds.length?'Multiple recorded backends':'No narrator inference observed'
+ const narrator=modelIds.length===1?(modelIds[0].includes('LiquidAI/LFM3')?'LFM3 1.7B / shared narrator':modelIds[0].includes('AtomicChat/LFM3')?'LFM3 1.7B Uncensored (AtomicChat) / shared narrator':modelIds[0]):modelIds.length?'Multiple recorded backends':'No narrator inference observed'
  return [
   stage('request','Your question','User input','A question enters the local job runner. Follow-ups can reuse assets from this conversation only.',route.slice(0,1).length?route.slice(0,1):root,run,text(object(route[0]?.inputs).query)||run.title),
   stage('router','Decision model','GLiNER2.5-Decide','Classifies intent and horizon, then resolves entities. It does not generate the answer or call tools.',[...route,...routerCalls],run,text(routeOutput.intent)?text(routeOutput.intent).replaceAll('_',' ')+' / '+(Array.isArray(routeOutput.tickers)?routeOutput.tickers.join(', '):'No assets'):'Waiting for a recorded route'),

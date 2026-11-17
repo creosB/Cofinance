@@ -49,6 +49,41 @@ BACKENDS = {
 }
 RUNTIMES_SIZE = sum(b["size"] for b in BACKENDS.values())
 
+# Pinned narrator catalog. Only these files can be downloaded, verified, qualified and selected. AtomicChat's
+# refusal-direction edit of LFM3 was approved by Baris on 2026-11-17 after a same-input comparison: equal on the
+# smoke gates, shorter replies, headline judgments ranked dev outcomes better (AUC 0.625 vs 0.574, not confirmed
+# on unseen data). Each narrator is qualified on its own: its SHA-256 is part of the fingerprint.
+ATOMIC_ID = "lfm3-1.7b-atomic-ad-q4km"
+ATOMIC_REVISION = "3ad712542eb9de349dbd28f2739b69c925cdec7d"
+ATOMIC_FILE = "LFM3-1.7B-Uncensored-AD-Q4_K_M.gguf"
+EXTRA_NARRATORS = {
+    ATOMIC_ID: {"name": "LFM3 1.7B Uncensored", "publisher": "AtomicChat", "quantization": "AD-Q4_K_M",
+                "repo": "AtomicChat/LFM3-1.7B-Uncensored-GGUF", "revision": ATOMIC_REVISION, "filename": ATOMIC_FILE,
+                "sha": "b22df65673b54ed326f18f74826d76f3b65dadc237ffd6306cd52be04544827d", "size": 1132208000,
+                "url": f"https://huggingface.co/AtomicChat/LFM3-1.7B-Uncensored-GGUF/resolve/{ATOMIC_REVISION}/{ATOMIC_FILE}",
+                "license_url": f"https://huggingface.co/AtomicChat/LFM3-1.7B-Uncensored-GGUF/raw/{ATOMIC_REVISION}/LICENSE",
+                "license_sha256": "4d28ca14dedc0b3d0fcc2b3339f0e79931faa33874f3d24f522183a8fc70068c",
+                "license_file": "LICENSE-AtomicChat-LFM.txt",
+                "source": "https://huggingface.co/AtomicChat/LFM3-1.7B-Uncensored-GGUF",
+                "note": "Refusal-direction edit of LFM3 1.7B. Shorter replies; headline judgments ranked dev outcomes better than the base. Not confirmed on unseen data."},
+}
+
+
+def narrators():
+    """The catalog, read at call time so tests can patch the base constants."""
+    base = {"name": "LFM3 1.7B", "publisher": "Liquid AI", "quantization": "Q4_K_M", "repo": "LiquidAI/LFM3-1.7B-GGUF",
+            "revision": REVISION, "filename": FILENAME, "sha": MODEL_SHA, "size": MODEL_SIZE, "url": MODEL_URL,
+            "license_url": LICENSE_URL, "license_blob": LICENSE_BLOB, "license_file": "LICENSE-LFM.txt",
+            "source": "https://huggingface.co/LiquidAI/LFM3-1.7B-GGUF", "note": "Original LFM3 1.7B release."}
+    return {MODEL_ID: base, **EXTRA_NARRATORS}
+
+
+def narrator_spec(model):
+    catalog = narrators()
+    if model not in catalog:
+        raise ValueError("Unknown narrator choice.")
+    return catalog[model]
+
 
 def server_flags(backend):
     return [*COMMON_FLAGS, *BACKENDS[backend]["flags"]]
@@ -60,10 +95,10 @@ def server_command(executable, model_path, alias, port, key, backend):
             *server_flags(backend), "--no-webui", "--api-key", key]
 
 
-def runtime_fingerprint(backend):
+def runtime_fingerprint(backend, model=None):
     """Everything that can change the narrator's output: weights, runtime build and server flags."""
     b = BACKENDS[backend]
-    return "|".join([MODEL_SHA, b["sha"], " ".join(server_flags(backend)), "greedy-thinking-off-v1"])
+    return "|".join([narrator_spec(model or MODEL_ID)["sha"], b["sha"], " ".join(server_flags(backend)), "greedy-thinking-off-v1"])
 
 
 class ModelError(RuntimeError):
@@ -136,6 +171,7 @@ class LocalModels:
         self.cancel = threading.Event()
         self.thread = None
         self.process = None
+        self.loaded_model = None
         self.url = ""
         self.key = ""
         self.ready = False
@@ -164,27 +200,41 @@ class LocalModels:
         tool-only and says why, instead of silently switching narrators.
         """
         preferred = self.state.get("preferred")
-        if preferred not in {"facts", MODEL_ID}:
+        if preferred not in {"facts", *narrators()}:
             preferred = "facts"
         self.state["preferred"], self.state["selected"], self.state["selection_note"] = preferred, "facts", ""
         if preferred == "facts":
             return
+        spec = narrator_spec(preferred)
         try:
-            file_ok = self.model_path.is_file() and self.model_path.stat().st_size == MODEL_SIZE
-            still_qualified = self.qualified()
+            path = self.path_of(preferred)
+            file_ok = path.is_file() and path.stat().st_size == spec["size"]
+            still_qualified = self.qualified(model=preferred)
         except OSError:
             file_ok = still_qualified = False
         if not file_ok:
-            self.state["selection_note"] = "Last choice was LFM3 1.7B, but the model file is missing. Using tool-only."
+            self.state["selection_note"] = f"Last choice was {spec['name']}, but the model file is missing. Using tool-only."
         elif not still_qualified:
-            self.state["selection_note"] = "Last choice was LFM3 1.7B, but its qualification is out of date. Using tool-only."
+            self.state["selection_note"] = f"Last choice was {spec['name']}, but its qualification is out of date. Using tool-only."
         else:
-            self.state["selected"] = MODEL_ID
+            self.state["selected"] = preferred
             self.state["selection_note"] = "Restored from the last session. Loads on the next run."
 
     @property
+    def narrator_id(self):
+        """The narrator that loads, judges headlines and is shown: the selection, else the remembered preference."""
+        catalog = narrators()
+        for key in ("selected", "preferred"):
+            if self.state.get(key) in catalog:
+                return self.state[key]
+        return MODEL_ID
+
+    def path_of(self, model=None):
+        return self.root / narrator_spec(model or self.narrator_id)["filename"]
+
+    @property
     def model_path(self):
-        return self.root / FILENAME
+        return self.path_of()
 
     @property
     def runtime_dir(self):
@@ -210,34 +260,59 @@ class LocalModels:
             self.state.update(values)
             atomic(self.root / "state.json", self.state)
 
+    def is_loaded(self, model=None):
+        running = self.ready and self.process is not None and self.process.poll() is None
+        return running and (model is None or self.loaded_model == model)
+
+    def report_for(self, model):
+        """Best qualification report of one narrator: a passing one on the fastest runtime, else any."""
+        reports = [r for r in [self.state.get("qualification"), *(self.state.get("qualifications") or {}).values()]
+                   if r and r.get("fingerprint") in {self.fingerprint(b, model) for b in BACKENDS}]
+        return next((r for r in reports if r.get("passed")), reports[0] if reports else None)
+
     def snapshot(self):
         with self.lock:
             result = dict(self.state)
-            result.update(id=MODEL_ID, name="LFM3 1.7B", quantization="Q4_K_M", size_bytes=MODEL_SIZE,
-                          revision=REVISION, runtime="llama.cpp " + RUNTIME_TAG + " / " + BACKENDS[self.active_backend]["label"],
-                          backend=self.active_backend, loaded=self.ready and self.process is not None and self.process.poll() is None,
+            active = self.narrator_id
+            spec = narrator_spec(active)
+            listed = []
+            for model, s in narrators().items():
+                path = self.path_of(model)
+                listed.append({"id": model, "name": s["name"], "publisher": s["publisher"], "quantization": s["quantization"],
+                               "size_bytes": s["size"], "revision": s["revision"], "source": s["source"], "note": s["note"],
+                               "downloaded": path.is_file() and path.stat().st_size == s["size"],
+                               "qualified": self.qualified(model=model), "loaded": self.is_loaded(model), "active": model == active})
+            result.update(id=active, name=spec["name"], quantization=spec["quantization"], size_bytes=spec["size"],
+                          revision=spec["revision"], runtime="llama.cpp " + RUNTIME_TAG + " / " + BACKENDS[self.active_backend]["label"],
+                          backend=self.active_backend, loaded=self.is_loaded(), loaded_model=self.loaded_model if self.is_loaded() else None,
                           license="LFM Open License v1.0", license_note="Commercial use is limited by the $10M annual-revenue threshold.",
-                          source="https://huggingface.co/LiquidAI/LFM3-1.7B-GGUF", router_model="fastino/GLiNER2.5-Decide",
-                          can_select=self.qualified(), busy=self.busy)
+                          source=spec["source"], router_model="fastino/GLiNER2.5-Decide", narrators=listed,
+                          qualification=self.report_for(active), can_select=self.qualified(model=active), busy=self.busy)
             return result
 
-    def qualified(self, backend=None):
-        """With no backend: can any runtime narrate. A report counts only for the exact weights, build and flags."""
+    def qualified(self, backend=None, model=None):
+        """With no backend: can any runtime narrate. A report counts only for the exact weights, build and flags,
+        so one narrator's report never qualifies another."""
+        model = model or self.narrator_id
         if backend is None:
-            return any(self.qualified(b) for b in BACKENDS)
+            return any(self.qualified(b, model) for b in BACKENDS)
         reports = [self.state.get("qualification"), *(self.state.get("qualifications") or {}).values()]
-        target = self.fingerprint(backend)
+        target = self.fingerprint(backend, model)
         return any(bool(q and q.get("passed") and q.get("fingerprint") == target) for q in reports)
 
-    def fingerprint(self, backend=None):
-        h = hashlib.sha256(runtime_fingerprint(backend or self.active_backend).encode())
+    def fingerprint(self, backend=None, model=None):
+        h = hashlib.sha256(runtime_fingerprint(backend or self.active_backend, model or self.narrator_id).encode())
         for name in ("qualify/cases.jsonl", "qualify/gates_narrator.json", "qualify/scorers.py"):
             h.update((self.repo / name).read_bytes())
         return h.hexdigest()
 
-    def launch_task(self, action):
+    def launch_task(self, action, model=None):
         if action not in {"download", "qualify", "load", "unload", "pause"}:
             raise ValueError("Unknown model action.")
+        if model is not None:
+            narrator_spec(model)
+            if action not in {"download", "qualify"}:
+                raise ValueError("Only download and qualification take a narrator; load uses the selected one.")
         if action == "pause":
             self.cancel.set()
             return self.snapshot()
@@ -249,8 +324,8 @@ class LocalModels:
             self.cancel.clear()
             def work():
                 try:
-                    if action == "download": self.download()
-                    elif action == "qualify": self.qualify()
+                    if action == "download": self.download(model)
+                    elif action == "qualify": self.qualify(model)
                     elif action == "load": self.load()
                     elif action == "unload": self.unload()
                 except Cancelled:
@@ -302,26 +377,32 @@ class LocalModels:
             raise ModelError("SHA-256 or size verification failed; partial file retained, never executed.")
         os.replace(part, target)
 
-    def download(self):
+    def download(self, model=None):
+        model = model or self.narrator_id
+        spec, path = narrator_spec(model), self.path_of(model)
         if self.process and self.process.poll() is None:
             raise ModelError("Unload the narrator before checking downloads.")
-        if shutil.disk_usage(self.root).free < MODEL_SIZE + 512*1024*1024 and not self.model_path.exists():
+        if shutil.disk_usage(self.root).free < spec["size"] + 512*1024*1024 and not path.exists():
             raise ModelError("At least 1.6 GB of free disk is required.")
-        self.update(phase="downloading", stage="License", error="")
-        with public_open(LICENSE_URL) as response:
-            license_data = response.read(20000)
-        if hashlib.sha1(b"blob " + str(len(license_data)).encode() + b"\0" + license_data).hexdigest() != LICENSE_BLOB:
+        self.update(phase="downloading", stage="License", error="", total_bytes=spec["size"] + RUNTIMES_SIZE)
+        with public_open(spec["license_url"]) as response:
+            license_data = response.read(20001)
+        if "license_blob" in spec:
+            ok = hashlib.sha1(b"blob " + str(len(license_data)).encode() + b"\0" + license_data).hexdigest() == spec["license_blob"]
+        else:
+            ok = len(license_data) <= 20000 and hashlib.sha256(license_data).hexdigest() == spec["license_sha256"]
+        if not ok:
             raise ModelError("Pinned license verification failed.")
-        (self.root / "LICENSE-LFM.txt").write_bytes(license_data)
+        (self.root / spec["license_file"]).write_bytes(license_data)
         base = 0
         for b in BACKENDS.values():
             self.fetch(b["url"], self.root / b["archive"], b["size"], b["sha"], base)
             base += b["size"]
-        self.fetch(MODEL_URL, self.model_path, MODEL_SIZE, MODEL_SHA, base)
+        self.fetch(spec["url"], path, spec["size"], spec["sha"], base)
         self.update(phase="verifying", stage="Runtime files")
         receipts = {name: self.extract(name) for name in BACKENDS}
         atomic(self.root / "runtime-receipt.json", receipts)
-        self.update(phase="downloaded", stage="SHA-256 verified", downloaded_bytes=MODEL_SIZE+RUNTIMES_SIZE, speed_bps=0, error="")
+        self.update(phase="downloaded", stage=spec["name"] + ": SHA-256 verified", downloaded_bytes=spec["size"]+RUNTIMES_SIZE, speed_bps=0, error="")
 
     def extract(self, backend):
         archive, target, receipts = self.root / BACKENDS[backend]["archive"], self.backend_dir(backend), {}
@@ -342,10 +423,11 @@ class LocalModels:
                 receipts[str(name)] = hashlib.sha256(data).hexdigest()
         return receipts
 
-    def verify(self, backend=None):
+    def verify(self, backend=None, model=None):
         backend = backend or self.active_backend
+        path, sha = self.path_of(model), narrator_spec(model or self.narrator_id)["sha"]
         self.update(phase="verifying", stage="Model and runtime integrity", error="")
-        if not self.model_path.is_file() or self.model_path.is_symlink() or digest(self.model_path) != MODEL_SHA:
+        if not path.is_file() or path.is_symlink() or digest(path) != sha:
             raise ModelError("Download and verify the pinned model first.")
         archive = self.root / BACKENDS[backend]["archive"]
         if not archive.is_file() or digest(archive) != BACKENDS[backend]["sha"]:
@@ -361,22 +443,27 @@ class LocalModels:
 
     def stop_process(self):
         self.ready = False
+        self.loaded_model = None
         if self.process and self.process.poll() is None:
             self.process.terminate()
             try: self.process.wait(timeout=8)
             except subprocess.TimeoutExpired: self.process.kill(); self.process.wait(timeout=3)
 
-    def load(self, for_qualification=False, backend=None):
-        """Start the fastest qualified runtime; if it cannot start (for example no GPU), fall back to the next one."""
-        if not for_qualification and not self.qualified():
+    def load(self, for_qualification=False, backend=None, model=None):
+        """Start the fastest qualified runtime; if it cannot start (for example no GPU), fall back to the next one.
+        A different narrator still running is stopped first, so two models never share the GPU unnoticed."""
+        model = model or self.narrator_id
+        if not for_qualification and not self.qualified(model=model):
             raise ModelError("The narrator must pass qualification before it can be loaded for research.")
-        if self.process and self.process.poll() is None and self.ready and backend in (None, self.state.get("backend")):
+        if self.is_loaded(model) and backend in (None, self.state.get("backend")):
             return
-        order = [backend] if backend else [b for b in self.installed_backends() if self.qualified(b)]
+        if self.process and self.process.poll() is None:
+            self.stop_process()
+        order = [backend] if backend else [b for b in self.installed_backends() if self.qualified(b, model)]
         failures = []
         for name in order:
             try:
-                self.start(name, for_qualification, failures)
+                self.start(name, for_qualification, failures, model=model)
                 return
             except Cancelled:
                 self.stop_process()
@@ -386,15 +473,16 @@ class LocalModels:
                 failures.append(f"{BACKENDS[name]['label']}: {exc}")
         raise ModelError("; ".join(failures) or "No qualified runtime is installed.")
 
-    def start(self, backend, for_qualification, failures):
-        self.verify(backend)
+    def start(self, backend, for_qualification, failures, model=None):
+        model = model or self.narrator_id
+        self.verify(backend, model)
         executables = list(self.backend_dir(backend).rglob("llama-server.exe"))
         if len(executables) != 1: raise ModelError("Managed llama-server executable not found.")
         with socket.socket() as sock:
             sock.bind(("127.0.0.1", 0)); port = sock.getsockname()[1]
         self.key = secrets.token_urlsafe(32)
         self.url = f"http://127.0.0.1:{port}"
-        command = server_command(executables[0], self.model_path, MODEL_ID, port, self.key, backend)
+        command = server_command(executables[0], self.path_of(model), model, port, self.key, backend)
         env = {k:v for k,v in os.environ.items() if k.upper() in {"SYSTEMROOT","WINDIR","PATH","TEMP","TMP","USERPROFILE","LOCALAPPDATA","APPDATA","COMSPEC","PROCESSOR_ARCHITECTURE"}}
         label = BACKENDS[backend]["label"]
         self.update(phase="loading", stage=f"Starting local {label} narrator", error="")
@@ -407,6 +495,7 @@ class LocalModels:
             try:
                 local_json(self.url + "/health", key=self.key, timeout=2)
                 self.ready = True
+                self.loaded_model = model
                 note = ("Fell back to " + label + " (" + "; ".join(failures) + ")") if failures else ""
                 self.update(phase="qualifying" if for_qualification else "ready", backend=backend,
                             stage=f"Local narrator loaded on {label}", runtime_note=note)
@@ -420,7 +509,7 @@ class LocalModels:
             raise ModelError("Local narrator is not loaded.")
         self.check_cancel()
         body = {
-            "model": MODEL_ID, "messages": [{"role":"system","content":system},{"role":"user","content":prompt}],
+            "model": self.loaded_model, "messages": [{"role":"system","content":system},{"role":"user","content":prompt}],
             "temperature": 0, "max_tokens": min(512,max_tokens), "stream": False,
             "chat_template_kwargs": {"enable_thinking": False}}
         if stop:
@@ -441,7 +530,7 @@ class LocalModels:
         if not self.ready or not self.process or self.process.poll() is not None:
             raise ModelError("Local narrator is not loaded.")
         self.check_cancel()
-        body = {"model": MODEL_ID, "messages": [{"role":"system","content":system},{"role":"user","content":prompt}],
+        body = {"model": self.loaded_model, "messages": [{"role":"system","content":system},{"role":"user","content":prompt}],
                 "temperature": 0, "max_tokens": min(64, int(max_tokens)), "chat_template_kwargs": {"enable_thinking": False}}
         if response_format:
             body["response_format"] = response_format
@@ -456,27 +545,34 @@ class LocalModels:
 
     @property
     def model_id(self):
-        return "LiquidAI/LFM3-1.7B-GGUF:Q4_K_M@" + REVISION[:12]
+        """Recorded in traces and headline judgments: repository, quantization and pinned revision."""
+        spec = narrator_spec(self.loaded_model or self.narrator_id)
+        return f"{spec['repo']}:{spec['quantization']}@{spec['revision'][:12]}"
 
-    def qualify(self):
-        """Qualify every installed runtime on the same frozen gates: CPU fallback first, GPU last so it stays loaded."""
+    def qualify(self, model=None):
+        """Qualify one narrator on every installed runtime with the same frozen gates: CPU fallback first, GPU last so
+        it stays loaded. Other narrators' reports are kept; legacy reports without a model belong to the base."""
         from qualify.run import load_cases, run_cases, check_gates
+        model = model or self.narrator_id
+        spec = narrator_spec(model)
         installed = self.installed_backends()
         if not installed:
             raise ModelError("Download and verify the pinned model first.")
         cases = [c for c in load_cases(str(self.repo/"qualify/cases.jsonl")) if c["category"] in {"narration","number_faithfulness"}]
         gates = json.loads((self.repo/"qualify/gates_narrator.json").read_text())
+        kept = {k: v for k, v in (self.state.get("qualifications") or {}).items() if (v or {}).get("model", MODEL_ID) != model}
         reports = {}
-        self.update(qualification=None, qualifications={})
+        self.update(qualifications=kept, **({"qualification": None} if model == MODEL_ID else {}))
         for backend in reversed(installed):
             label = BACKENDS[backend]["label"]
             self.stop_process()
             try:
-                self.load(for_qualification=True, backend=backend)
+                self.load(for_qualification=True, backend=backend, model=model)
             except Cancelled:
                 raise
             except ModelError as exc:
-                reports[backend] = {"passed": False, "backend": backend, "error": str(exc)[:250], "fingerprint": self.fingerprint(backend)}
+                reports[backend] = {"passed": False, "backend": backend, "model": model, "error": str(exc)[:250],
+                                    "fingerprint": self.fingerprint(backend, model)}
                 continue
             self.update(phase="qualifying", stage=f"Narrator smoke qualification on {label}")
             done = 0
@@ -487,27 +583,31 @@ class LocalModels:
                 done += 1
                 self.update(stage=f"{label}: checked {done} of {len(cases)} qualification cases")
                 return result
-            report = run_cases(cases, call, MODEL_ID, max_tokens=256)
+            report = run_cases(cases, call, model, max_tokens=256)
             report["gates"] = check_gates(report,gates)
-            report.update(fingerprint=self.fingerprint(backend), backend=backend, flags=server_flags(backend),
-                          model_sha256=MODEL_SHA, revision=REVISION, runtime=f"{RUNTIME_TAG} {label}", quantization="Q4_K_M",
+            report.update(fingerprint=self.fingerprint(backend, model), backend=backend, flags=server_flags(backend), model=model,
+                          model_sha256=spec["sha"], revision=spec["revision"], runtime=f"{RUNTIME_TAG} {label}", quantization=spec["quantization"],
                           thinking=False, evaluated_at=time.time(), passed=all(g["passed"] for g in report["gates"].values()))
             reports[backend] = report
-            self.update(qualifications=dict(reports))
-        atomic(self.root/"qualification.json", reports)
+            self.update(qualifications={**kept, **{f"{model}:{b}": r for b, r in reports.items()}})
+        atomic(self.root/"qualification.json", {**kept, **{f"{model}:{b}": r for b, r in reports.items()}})
         best = next((reports[b] for b in BACKENDS if reports.get(b, {}).get("passed")), None)
+        legacy = {"qualification": best} if model == MODEL_ID else {}
         loaded = self.state.get("backend")
-        if self.ready and reports.get(loaded, {}).get("passed"):
-            self.update(qualification=best, phase="ready", stage=f"Smoke gates passed on {BACKENDS[loaded]['label']}")
+        if self.ready and self.loaded_model == model and reports.get(loaded, {}).get("passed"):
+            self.update(phase="ready", stage=f"{spec['name']}: smoke gates passed on {BACKENDS[loaded]['label']}", **legacy)
         else:
             self.stop_process()
-            self.update(qualification=best, phase="downloaded" if best else "qualification_failed",
-                        stage="Smoke gates passed; loads on the next run" if best else "Narrator remains disabled")
+            self.update(phase="downloaded" if best else "qualification_failed",
+                        stage=f"{spec['name']}: smoke gates passed; loads on the next run" if best else f"{spec['name']} remains disabled", **legacy)
 
     def select(self, model):
-        if model not in {"facts",MODEL_ID}: raise ValueError("Unknown narrator choice.")
-        if model != "facts" and not self.qualified(): raise ModelError("Narrator qualification has not passed.")
+        if model not in {"facts", *narrators()}: raise ValueError("Unknown narrator choice.")
+        if model != "facts" and not self.qualified(model=model): raise ModelError("Narrator qualification has not passed.")
         if self.busy: raise ModelError("Wait for the current run before changing models.")
+        if self.is_loaded() and model not in ("facts", self.loaded_model):
+            self.stop_process()  # the next run loads the chosen narrator; never answer with the previous one
+            self.update(phase="downloaded", stage="Previous narrator unloaded")
         self.update(selected=model, preferred=model, selection_note="")
         return self.snapshot()
 
@@ -532,12 +632,13 @@ def main():
     import argparse
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument("action",choices=["download","qualify","status"])
+    ap.add_argument("--model",choices=sorted(narrators()))
     args=ap.parse_args()
     repo=Path(__file__).resolve().parents[1]
     manager=LocalModels(repo/"data/local_models",repo)
     try:
-        if args.action=="download":manager.download()
-        elif args.action=="qualify":manager.qualify()
+        if args.action=="download":manager.download(args.model)
+        elif args.action=="qualify":manager.qualify(args.model)
         print(json.dumps(manager.snapshot(),indent=2))
     finally:
         if manager.process:manager.close()

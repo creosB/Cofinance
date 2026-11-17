@@ -162,7 +162,9 @@ def make_dashboard_handler(dist: Path, trace_dir: Path, corpus_dir: Path, servic
                     self.reply(200, labels.save(body));return  # human labels only; no model call, no service lock
                 if self.path not in routes:
                     self.reply(404, {'error':'Unknown local action.'});return
-                if set(body) != routes[self.path]:raise ValueError('Unexpected request fields.')
+                # A model action may name one catalog narrator (download or qualify it); every other route is exact.
+                extra = {'model'} if self.path == '/api/models/action' else set()
+                if not routes[self.path] <= set(body) <= routes[self.path] | extra:raise ValueError('Unexpected request fields.')
                 if self.path in {'/api/sessions/delete', '/api/sessions/clear'}:
                     # Not under the service-wide lock either: deleting memory copies can start the local embedder.
                     value = (service.delete_conversation(body['session_id'], body['request_id']) if self.path == '/api/sessions/delete'
@@ -181,7 +183,7 @@ def make_dashboard_handler(dist: Path, trace_dir: Path, corpus_dir: Path, servic
                     if self.path=='/api/sessions':value=service.store.create_session(body['request_id'])
                     elif self.path=='/api/chat':value=service.submit(**body)
                     elif self.path=='/api/jobs/cancel':value=service.stop(body['id'])
-                    elif self.path=='/api/models/action':value=service.models.launch_task(body['action'])
+                    elif self.path=='/api/models/action':value=service.models.launch_task(body['action'],body.get('model'))
                     elif self.path=='/api/models/select':value=service.models.select(body['model'])
                     elif self.path=='/api/news/collect':value=service.collect_news(body['request_id'])
                     else:value=service.store.add_watch(body['ticker'])

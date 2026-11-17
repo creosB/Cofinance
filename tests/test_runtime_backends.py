@@ -47,7 +47,7 @@ class RuntimeBackendTests(unittest.TestCase):
         self.models.update(qualifications={b: {"passed": True, "fingerprint": self.models.fingerprint(b)} for b in BACKENDS})
         tried = []
 
-        def start(backend, for_qualification, failures):
+        def start(backend, for_qualification, failures, model=None):
             tried.append(backend)
             if backend == "vulkan":
                 raise ModelError("Local narrator exited.")

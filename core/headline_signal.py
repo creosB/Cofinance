@@ -32,6 +32,29 @@ DEV_AUC = 0.585
 NOTE = ('Experimental. The local model judged each served headline on its own (asset and title only); Python adds '
         'the judgments up. Ranking skill on past dev data was 0.585, where 0.5 is no skill, and it has not been '
         'confirmed on unseen data yet. Not a forecast or financial advice. Cofinance never trades.')
+# Judgments from different weights never mix: the base narrator keeps the screened key, any other judge gets its own
+# version key, so switching narrators re-judges headlines instead of summing two models' judgments together.
+BASE_JUDGE = 'lfm3-1.7b-q4km'
+JUDGES = {
+    BASE_JUDGE: {'name': 'LFM3 1.7B', 'dev_auc': DEV_AUC, 'note': NOTE},
+    'lfm3-1.7b-atomic-ad-q4km': {'name': 'LFM3 1.7B Uncensored (AtomicChat)', 'dev_auc': 0.625, 'note': (
+        'Experimental. AtomicChat\'s LFM3 1.7B Uncensored judged each served headline on its own (asset and title only); '
+        'Python adds the judgments up. Ranking skill on past dev data was 0.625 (base model 0.574 on the same runtime), '
+        'where 0.5 is no skill, and it has not been confirmed on unseen data yet. Not a forecast or financial advice. '
+        'Cofinance never trades.')},
+}
+
+
+def version_for(judge=None):
+    if judge in (None, BASE_JUDGE):
+        return VERSION
+    if judge not in JUDGES:
+        raise ValueError('Unknown headline judge')
+    return f'{VERSION}@{judge}'
+
+
+def judge_of(version):
+    return next((j for j in JUDGES if version_for(j) == version), None)
 
 
 def prompt(symbol: str, title: str) -> str:
@@ -104,22 +127,24 @@ TABLE = """CREATE TABLE IF NOT EXISTS headline_judgments (
     PRIMARY KEY (namespace, version, ticker, title))"""
 
 
-def pending(conn: sqlite3.Connection, namespace: str = 'news', now: Optional[float] = None, limit: int = 300) -> List[tuple]:
+def pending(conn: sqlite3.Connection, namespace: str = 'news', now: Optional[float] = None, limit: int = 300,
+            version: str = VERSION) -> List[tuple]:
     """Live gated headlines (alert or digest, not expired) without a judgment for this version, newest first."""
     now = time.time() if now is None else now
     return conn.execute(
         "SELECT s.ticker, s.title FROM signals s WHERE s.namespace=? AND s.expires_at>? AND s.action IN ('alert','digest') "
         "AND COALESCE(s.title,'')<>'' AND NOT EXISTS (SELECT 1 FROM headline_judgments h WHERE h.namespace=s.namespace "
         "AND h.version=? AND h.ticker=s.ticker AND h.title=s.title) GROUP BY s.ticker, s.title "
-        "ORDER BY MAX(s.created_at) DESC LIMIT ?", (namespace, now, VERSION, int(limit))).fetchall()
+        "ORDER BY MAX(s.created_at) DESC LIMIT ?", (namespace, now, version, int(limit))).fetchall()
 
 
 def judge_pending(conn: sqlite3.Connection, choose: Callable, *, model: str, namespace: str = 'news',
-                  clock: Callable[[], float] = time.time, check: Optional[Callable[[], None]] = None) -> Dict:
+                  clock: Callable[[], float] = time.time, check: Optional[Callable[[], None]] = None,
+                  version: str = VERSION) -> Dict:
     """Judge every unjudged live headline once. Each row commits on its own, so a stop or crash keeps finished
     judgments; a failed judgment writes nothing and is retried on the next collection."""
     conn.execute(TABLE)
-    todo = pending(conn, namespace, clock())
+    todo = pending(conn, namespace, clock(), version=version)
     judged = failed = 0
     started = time.monotonic()
     for ticker, title in todo:
@@ -134,13 +159,13 @@ def judge_pending(conn: sqlite3.Connection, choose: Callable, *, model: str, nam
             continue
         p = {k: (math.exp(v) if v is not None else None) for k, v in j['logprobs'].items()}
         conn.execute("INSERT OR REPLACE INTO headline_judgments VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                     (namespace, VERSION, ticker, title, j['label'], p['UP'], p['DOWN'], p['ABSTAIN'], j['impact'], model, clock()))
+                     (namespace, version, ticker, title, j['label'], p['UP'], p['DOWN'], p['ABSTAIN'], j['impact'], model, clock()))
         judged += 1
-    return {'version': VERSION, 'pending': len(todo), 'judged': judged, 'failed': failed,
+    return {'version': version, 'pending': len(todo), 'judged': judged, 'failed': failed,
             'seconds': round(time.monotonic() - started, 2)}
 
 
-def card(db_path: Path, served: Mapping[str, Iterable[str]], namespace: str = 'news') -> Optional[Dict]:
+def card(db_path: Path, served: Mapping[str, Iterable[str]], namespace: str = 'news', version: str = VERSION) -> Optional[Dict]:
     """The chat signal for one run: per asset, the sum over exactly the headlines the News Researcher was served.
     Read-only. A served headline without a judgment yet counts 0, as a failed judgment did in the screen."""
     served = {t: list(dict.fromkeys(titles)) for t, titles in served.items() if titles}
@@ -153,7 +178,7 @@ def card(db_path: Path, served: Mapping[str, Iterable[str]], namespace: str = 'n
             for ticker, titles in served.items():
                 marks = ','.join('?' * len(titles))
                 for r in db.execute(f"SELECT title, label, impact FROM headline_judgments WHERE namespace=? AND version=? "
-                                    f"AND ticker=? AND title IN ({marks})", (namespace, VERSION, ticker, *titles)):
+                                    f"AND ticker=? AND title IN ({marks})", (namespace, version, ticker, *titles)):
                     rows[(ticker, r[0])] = {'label': r[1], 'impact': r[2]}
         finally:
             db.close()
@@ -168,4 +193,6 @@ def card(db_path: Path, served: Mapping[str, Iterable[str]], namespace: str = 'n
                        'judged': len(judged), 'headlines': heads})
     if not any(a['judged'] for a in assets):
         return None
-    return {'version': VERSION, 'call_line': CALL_LINE, 'dev_auc': DEV_AUC, 'assets': assets, 'note': NOTE}
+    judge = JUDGES[judge_of(version) or BASE_JUDGE]
+    return {'version': version, 'judge': judge['name'], 'call_line': CALL_LINE, 'dev_auc': judge['dev_auc'],
+            'assets': assets, 'note': judge['note']}

@@ -63,4 +63,4 @@ Fewer unnecessary refusals cannot repair these grounding errors. Neither model r
 
 The inputs are development data, with overlapping historical stories, and only eight synthetic sensitive-news cases. Automatic guards have known false positives and semantic blind spots. Exact inputs, raw responses and a result seal are retained locally; this compact public report alone does not enable an exact independent rerun. No independent financial outcomes, new-window accuracy, CPU compatibility or full chat-path qualification of the candidate were measured.
 
-The candidate remains an isolated experiment. The base model stays selected. The live model catalog, existing qualification state and sealed forecasts were not changed.
+This comparison ran as an isolated experiment and changed no sealed forecast. Since then both models are pinned, separately qualified narrators that a user can choose in the Models view; the base stays the default for a fresh install. Headline judgments are stored per narrator, and the chat card names the judge and its own dev result. Choosing AtomicChat before the unseen-window look is a product choice, not a validated accuracy upgrade.
