@@ -45,13 +45,27 @@ def quote(arg):
     return '"' + arg + '"' if (' ' in arg or not arg) else arg
 
 
-def detached_command(argv, log):
+def detached_command(argv, log, run_id=''):
     """cmd line for a job that outlives the calling shell and writes everything to its log."""
     inner = ' '.join(quote(a) for a in argv)
-    return f'cmd /c cd /d {quote(str(ROOT))} && set PYTHONPATH=.&& set PYTHONIOENCODING=utf-8&& {inner} > {quote(str(log))} 2>&1'
+    run = f'set DEV_RUN_ID={run_id}&& ' if run_id else ''
+    return f'cmd /c cd /d {quote(str(ROOT))} && set PYTHONPATH=.&& set PYTHONIOENCODING=utf-8&& {run}{inner} > {quote(str(log))} 2>&1'
 
 
 EXIT = 'dev.py exit '
+# Every background job gets a fresh run id (sidecar <name>.run, first log line). wait/status trust an exit marker only
+# in a log that carries the current id: three times on 11/17 the first `wait suite` after `test --bg` returned the
+# PREVIOUS run's result; the cause was not reproduced, so the check makes any stale log harmless instead.
+RUN = 'dev.py run '
+
+
+def run_file(log):
+    return Path(log).with_suffix('.run')
+
+
+def expected_run(log):
+    p = run_file(log)
+    return p.read_text(encoding='ascii').strip() if p.exists() else None
 PY = sys.executable if ' ' not in sys.executable else 'python'
 WAIT_MAX = 280      # under the bridge's 300 s process limit
 WAIT_DEFAULT = 40   # under the ~60 s a ClickUp tool call survives (measured 11/16); 50 s timed out on 11/17 while a model job loaded the CPU
@@ -60,7 +74,7 @@ WAIT_DEFAULT = 40   # under the ~60 s a ClickUp tool call survives (measured 11/
 def child(argv):
     """Run a background job and end its log with an exit marker, so 'finished' is a fact, not a guess from age."""
     ignore_console_breaks()
-    sys.stdout.flush()
+    print(f'{RUN}{os.environ.get("DEV_RUN_ID", "")}', flush=True)
     code = subprocess.call(argv, cwd=ROOT, env=env())
     print(f'{EXIT}{code}', flush=True)
     return code
@@ -78,10 +92,13 @@ def boot_time():
         return None
 
 
-def job_state(text, mtime=None, boot=None):
+def job_state(text, mtime=None, boot=None, run=None):
     """(state, exit code): ('done', 0), ('failed', n), ('running', None) when the log has no exit marker yet,
-    or ('lost', None) when it has none and was last written before the OS restarted (the job was killed)."""
+    or ('lost', None) when it has none and was last written before the OS restarted (the job was killed).
+    With `run`, a log that lacks that run's id line is someone else's output: its exit marker does not count."""
     marks = re.findall(r'^' + re.escape(EXIT) + r'(-?\d+)\s*$', text, flags=re.M)
+    if run and not re.search(r'^' + re.escape(RUN + run) + r'\s*$', text, flags=re.M):
+        marks = []
     if not marks:
         if mtime is not None and boot is not None and mtime < boot:
             return 'lost', None
@@ -97,7 +114,7 @@ def wait(name, max_s=WAIT_DEFAULT, tick=2.0):
     max_s = min(max_s, WAIT_MAX)
     while True:
         text = log.read_text(encoding='utf-8', errors='replace') if log.exists() else ''
-        state, code = job_state(text, log.stat().st_mtime if log.exists() else None, boot)
+        state, code = job_state(text, log.stat().st_mtime if log.exists() else None, boot, expected_run(log))
         if state == 'lost':
             print(f'{name} lost: no exit marker and the log predates the last OS restart. Rerun it (resumable jobs continue).')
             return 1
@@ -111,8 +128,11 @@ def wait(name, max_s=WAIT_DEFAULT, tick=2.0):
 
 
 def start_detached(argv, log):
+    import uuid
+    run_id = uuid.uuid4().hex[:12]
+    run_file(log).write_text(run_id, encoding='ascii')  # before the log, so wait never pairs a new id with an old log
     log.write_text(f'started {time.strftime("%Y-%m-%d %H:%M:%S")}: {" ".join(argv)}\n', encoding='utf-8')
-    line = detached_command([PY, 'dev.py', 'child', '--', *argv], log)
+    line = detached_command([PY, 'dev.py', 'child', '--', *argv], log, run_id)
     if os.name == 'nt':
         # WMI starts the process outside the bridge's process tree, so a request timeout cannot kill it.
         r = subprocess.run(['wmic', 'process', 'call', 'create', line], capture_output=True, text=True)
@@ -145,7 +165,7 @@ def status():
         mtime = p.stat().st_mtime
         age = int(time.time() - mtime)
         text = p.read_text(encoding='utf-8', errors='replace')
-        print(f'{p.stem:22s} {age // 60:4d} min ago  {job_state(text, mtime, boot)[0]:8s} {summarize(text)}')
+        print(f'{p.stem:22s} {age // 60:4d} min ago  {job_state(text, mtime, boot, expected_run(p))[0]:8s} {summarize(text)}')
 
 
 FORWARD = {'record': ['record', '--root', 'data/forward_benchmark', '--publish', 'docs/benchmarks/forward-ledger.jsonl'],

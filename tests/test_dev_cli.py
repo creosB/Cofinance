@@ -99,6 +99,25 @@ class TestBackgroundJobs(unittest.TestCase):
                 self.assertEqual(dev.child([sys.executable, '-c', f'raise SystemExit({code})']), code)
             self.assertEqual(out.getvalue().strip().splitlines()[-1], f'dev.py exit {code}')
 
+    def test_a_previous_runs_result_is_never_reported_as_this_run(self):
+        # 11/17, three times: the first `wait suite` after `test --bg` printed the PREVIOUS run's "OK (528 tests)"
+        old = 'dev.py run aaaa\nRan 528 tests in 93s\n\nOK (skipped=17)\ndev.py exit 0\n'
+        self.assertEqual(dev.job_state(old, run='bbbb'), ('running', None))
+        self.assertEqual(dev.job_state(old, run='aaaa'), ('done', 0))
+        self.assertEqual(dev.job_state(old), ('done', 0))  # logs without a sidecar keep the old behaviour
+        self.assertEqual(dev.job_state('dev.py run aaaab\ndev.py exit 0\n', run='aaaa'), ('running', None))  # whole line
+        name = 'stale_probe'
+        log = dev.log_path(name)
+        self.addCleanup(lambda: (log.unlink(missing_ok=True), dev.run_file(log).unlink(missing_ok=True)))
+        log.write_text(old, encoding='utf-8')
+        dev.run_file(log).write_text('bbbb', encoding='ascii')
+        self.assertEqual(dev.wait(name, 1, tick=.2), 2)  # still running, not "done: OK (528 tests)"
+
+    def test_detached_command_carries_the_run_id(self):
+        line = dev.detached_command(['python', '-c', 'pass'], Path('C:/x/data/_logs/j.log'), 'abc123')
+        self.assertIn('set DEV_RUN_ID=abc123&& python -c pass', line)
+        self.assertNotIn('DEV_RUN_ID', dev.detached_command(['python'], Path('C:/x/j.log')))
+
     def test_detached_job_end_to_end(self):
         import os
         if os.name != 'nt':
@@ -126,6 +145,9 @@ class TestBackgroundJobs(unittest.TestCase):
         text = dev.log_path('e2e').read_text(encoding='utf-8')
         self.assertIn('hello from the background', text)
         self.assertTrue(text.rstrip().endswith('dev.py exit 0'))
+        run = dev.expected_run(dev.log_path('e2e'))
+        self.assertTrue(run and text.startswith(dev.RUN + run), text[:80])  # the job wrote this launch's id first
+        dev.run_file(dev.log_path('e2e')).unlink(missing_ok=True)
 
 
 if __name__ == '__main__':
