@@ -4,7 +4,8 @@ A Decision-only change reuses the team outputs a sealed replay already produced,
 per case instead of a full team run. No router or specialist runs, and no outcome is read before the screen is
 sealed. 'card' candidates also get a fact card that Python builds from the same point-in-time tool outputs: prices
 through ReplayMarket (bars on or before T only) and the headlines the team was served. Smoke selects the first and
-last origin per asset without outcomes; full screens every cached case. A change to any upstream agent invalidates
+last origin per asset without outcomes; full screens every cached case. 'headline' candidates judge each unique
+served headline once and Python aggregates the judgments per case. A change to any upstream agent invalidates
 the cache and needs a replay variant instead.
 """
 from __future__ import annotations
@@ -58,6 +59,39 @@ PROB_SHORTLIST = ('Full cached window only. Shortlisted when at most 2 replies f
                   'did. Python calls UP when P(UP) / (P(UP) + P(DOWN)) is at least 0.6, DOWN when at most 0.4, '
                   'otherwise ABSTAIN. References (20-session return, net headline labels) are context, not targets. '
                   'A shortlisted candidate becomes a replay variant; nothing is adopted from dev results.')
+# headline-v1 (structure), written before any headline-v1 output: the model judges each served headline alone, from
+# the asset and the title only (no gate label); Python sums the judgments per case. Unique headlines are judged once.
+CANDIDATES['headline-v1'] = (
+    'You are [Headline Judge]. You get one accepted news headline about one asset. Judge its likely effect on that '
+    'asset\'s price over the next five US market sessions. Return a JSON object with one key, label: UP if it is '
+    'likely to push the price up, DOWN if it is likely to push it down, ABSTAIN if it has no clear price effect. '
+    'Company announcements are claims, not proof. No explanation.')
+INPUTS['headline-v1'] = 'headline'
+READOUTS['headline-v1'] = 'logprobs'
+HEADLINE_SHORTLIST = (
+    'Full cached window only. Each unique served headline is judged once; a case scores the sum of '
+    '(P(UP) - P(DOWN)) / (P(UP) + P(DOWN) + P(ABSTAIN)) over its served headlines, 0 without news or for a failed '
+    'judgment. Shortlisted when at most 2 judgments fail and the case-score AUC is above 0.55 and above the gate '
+    'labels\' AUC on the same cases, and above 0.50 in both halves. Python calls UP at a score of 0.5 or more, DOWN '
+    'at -0.5 or less, otherwise ABSTAIN. Nothing is adopted from dev results.')
+# pair-v1 (parallel views), written before any pair-v1 output: rise and fall asked as two separate yes/no questions
+# over the signals-v1 input. A model that says yes to everything, or always leans UP, cancels out to 0.
+YN = {'type': 'json_schema', 'json_schema': {'name': 'answer', 'strict': True, 'schema': {
+    'type': 'object', 'properties': {'label': {'type': 'string', 'enum': ['YES', 'NO']}},
+    'required': ['label'], 'additionalProperties': False}}}
+QUESTION = ('You are [Decision], the last step of a research team. You get the team\'s accepted answer, its two '
+            'specialist reports and a fact card that Python computed from the same research tools. Answer one '
+            'question about the asset: {q} Return a JSON object with one key, label: YES or NO. No explanation.')
+PAIR = {'rise': QUESTION.format(q='will it close higher five US market sessions after the next open than at that open?'),
+        'fall': QUESTION.format(q='will it close lower five US market sessions after the next open than at that open?')}
+CANDIDATES['pair-v1'] = PAIR['rise'] + '\n' + PAIR['fall']
+INPUTS['pair-v1'] = 'card'
+READOUTS['pair-v1'] = 'pair'
+PAIR_SHORTLIST = (
+    'Full cached window only. Two questions per case, rise and fall, each read as log P(YES) - log P(NO); the case '
+    'score is rise minus fall. Shortlisted when at most 2 cases fail and the AUC is above 0.55 and above the gate '
+    'labels\' AUC on the same cases, and above 0.50 in both halves. Python calls UP at sigmoid(score) of 0.6 or '
+    'more, DOWN at 0.4 or less, otherwise ABSTAIN. Nothing is adopted from dev results.')
 
 
 def cached_prompt(row):
@@ -132,17 +166,38 @@ def select_cases(rows, sample):
     return [r for r in ordered if r['id'] in keep]
 
 
-def parse_json_label(text):
+def headline_items(rows):
+    """Unique (asset, title) pairs the team was served, in a stable order, without gate labels or outcomes."""
+    seen = {}
+    for r in rows:
+        for n in r.get('news_served') or []:
+            seen.setdefault(f"{r['symbol']}|{n['title']}", {'symbol': r['symbol'], 'title': n['title']})
+    return [{**seen[k], 'key': k} for k in sorted(seen)]
+
+
+def headline_prompt(item):
+    return f"Asset: {item['symbol']}\nHeadline: {item['title']}"
+
+
+def impact(lps):
+    """(P(UP) - P(DOWN)) over all listed label mass, so a no-effect judgment counts near 0; 0 when nothing is listed."""
+    p = {k: math.exp(v) if v is not None else 0.0 for k, v in lps.items()}
+    total = sum(p.values())
+    return round((p['UP'] - p['DOWN']) / total, 6) if total > 0 else 0.0
+
+
+def parse_json_label(text, labels=None):
+    labels = R.LABELS if labels is None else set(labels)
     try:
         obj = json.loads(text)
-        if isinstance(obj, dict) and set(obj) == {'label'} and isinstance(obj['label'], str) and obj['label'] in R.LABELS:
+        if isinstance(obj, dict) and set(obj) == {'label'} and isinstance(obj['label'], str) and obj['label'] in labels:
             return obj['label']
     except (ValueError, TypeError):
         pass
     return 'ERROR'
 
 
-def label_probs(choice):
+def label_probs(choice, labels=('UP', 'DOWN', 'ABSTAIN')):
     """Log-probability of each label at the label token, from the runtime's top list (raw scores before the schema).
     Returns ({label: logprob or None}, floor); a label missing from the list is None, floor is the lowest listed."""
     toks = (choice.get('logprobs') or {}).get('content') or []
@@ -157,7 +212,7 @@ def label_probs(choice):
     else:
         raise ValueError('No label value in the reply')
     alts = tok.get('top_logprobs') or []
-    mass = {k: 0.0 for k in ('UP', 'DOWN', 'ABSTAIN')}
+    mass = {k: 0.0 for k in labels}
     for alt in alts:
         rest = alt['token'][len(prefix):] if alt['token'].startswith(prefix) else ''
         hits = [k for k in mass if rest and k.startswith(rest)]
@@ -196,7 +251,47 @@ def auc(pairs):
     return round(wins / (len(pos) * len(neg)), 4)
 
 
+def run_headlines(root, out, source, candidate, call, model_meta, *, clock=time.monotonic):
+    """Judge every unique served headline once; the plan and seal follow the same rules as case screens."""
+    rows, source_sha = load_source(root, source)
+    items = headline_items(rows)
+    plan = {'format': 'cofinance-decision-screen/1', 'stage': 'cached-headline-judgments', 'window_kind': 'dev',
+            'source': source, 'source_sha256': source_sha, 'candidate': candidate, 'input': 'headline',
+            'readout': 'logprobs', 'system': CANDIDATES[candidate], 'response_format': SCHEMA, 'max_tokens': 24,
+            'top_logprobs': TOP_LOGPROBS, 'sample': 'full', 'ids': [i['key'] for i in items], 'model': model_meta,
+            'shortlist_rule': HEADLINE_SHORTLIST, 'code_sha256': digest(Path(__file__).read_bytes()),
+            'created_at': datetime.now(timezone.utc).isoformat()}
+    out.mkdir(parents=True, exist_ok=False)
+    dump(out / 'plan.json', plan)
+    path = out / 'predictions.jsonl'
+    started = clock()
+    with path.open('x', encoding='utf-8') as fh:
+        for item in items:
+            prompt = headline_prompt(item)
+            t0 = clock()
+            rec = {'id': item['key'], 'label': 'ERROR', 'impact': 0.0, 'ok': False,
+                   'prompt_sha256': digest(prompt.encode('utf-8'))}
+            try:
+                choice = call(plan['system'], prompt, max_tokens=24, response_format=SCHEMA, timeout=30,
+                              top_logprobs=TOP_LOGPROBS, return_choice=True)
+                text = choice['message']['content']
+                rec.update(label=parse_json_label(text), response=text)
+                lps, floor = label_probs(choice)
+                rec.update(logprobs=lps, floor=floor, impact=impact(lps), ok=True)
+            except Exception as exc:
+                rec['error'] = f'{type(exc).__name__}: {exc}'[:240]
+            rec['seconds'] = round(clock() - t0, 3)
+            fh.write(json.dumps(rec, allow_nan=False) + '\n')
+            fh.flush()
+    dump(out / 'seal.json', {'cases': len(items), 'predictions_sha256': digest(path.read_bytes()),
+                            'plan_sha256': digest((out / 'plan.json').read_bytes()),
+                            'seconds': round(clock() - started, 3)})
+    return {'headlines': len(items), 'seconds': round(clock() - started, 3)}
+
+
 def run(root, out, source, candidate, sample, call, model_meta, *, clock=time.monotonic):
+    if INPUTS.get(candidate) == 'headline':
+        return run_headlines(root, out, source, candidate, call, model_meta, clock=clock)
     rows, source_sha = load_source(root, source)
     chosen = select_cases(rows, sample)
     kind = INPUTS.get(candidate, 'reports')
@@ -206,8 +301,8 @@ def run(root, out, source, candidate, sample, call, model_meta, *, clock=time.mo
             'source': source, 'source_sha256': source_sha, 'candidate': candidate, 'input': kind, 'readout': readout,
             'system': CANDIDATES[candidate], 'response_format': SCHEMA, 'max_tokens': 24,
             'sample': sample, 'ids': [r['id'] for r in chosen], 'model': model_meta,
-            'shortlist_rule': PROB_SHORTLIST if readout == 'logprobs' else SHORTLIST,
-            **({'top_logprobs': TOP_LOGPROBS, 'margin': MARGIN} if readout == 'logprobs' else {}),
+            'shortlist_rule': {'logprobs': PROB_SHORTLIST, 'pair': PAIR_SHORTLIST}.get(readout, SHORTLIST),
+            **({'top_logprobs': TOP_LOGPROBS, 'margin': MARGIN} if readout in ('logprobs', 'pair') else {}),
             'code_sha256': digest(Path(__file__).read_bytes()),
             'created_at': datetime.now(timezone.utc).isoformat()}
     out.mkdir(parents=True, exist_ok=False)
@@ -228,6 +323,20 @@ def run(root, out, source, candidate, sample, call, model_meta, *, clock=time.mo
                     lps, floor = label_probs(choice)
                     s, q, floored = direction(lps, floor)
                     rec.update(logprobs=lps, floor=floor, score=s, q_up=q, floored=floored, python_label=policy(q))
+                elif readout == 'pair':
+                    rec['python_label'] = 'ERROR'
+                    sides = {}
+                    for side, system in PAIR.items():
+                        choice = call(system, prompt, max_tokens=24, response_format=YN, timeout=30,
+                                      top_logprobs=TOP_LOGPROBS, return_choice=True)
+                        lps, floor = label_probs(choice, ('YES', 'NO'))
+                        yes = lps['YES'] if lps['YES'] is not None else floor
+                        no = lps['NO'] if lps['NO'] is not None else floor
+                        sides[side] = {'answer': parse_json_label(choice['message']['content'], ('YES', 'NO')),
+                                       'yes': lps['YES'], 'no': lps['NO'], 'floor': floor, 'logit': round(yes - no, 6)}
+                    s = round(sides['rise']['logit'] - sides['fall']['logit'], 6)
+                    q = round(1 / (1 + math.exp(-s)), 6)
+                    rec.update(sides=sides, score=s, q_up=q, python_label=policy(q), label=policy(q))
                 else:
                     text = call(plan['system'], prompt, max_tokens=24, response_format=SCHEMA, timeout=30)
                     rec.update(label=parse_json_label(text), response=text)
@@ -255,6 +364,12 @@ def verified(root, out):
     if [r['id'] for r in predictions] != plan['ids'] or len(predictions) != seal['cases']:
         raise ValueError('Screen is incomplete or contains duplicate/reordered cases')
     kind = plan.get('input', 'reports')
+    if kind == 'headline':
+        items = {i['key']: i for i in headline_items(source)}
+        for row in predictions:
+            if row['id'] not in items or row['prompt_sha256'] != digest(headline_prompt(items[row['id']]).encode('utf-8')):
+                raise ValueError('Model input differs from the sealed upstream reports')
+        return plan, predictions, {r['id']: r for r in source}, seal
     market = R.load_market(root) if kind == 'card' else None
     by_id = {r['id']: r for r in source}
     for row in predictions:
@@ -337,8 +452,56 @@ def prob_shortlisted(report):
                 and all(rk[h] is not None and rk[h] > .5 for h in ('early', 'late')))
 
 
+def skill_shortlisted(report):
+    """HEADLINE_SHORTLIST and PAIR_SHORTLIST: AUC above 0.55 and above the gate labels, both halves above 0.50."""
+    rk = report['ranking']
+    gate = rk['references_context_only']['net_headline_labels'] or 0.5
+    return bool(report['failures'] <= 2 and rk['auc'] is not None and rk['auc'] > max(.55, gate)
+                and all(rk[h] is not None and rk[h] > .5 for h in ('early', 'late')))
+
+
+def score_headlines(root, out, plan, predictions, source, seal):
+    """Aggregate headline judgments into case scores in Python, then score ranking skill per case."""
+    series, _, _ = R.load_market(root)
+    judged = {p['id']: p for p in predictions}
+    gate = {}
+    for r in source.values():
+        for n in r.get('news_served') or []:
+            gate[f"{r['symbol']}|{n['title']}"] = {'bullish': 'UP', 'bearish': 'DOWN'}.get(n.get('direction'), 'ABSTAIN')
+    rows, missing = [], []
+    for old in sorted(source.values(), key=lambda r: (r['symbol'], r['origin'])):
+        bars = {b['date']: b for b in series[old['symbol']]}
+        enter, leave = bars.get(old['entry_date']), bars.get(old['exit_date'])
+        if enter is None or leave is None:
+            missing.append(old['id'])
+            continue
+        s = round(sum(judged[f"{old['symbol']}|{n['title']}"].get('impact', 0.0) for n in old.get('news_served') or []), 6)
+        call = 'UP' if s >= .5 else 'DOWN' if s <= -.5 else 'ABSTAIN'
+        rows.append({**old, 'label': call, 'python_label': call, 'score': s, 'return': leave['close'] / enter['open'] - 1})
+    origins = sorted({r['origin'] for r in rows})
+    midpoint = max(1, len(origins) // 2)
+    report = {'warning': 'Experimental dev screening, cached headline judgments. Not a full-system or held-out result.',
+              'candidate': plan['candidate'], 'input': 'headline', 'source': plan['source'], 'sample': 'full',
+              'headlines': len(predictions), 'cases': len(source), 'scored': len(rows), 'missing_outcomes': missing,
+              'date_cutoff_violations': sum(bool(r.get('audit', {}).get('leak')) for r in source.values()),
+              'headline_labels': {k: sum(p['label'] == k for p in predictions) for k in ('UP', 'DOWN', 'ABSTAIN', 'ERROR')},
+              'gate_agreement': sum(p['label'] == gate.get(p['id']) for p in predictions),
+              'seconds': seal['seconds'],
+              'median_decision_seconds': statistics.median(p['seconds'] for p in predictions) if predictions else None,
+              'limits': ['Known dev outcomes; not an independent evaluation', 'Headline titles only, no article text',
+                         'Same source/revision/news-availability limits as the replay benchmark']}
+    report.update(ranking(rows, series, origins[:midpoint]))
+    report['failures'] = sum(not p.get('ok') for p in predictions)
+    report['shortlist_rule'] = plan['shortlist_rule']
+    report['shortlist'] = skill_shortlisted(report)
+    dump(out / 'report.json', report)
+    return report
+
+
 def score(root, out):
     plan, predictions, source, seal = verified(root, out)
+    if plan.get('input') == 'headline':
+        return score_headlines(root, out, plan, predictions, source, seal)
     series, _, _ = R.load_market(root)
     rows, missing = [], []
     for pred in predictions:
@@ -368,9 +531,10 @@ def score(root, out):
                          'Same source/revision/news-availability limits as the replay benchmark',
                          'No second-source cross-check added; date audit is not a complete leakage proof']}
     report['shortlist_rule'] = plan.get('shortlist_rule')
-    if plan.get('readout') == 'logprobs':
+    if plan.get('readout') in ('logprobs', 'pair'):
         report.update(ranking(rows, series, origins[:midpoint]))
-        report['shortlist'] = prob_shortlisted(report) if plan['sample'] == 'full' else None
+        rule = prob_shortlisted if plan['readout'] == 'logprobs' else skill_shortlisted
+        report['shortlist'] = rule(report) if plan['sample'] == 'full' else None
     else:
         report['shortlist'] = shortlisted(report) if plan['sample'] == 'full' and plan.get('shortlist_rule') else None
     dump(out / 'report.json', report)

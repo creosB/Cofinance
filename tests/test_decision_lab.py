@@ -1,4 +1,5 @@
 import json
+import math
 import tempfile
 import unittest
 from pathlib import Path
@@ -203,7 +204,7 @@ class TestFactCard(unittest.TestCase):
 
 def choice(label, alts, prefix=''):
     """A runtime reply shaped like llama-server's: JSON label tokens, top log-probabilities at the label token."""
-    first = {'UP': 'UP', 'DOWN': 'D', 'ABSTAIN': 'AB'}[label]
+    first = {'UP': 'UP', 'DOWN': 'D', 'ABSTAIN': 'AB', 'YES': 'YES', 'NO': 'NO'}[label]
     tok = lambda t, top=(): {'token': t, 'logprob': 0.0, 'top_logprobs': [{'token': a, 'logprob': lp} for a, lp in top]}
     content = [tok('{\n'), tok(' "'), tok('label'), tok('":'), tok('' if prefix else ' "'), tok(prefix + first, alts)]
     return {'message': {'content': json.dumps({'label': label})}, 'logprobs': {'content': content}}
@@ -274,6 +275,82 @@ class TestProbReadout(unittest.TestCase):
         self.assertEqual(sum(report['python_call']['all']['labels'].values()), 3)
         self.assertIn('auc', report['ranking'])
         self.assertIsInstance(report['shortlist'], bool)
+
+
+class TestHeadlineAndPair(unittest.TestCase):
+    def setUp(self):
+        TestFactCard.setUp(self)
+        for r in self.rows:
+            r.update(entry_date='2026-10-29', exit_date='2026-10-30',
+                     baselines={'always_up': 'UP', 'momentum20': 'DOWN', 'news_rule': 'ABSTAIN'})
+        write_lines(self.source, self.rows)
+        dump(self.root / 'predictions_v2.seal.json', {'cases': len(self.rows), 'predictions_sha256': digest(self.source.read_bytes())})
+
+    def test_headlines_are_judged_once_from_asset_and_title_only(self):
+        items = D.headline_items(self.rows)
+        self.assertEqual([i['key'] for i in items],
+                         sorted({f"{r['symbol']}|{n['title']}" for r in self.rows for n in r['news_served']}))
+        self.assertEqual(len(items), 6)
+        prompt = D.headline_prompt(items[0])
+        self.assertEqual(prompt, f"Asset: {items[0]['symbol']}\nHeadline: {items[0]['title']}")
+        for hidden in ('bullish', 'bearish', 'neutral', 'alert', 'digest', '99999', '2026-'):
+            self.assertNotIn(hidden, prompt.lower(), 'The judge sees the headline, not the gate label or any outcome.')
+
+    def test_impact_discounts_no_effect_mass(self):
+        self.assertAlmostEqual(D.impact({'UP': math.log(.6), 'DOWN': math.log(.2), 'ABSTAIN': math.log(.2)}), .4)
+        self.assertAlmostEqual(D.impact({'UP': math.log(.05), 'DOWN': math.log(.05), 'ABSTAIN': math.log(.9)}), 0)
+        self.assertAlmostEqual(D.impact({'UP': math.log(.1), 'DOWN': None, 'ABSTAIN': math.log(.9)}), .1)
+        self.assertEqual(D.impact({'UP': None, 'DOWN': None, 'ABSTAIN': None}), 0.0)
+
+    def test_headline_screen_aggregates_per_case_and_counts_failures(self):
+        judged = {'Nvidia wins a contract': ('UP', [('UP', math.log(.8)), ('D', math.log(.1)), ('AB', math.log(.1))]),
+                  'Regulator opens a probe': ('DOWN', [('D', math.log(.7)), ('UP', math.log(.1)), ('AB', math.log(.2))])}
+        def call(system, prompt, **kw):
+            self.assertIn('[Headline Judge]', system)
+            title = prompt.split('Headline: ')[1]
+            if title not in judged:
+                raise ValueError('Incomplete forecast')
+            return choice(*judged[title])
+        D.run(self.root, self.out, 'v2', 'headline-v1', 'full', call, {'test': True})
+        report = D.score(self.root, self.out)
+        self.assertEqual((report['headlines'], report['scored']), (6, 3))
+        self.assertEqual(report['failures'], 2, 'Failed judgments stay counted and score 0.')
+        preds = {p['id']: p for p in lines(self.out / 'predictions.jsonl')}
+        self.assertAlmostEqual(preds['NVDA|Nvidia wins a contract']['impact'], .7)
+        self.assertAlmostEqual(preds['NVDA|Regulator opens a probe']['impact'], -.6)
+        self.assertEqual(report['gate_agreement'], 4)
+        self.assertEqual(report['python_call']['all']['labels']['ABSTAIN'], 3, 'Each case sums to 0.1, below the 0.5 call line.')
+        self.assertIsInstance(report['shortlist'], bool)
+
+    def test_pair_scores_rise_minus_fall(self):
+        answers = {'higher': [('YES', -0.1), ('NO', -2.4)], 'lower': [('YES', -0.2), ('NO', -1.7)]}
+        def call(system, prompt, **kw):
+            self.assertEqual(kw['response_format'], D.YN)
+            return choice('YES', answers['higher' if 'close higher' in system else 'lower'])
+        D.run(self.root, self.out, 'v2', 'pair-v1', 'full', call, {'test': True})
+        p = lines(self.out / 'predictions.jsonl')[0]
+        self.assertAlmostEqual(p['sides']['rise']['logit'], 2.3)
+        self.assertAlmostEqual(p['sides']['fall']['logit'], 1.5)
+        self.assertAlmostEqual(p['score'], 0.8)
+        self.assertEqual(p['python_label'], 'UP')
+        report = D.score(self.root, self.out)
+        self.assertEqual(report['failures'], 0)
+        self.assertIn('auc', report['ranking'])
+
+    def test_constant_yes_cancels_out(self):
+        same = [('YES', -0.1), ('NO', -2.4)]
+        D.run(self.root, self.out, 'v2', 'pair-v1', 'full', lambda s, p, **kw: choice('YES', same), {'test': True})
+        self.assertTrue(all(p['score'] == 0 and p['python_label'] == 'ABSTAIN' for p in lines(self.out / 'predictions.jsonl')))
+
+    def test_skill_shortlist_must_beat_the_gate_labels(self):
+        rep = lambda a, gate, e=.6, l=.6, f=0: {'failures': f, 'ranking': {
+            'auc': a, 'early': e, 'late': l, 'references_context_only': {'net_headline_labels': gate}}}
+        self.assertTrue(D.skill_shortlisted(rep(.6, .556)))
+        self.assertFalse(D.skill_shortlisted(rep(.55, .5)))
+        self.assertFalse(D.skill_shortlisted(rep(.57, .58)))
+        self.assertFalse(D.skill_shortlisted(rep(.6, .5, e=.49)))
+        self.assertFalse(D.skill_shortlisted(rep(.6, .5, f=3)))
+        self.assertTrue(D.skill_shortlisted(rep(.56, None)))
 
 
 if __name__ == '__main__':
