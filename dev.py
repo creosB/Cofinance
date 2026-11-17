@@ -6,7 +6,7 @@
                                 any long job, detached, log in data/_logs/NAME.log
   python dev.py status          every log in data/_logs: age, running/done/failed, last result
   python dev.py wait NAME [--max S]
-                                block until a background job ends (default 50 s, fits one tool call): exit 0 done, 1 failed, 2 running.
+                                block until a background job ends (default 40 s, fits one tool call even under load): exit 0 done, 1 failed, 2 running.
                                 Use this instead of sleep-and-status loops; on 2, stop and check once later
   python dev.py news [--bg]     one Clock 1 collection over the official feeds (same path as the Collect button)
   python dev.py forward record|score [--bg]
@@ -54,7 +54,7 @@ def detached_command(argv, log):
 EXIT = 'dev.py exit '
 PY = sys.executable if ' ' not in sys.executable else 'python'
 WAIT_MAX = 280      # under the bridge's 300 s process limit
-WAIT_DEFAULT = 50   # under the ~60 s a ClickUp tool call survives (measured 11/16), so a wait reports instead of dying
+WAIT_DEFAULT = 40   # under the ~60 s a ClickUp tool call survives (measured 11/16); 50 s timed out on 11/17 while a model job loaded the CPU
 
 
 def child(argv):

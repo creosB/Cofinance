@@ -86,6 +86,8 @@ class TestBackgroundJobs(unittest.TestCase):
             self.assertEqual(dev.wait('slow', 9999, tick=.01), 2)
         self.assertLess(time.monotonic() - started, 1)
         self.assertLess(dev.WAIT_MAX, 300)
+        self.assertLessEqual(dev.WAIT_DEFAULT, 40, 'A ClickUp tool call dies near 60 s; a 50 s wait timed out under model '
+                             'load on 11/17. Keep the default wait at 40 s or less.')
 
     def test_child_ends_the_log_with_the_exit_code(self):
         import contextlib
