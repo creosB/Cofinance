@@ -220,6 +220,47 @@ class TestReplay(unittest.TestCase):
             finally:
                 tmp.cleanup()
 
+    def test_collect_through_a_day_that_has_closed(self):
+        # The Sat 11/21 one look needs bars through Fri 11/20; the replay download stopped at a fixed 11/15.
+        urls = []
+        def fetch(url):
+            urls.append(url)
+            return {'data': []} if 'alternative.me' in url else raw(1)
+        with tempfile.TemporaryDirectory() as t:
+            root = Path(t) / 'prices'
+            end = R.through_end('2026-11-20')
+            self.assertEqual(end, datetime(2026, 11, 21, tzinfo=timezone.utc))
+            receipt = R.collect(root, fetch=fetch, fetch_to=end, now=datetime(2026, 11, 21, 7, tzinfo=timezone.utc))
+            charts = [u for u in urls if 'yahoo' in u]
+            self.assertEqual(len(charts), len(R.ASSETS) + 1)
+            self.assertTrue(all(f'&period2={int(end.timestamp())}&' in u for u in charts), charts[0])
+            self.assertEqual(receipt['fetch_to'], end.isoformat())
+            with self.assertRaises(ValueError):  # one folder holds one download, never two mixed
+                R.collect(root, fetch=fetch, fetch_to=R.through_end('2026-11-27'), now=datetime(2026, 11, 28, tzinfo=timezone.utc))
+            R.collect(root, fetch=fetch, fetch_to=end, now=datetime(2026, 11, 22, tzinfo=timezone.utc))  # same end resumes
+            old = Path(t) / 'replay'
+            old.mkdir()
+            (old / 'collection.json').write_text(json.dumps({'sources': {}}), encoding='utf-8')  # receipts before 11/18
+            R.collect(old, fetch=fetch)
+            self.assertTrue(any(f'&period2={int(R.FETCH_TO.timestamp())}&' in u for u in urls))
+
+    def test_collect_cli_passes_the_through_day(self):
+        from unittest.mock import patch
+        for argv, want in ((['replay', 'collect', '--root', 'p', '--through', '2026-11-20'], R.through_end('2026-11-20')),
+                           (['replay', 'collect', '--root', 'p'], R.FETCH_TO)):
+            with patch('sys.argv', argv), patch.object(R, 'collect', return_value={}) as got, patch('builtins.print'):
+                R.main()
+            got.assert_called_once_with(Path('p'), fetch_to=want)
+
+    def test_collect_refuses_a_session_that_has_not_closed(self):
+        calls = []
+        with tempfile.TemporaryDirectory() as t:
+            with self.assertRaises(ValueError):  # after the US close, before UTC midnight: still refused
+                R.collect(Path(t) / 'p', fetch=calls.append, fetch_to=R.through_end('2026-11-20'),
+                          now=datetime(2026, 11, 20, 22, tzinfo=timezone.utc))
+            self.assertEqual(calls, [])
+            self.assertFalse((Path(t) / 'p').exists())
+
 
 if __name__ == '__main__':
     unittest.main()

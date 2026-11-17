@@ -717,13 +717,17 @@ def main():
     ap.add_argument('--first')
     ap.add_argument('--last')
     ap.add_argument('--prices-root', type=Path)
-    ap.add_argument('--root', type=Path, required=True)
+    ap.add_argument('--root', type=Path, help='replay folder; every action but score-window needs it')
     ap.add_argument('--out', type=Path, required=True)
     ap.add_argument('--source', choices=sorted(R.VARIANTS), default='v2')
     ap.add_argument('--candidate', choices=sorted(CANDIDATES), default='contract-v1')
     ap.add_argument('--sample', choices=['smoke', 'full'], default='smoke')
     ap.add_argument('--model-root', type=Path, default=Path('data/local_models'))
     a = ap.parse_args()
+    if a.action == 'score-window' and a.prices_root is None:
+        ap.error('score-window needs --prices-root (a fresh download, collected after the window matured)')
+    if a.action != 'score-window' and a.root is None:
+        ap.error(f'{a.action} needs --root')
     if a.action == 'register-addendum':
         print(json.dumps(register_addendum(a.root, a.out, a.addendum), indent=2))
         return

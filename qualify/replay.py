@@ -89,7 +89,23 @@ def finite(v):
 
 # ---------------------------------------------------------------- prices
 
-def collect(root, fetch=None):
+def through_end(day):
+    """Exclusive download end for 'bars through `day`' (YYYY-MM-DD): the next UTC midnight."""
+    return datetime.combine(date.fromisoformat(day) + timedelta(days=1), datetime.min.time(), timezone.utc)
+
+
+def collect(root, fetch=None, fetch_to=FETCH_TO, now=None):
+    """Download daily bars for the assets and SPY into root/raw (existing files are kept, so a folder is one download).
+    `fetch_to` must already have passed: otherwise a session still trading would be stored as if it had closed."""
+    now = now or datetime.now(timezone.utc)
+    if fetch_to > now:
+        raise ValueError(f'Download end {fetch_to.isoformat()} has not passed yet; a session still trading would '
+                         'be stored as a close. Collect after it, or give an earlier --through day.')
+    receipt_path = root / 'collection.json'
+    if receipt_path.exists():
+        before = json.loads(receipt_path.read_text(encoding='utf-8')).get('fetch_to', FETCH_TO.isoformat())
+        if before != fetch_to.isoformat():
+            raise ValueError(f'{root} already holds a download ending {before}; use a new folder')
     if fetch is None:
         from core.market import fetch_json as fetch
     (root / 'raw').mkdir(parents=True, exist_ok=True)
@@ -98,7 +114,7 @@ def collect(root, fetch=None):
         if path.exists():
             continue
         raw = fetch(f'https://query1.finance.yahoo.com/v8/finance/chart/{quote(s)}?period1={int(FETCH_FROM.timestamp())}'
-                    f'&period2={int(FETCH_TO.timestamp())}&interval=1d')
+                    f'&period2={int(fetch_to.timestamp())}&interval=1d')
         if not (raw.get('chart') or {}).get('result'):
             raise ValueError('Missing source result: ' + s)
         path.write_text(json.dumps(raw), encoding='utf-8')
@@ -107,9 +123,9 @@ def collect(root, fetch=None):
         (root / 'raw' / 'fng.json').write_text(json.dumps(raw), encoding='utf-8')
     except (OSError, ValueError):
         pass
-    receipt = {'downloaded_at': datetime.now(timezone.utc).isoformat(),
+    receipt = {'downloaded_at': now.isoformat(), 'fetch_to': fetch_to.isoformat(),
                'sources': {p.name: digest(p.read_bytes()) for p in sorted((root / 'raw').glob('*.json'))}}
-    dump(root / 'collection.json', receipt)
+    dump(receipt_path, receipt)
     return receipt
 
 
@@ -470,9 +486,10 @@ def main():
     ap.add_argument('--variant', default='v1', choices=sorted(VARIANTS))
     ap.add_argument('--model-root', type=Path, default=Path('data/local_models'))
     ap.add_argument('--limit', type=int, default=None)
+    ap.add_argument('--through', help='collect: last day to include, YYYY-MM-DD (default: the replay download)')
     a = ap.parse_args()
     if a.action == 'collect':
-        print(json.dumps(collect(a.root), indent=2))
+        print(json.dumps(collect(a.root, fetch_to=through_end(a.through) if a.through else FETCH_TO), indent=2))
         return
     if a.action == 'score':
         rep = score(a.root, a.variant)

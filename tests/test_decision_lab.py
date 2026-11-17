@@ -454,6 +454,21 @@ class TestWindow(unittest.TestCase):
         with self.assertRaises(ValueError):
             D.seal_window(self.root, self.out, '2026-10-29', '2026-10-29', 'prob-v1', self.judge, {})
 
+    def test_score_window_cli_needs_prices_not_a_replay_root(self):
+        # The Sat 11/21 command has no replay folder; --root used to be required for every action.
+        argv = ['decision_lab', 'score-window', '--prices-root', 'data/prices_x', '--out', 'data/window_x']
+        with patch('sys.argv', argv), patch.object(D, 'score_window', return_value={'ok': 1}) as scored, \
+                patch('builtins.print'):
+            D.main()
+        scored.assert_called_once_with(Path('data/prices_x'), Path('data/window_x'))
+        for bad in (['decision_lab', 'score-window', '--out', 'o'], ['decision_lab', 'register-addendum', '--out', 'o']):
+            with patch('sys.argv', bad), patch.object(D, 'score_window') as scored, \
+                    patch.object(D, 'register_addendum') as reg, patch('sys.stderr'):
+                with self.assertRaises(SystemExit):
+                    D.main()
+            scored.assert_not_called()
+            reg.assert_not_called()
+
 
 if __name__ == '__main__':
     unittest.main()
