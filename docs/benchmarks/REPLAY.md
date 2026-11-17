@@ -107,6 +107,20 @@ What changed is behavior: the same model on the same upstream reports moved from
 
 The screen took 6.0 minutes for 72 cases (median 4.97 seconds per Decision call, excluding model startup), versus about 35 minutes for a full-team replay at the v2 median.
 
+### prob-v1: label probabilities, Python makes the call
+
+Same prompt and card as signals-v1. The local runtime also returns the log-probability of each label at the label token; Python makes the call: UP when P(UP) / (P(UP) + P(DOWN)) is at least 0.6, DOWN at 0.4 or less, otherwise ABSTAIN. The measure is **ranking skill**: AUC of log P(UP) minus log P(DOWN) against the outcome, where 0.5 is no skill whether the market rose or fell, so a constant UP call scores exactly 0.5. Rule committed before the run: AUC above 0.55 overall and above 0.50 in both halves, at most two failures.
+
+| Score | AUC, all 72 |
+| --- | --- |
+| prob-v1 model score | 0.511 (halves 0.555 and 0.491) |
+| Net headline labels from the gate, context only | 0.556 |
+| 20-session return, context only | 0.406 |
+
+**Not shortlisted.** Origin-cluster interval for the model score 0.41 to 0.61. Python's call: 29 UP, 38 DOWN, 5 ABSTAIN, zero failures, balanced accuracy 0.478. The model's own labels matched signals-v1's counts exactly (20 / 30 / 22), as expected at temperature 0 with the same input. DOWN was absent from the top 20 tokens in 6 cases and took the floor.
+
+On this window the model's confidence does not order outcomes. The gate's headline labels order them slightly better, without an interval and over nine correlated days, so that is context, not a finding. The 20-session return ranks below 0.5: momentum's 52.8% accuracy here came from calling DOWN in a falling window, not from ordering assets. Ranking skill is the measure for later candidates. 346 seconds for 72 cases.
+
 ## Limits
 
 - Known dev outcomes and overlapping origins make these descriptive measurements, not independent performance estimates.

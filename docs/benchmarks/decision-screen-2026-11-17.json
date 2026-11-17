@@ -3,7 +3,7 @@
   "stage": "cached-decision-only",
   "warning": "Experimental diagnostic dev subset. Not full-system or held-out accuracy. Not financial advice.",
   "source_report": "replay-v2-2026-11-16.json",
-  "selection": "contract-v1 and evidence-v1: first and last origin per asset, fixed without outcomes (16 cases, two correlated origin days). signals-v1: all 72 cached cases (nine correlated origin days).",
+  "selection": "contract-v1 and evidence-v1: first and last origin per asset, fixed without outcomes (16 cases, two correlated origin days). signals-v1: all 72 cached cases (nine correlated origin days). prob-v1: all 72 cached cases, scored by ranking AUC.",
   "candidates": {
     "contract-v1": {
       "warning": "Experimental dev screening, cached Decision only. Not a full-system or held-out result.",
@@ -2313,6 +2313,838 @@
         "No second-source cross-check added; date audit is not a complete leakage proof"
       ],
       "shortlist_rule": "Full cached window only. Shortlisted when at most 2 replies are malformed or failed and balanced accuracy is above 0.500 (always-UP) overall and in both halves of the origins. A shortlisted candidate becomes a replay variant judged on the next completed window; nothing is adopted from dev results.",
+      "shortlist": false
+    },
+    "prob-v1": {
+      "warning": "Experimental dev screening, cached Decision only. Not a full-system or held-out result.",
+      "candidate": "prob-v1",
+      "input": "card",
+      "source": "v2",
+      "sample": "full",
+      "cases": 72,
+      "scored": 72,
+      "missing_outcomes": [],
+      "date_cutoff_violations": 0,
+      "arms": {
+        "candidate": {
+          "n": 72,
+          "accuracy_all": 0.3889,
+          "coverage": 0.6944,
+          "accuracy_covered": 0.56,
+          "balanced_accuracy": 0.3808,
+          "labels": {
+            "UP": 20,
+            "DOWN": 30,
+            "ABSTAIN": 22,
+            "ERROR": 0
+          }
+        },
+        "cached_source": {
+          "n": 72,
+          "accuracy_all": 0.4306,
+          "coverage": 0.9861,
+          "accuracy_covered": 0.4366,
+          "balanced_accuracy": 0.5,
+          "labels": {
+            "UP": 71,
+            "DOWN": 0,
+            "ABSTAIN": 0,
+            "ERROR": 1
+          }
+        },
+        "always_up": {
+          "n": 72,
+          "accuracy_all": 0.4306,
+          "coverage": 1.0,
+          "accuracy_covered": 0.4306,
+          "balanced_accuracy": 0.5,
+          "labels": {
+            "UP": 72,
+            "DOWN": 0,
+            "ABSTAIN": 0,
+            "ERROR": 0
+          }
+        },
+        "momentum20": {
+          "n": 72,
+          "accuracy_all": 0.5278,
+          "coverage": 1.0,
+          "accuracy_covered": 0.5278,
+          "balanced_accuracy": 0.5067,
+          "labels": {
+            "UP": 25,
+            "DOWN": 47,
+            "ABSTAIN": 0,
+            "ERROR": 0
+          }
+        },
+        "news_rule": {
+          "n": 72,
+          "accuracy_all": 0.3889,
+          "coverage": 0.6389,
+          "accuracy_covered": 0.6087,
+          "balanced_accuracy": 0.4044,
+          "labels": {
+            "UP": 29,
+            "DOWN": 17,
+            "ABSTAIN": 26,
+            "ERROR": 0
+          }
+        }
+      },
+      "by_asset": {
+        "AAPL": {
+          "candidate": {
+            "n": 9,
+            "accuracy_all": 0.1111,
+            "coverage": 0.3333,
+            "accuracy_covered": 0.3333,
+            "balanced_accuracy": 0.0833,
+            "labels": {
+              "UP": 3,
+              "DOWN": 0,
+              "ABSTAIN": 6,
+              "ERROR": 0
+            }
+          },
+          "cached_source": {
+            "n": 9,
+            "accuracy_all": 0.6667,
+            "coverage": 1.0,
+            "accuracy_covered": 0.6667,
+            "balanced_accuracy": 0.5,
+            "labels": {
+              "UP": 9,
+              "DOWN": 0,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "always_up": {
+            "n": 9,
+            "accuracy_all": 0.6667,
+            "coverage": 1.0,
+            "accuracy_covered": 0.6667,
+            "balanced_accuracy": 0.5,
+            "labels": {
+              "UP": 9,
+              "DOWN": 0,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "momentum20": {
+            "n": 9,
+            "accuracy_all": 0.5556,
+            "coverage": 1.0,
+            "accuracy_covered": 0.5556,
+            "balanced_accuracy": 0.4167,
+            "labels": {
+              "UP": 8,
+              "DOWN": 1,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "news_rule": {
+            "n": 9,
+            "accuracy_all": 0.2222,
+            "coverage": 0.5556,
+            "accuracy_covered": 0.4,
+            "balanced_accuracy": 0.1667,
+            "labels": {
+              "UP": 5,
+              "DOWN": 0,
+              "ABSTAIN": 4,
+              "ERROR": 0
+            }
+          }
+        },
+        "AMD": {
+          "candidate": {
+            "n": 9,
+            "accuracy_all": 0.5556,
+            "coverage": 1.0,
+            "accuracy_covered": 0.5556,
+            "balanced_accuracy": 0.55,
+            "labels": {
+              "UP": 5,
+              "DOWN": 4,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "cached_source": {
+            "n": 9,
+            "accuracy_all": 0.5556,
+            "coverage": 1.0,
+            "accuracy_covered": 0.5556,
+            "balanced_accuracy": 0.5,
+            "labels": {
+              "UP": 9,
+              "DOWN": 0,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "always_up": {
+            "n": 9,
+            "accuracy_all": 0.5556,
+            "coverage": 1.0,
+            "accuracy_covered": 0.5556,
+            "balanced_accuracy": 0.5,
+            "labels": {
+              "UP": 9,
+              "DOWN": 0,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "momentum20": {
+            "n": 9,
+            "accuracy_all": 0.4444,
+            "coverage": 1.0,
+            "accuracy_covered": 0.4444,
+            "balanced_accuracy": 0.5,
+            "labels": {
+              "UP": 0,
+              "DOWN": 9,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "news_rule": {
+            "n": 9,
+            "accuracy_all": 0.4444,
+            "coverage": 0.4444,
+            "accuracy_covered": 1.0,
+            "balanced_accuracy": 0.4,
+            "labels": {
+              "UP": 4,
+              "DOWN": 0,
+              "ABSTAIN": 5,
+              "ERROR": 0
+            }
+          }
+        },
+        "AMZN": {
+          "candidate": {
+            "n": 9,
+            "accuracy_all": 0.5556,
+            "coverage": 0.6667,
+            "accuracy_covered": 0.8333,
+            "balanced_accuracy": 0.4167,
+            "labels": {
+              "UP": 6,
+              "DOWN": 0,
+              "ABSTAIN": 3,
+              "ERROR": 0
+            }
+          },
+          "cached_source": {
+            "n": 9,
+            "accuracy_all": 0.6667,
+            "coverage": 1.0,
+            "accuracy_covered": 0.6667,
+            "balanced_accuracy": 0.5,
+            "labels": {
+              "UP": 9,
+              "DOWN": 0,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "always_up": {
+            "n": 9,
+            "accuracy_all": 0.6667,
+            "coverage": 1.0,
+            "accuracy_covered": 0.6667,
+            "balanced_accuracy": 0.5,
+            "labels": {
+              "UP": 9,
+              "DOWN": 0,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "momentum20": {
+            "n": 9,
+            "accuracy_all": 0.3333,
+            "coverage": 1.0,
+            "accuracy_covered": 0.3333,
+            "balanced_accuracy": 0.3333,
+            "labels": {
+              "UP": 4,
+              "DOWN": 5,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "news_rule": {
+            "n": 9,
+            "accuracy_all": 0.5556,
+            "coverage": 0.6667,
+            "accuracy_covered": 0.8333,
+            "balanced_accuracy": 0.4167,
+            "labels": {
+              "UP": 6,
+              "DOWN": 0,
+              "ABSTAIN": 3,
+              "ERROR": 0
+            }
+          }
+        },
+        "BTC": {
+          "candidate": {
+            "n": 9,
+            "accuracy_all": 0.7778,
+            "coverage": 0.7778,
+            "accuracy_covered": 1.0,
+            "balanced_accuracy": null,
+            "labels": {
+              "UP": 0,
+              "DOWN": 7,
+              "ABSTAIN": 2,
+              "ERROR": 0
+            }
+          },
+          "cached_source": {
+            "n": 9,
+            "accuracy_all": 0.0,
+            "coverage": 1.0,
+            "accuracy_covered": 0.0,
+            "balanced_accuracy": null,
+            "labels": {
+              "UP": 9,
+              "DOWN": 0,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "always_up": {
+            "n": 9,
+            "accuracy_all": 0.0,
+            "coverage": 1.0,
+            "accuracy_covered": 0.0,
+            "balanced_accuracy": null,
+            "labels": {
+              "UP": 9,
+              "DOWN": 0,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "momentum20": {
+            "n": 9,
+            "accuracy_all": 1.0,
+            "coverage": 1.0,
+            "accuracy_covered": 1.0,
+            "balanced_accuracy": null,
+            "labels": {
+              "UP": 0,
+              "DOWN": 9,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "news_rule": {
+            "n": 9,
+            "accuracy_all": 0.5556,
+            "coverage": 0.5556,
+            "accuracy_covered": 1.0,
+            "balanced_accuracy": null,
+            "labels": {
+              "UP": 0,
+              "DOWN": 5,
+              "ABSTAIN": 4,
+              "ERROR": 0
+            }
+          }
+        },
+        "GOOGL": {
+          "candidate": {
+            "n": 9,
+            "accuracy_all": 0.1111,
+            "coverage": 0.5556,
+            "accuracy_covered": 0.2,
+            "balanced_accuracy": 0.0714,
+            "labels": {
+              "UP": 1,
+              "DOWN": 4,
+              "ABSTAIN": 4,
+              "ERROR": 0
+            }
+          },
+          "cached_source": {
+            "n": 9,
+            "accuracy_all": 0.7778,
+            "coverage": 0.8889,
+            "accuracy_covered": 0.875,
+            "balanced_accuracy": 0.5,
+            "labels": {
+              "UP": 8,
+              "DOWN": 0,
+              "ABSTAIN": 0,
+              "ERROR": 1
+            }
+          },
+          "always_up": {
+            "n": 9,
+            "accuracy_all": 0.7778,
+            "coverage": 1.0,
+            "accuracy_covered": 0.7778,
+            "balanced_accuracy": 0.5,
+            "labels": {
+              "UP": 9,
+              "DOWN": 0,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "momentum20": {
+            "n": 9,
+            "accuracy_all": 0.2222,
+            "coverage": 1.0,
+            "accuracy_covered": 0.2222,
+            "balanced_accuracy": 0.5,
+            "labels": {
+              "UP": 0,
+              "DOWN": 9,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "news_rule": {
+            "n": 9,
+            "accuracy_all": 0.5556,
+            "coverage": 0.6667,
+            "accuracy_covered": 0.8333,
+            "balanced_accuracy": 0.3571,
+            "labels": {
+              "UP": 6,
+              "DOWN": 0,
+              "ABSTAIN": 3,
+              "ERROR": 0
+            }
+          }
+        },
+        "MSFT": {
+          "candidate": {
+            "n": 9,
+            "accuracy_all": 0.4444,
+            "coverage": 0.8889,
+            "accuracy_covered": 0.5,
+            "balanced_accuracy": 0.4,
+            "labels": {
+              "UP": 0,
+              "DOWN": 8,
+              "ABSTAIN": 1,
+              "ERROR": 0
+            }
+          },
+          "cached_source": {
+            "n": 9,
+            "accuracy_all": 0.4444,
+            "coverage": 1.0,
+            "accuracy_covered": 0.4444,
+            "balanced_accuracy": 0.5,
+            "labels": {
+              "UP": 9,
+              "DOWN": 0,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "always_up": {
+            "n": 9,
+            "accuracy_all": 0.4444,
+            "coverage": 1.0,
+            "accuracy_covered": 0.4444,
+            "balanced_accuracy": 0.5,
+            "labels": {
+              "UP": 9,
+              "DOWN": 0,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "momentum20": {
+            "n": 9,
+            "accuracy_all": 0.5556,
+            "coverage": 1.0,
+            "accuracy_covered": 0.5556,
+            "balanced_accuracy": 0.575,
+            "labels": {
+              "UP": 6,
+              "DOWN": 3,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "news_rule": {
+            "n": 9,
+            "accuracy_all": 0.5556,
+            "coverage": 1.0,
+            "accuracy_covered": 0.5556,
+            "balanced_accuracy": 0.5,
+            "labels": {
+              "UP": 0,
+              "DOWN": 9,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          }
+        },
+        "NVDA": {
+          "candidate": {
+            "n": 9,
+            "accuracy_all": 0.3333,
+            "coverage": 0.8889,
+            "accuracy_covered": 0.375,
+            "balanced_accuracy": null,
+            "labels": {
+              "UP": 5,
+              "DOWN": 3,
+              "ABSTAIN": 1,
+              "ERROR": 0
+            }
+          },
+          "cached_source": {
+            "n": 9,
+            "accuracy_all": 0.0,
+            "coverage": 1.0,
+            "accuracy_covered": 0.0,
+            "balanced_accuracy": null,
+            "labels": {
+              "UP": 9,
+              "DOWN": 0,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "always_up": {
+            "n": 9,
+            "accuracy_all": 0.0,
+            "coverage": 1.0,
+            "accuracy_covered": 0.0,
+            "balanced_accuracy": null,
+            "labels": {
+              "UP": 9,
+              "DOWN": 0,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "momentum20": {
+            "n": 9,
+            "accuracy_all": 1.0,
+            "coverage": 1.0,
+            "accuracy_covered": 1.0,
+            "balanced_accuracy": null,
+            "labels": {
+              "UP": 0,
+              "DOWN": 9,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "news_rule": {
+            "n": 9,
+            "accuracy_all": 0.1111,
+            "coverage": 1.0,
+            "accuracy_covered": 0.1111,
+            "balanced_accuracy": null,
+            "labels": {
+              "UP": 8,
+              "DOWN": 1,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          }
+        },
+        "TSLA": {
+          "candidate": {
+            "n": 9,
+            "accuracy_all": 0.2222,
+            "coverage": 0.4444,
+            "accuracy_covered": 0.5,
+            "balanced_accuracy": 0.1667,
+            "labels": {
+              "UP": 0,
+              "DOWN": 4,
+              "ABSTAIN": 5,
+              "ERROR": 0
+            }
+          },
+          "cached_source": {
+            "n": 9,
+            "accuracy_all": 0.3333,
+            "coverage": 1.0,
+            "accuracy_covered": 0.3333,
+            "balanced_accuracy": 0.5,
+            "labels": {
+              "UP": 9,
+              "DOWN": 0,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "always_up": {
+            "n": 9,
+            "accuracy_all": 0.3333,
+            "coverage": 1.0,
+            "accuracy_covered": 0.3333,
+            "balanced_accuracy": 0.5,
+            "labels": {
+              "UP": 9,
+              "DOWN": 0,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "momentum20": {
+            "n": 9,
+            "accuracy_all": 0.1111,
+            "coverage": 1.0,
+            "accuracy_covered": 0.1111,
+            "balanced_accuracy": 0.1667,
+            "labels": {
+              "UP": 7,
+              "DOWN": 2,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "news_rule": {
+            "n": 9,
+            "accuracy_all": 0.1111,
+            "coverage": 0.2222,
+            "accuracy_covered": 0.5,
+            "balanced_accuracy": 0.0833,
+            "labels": {
+              "UP": 0,
+              "DOWN": 2,
+              "ABSTAIN": 7,
+              "ERROR": 0
+            }
+          }
+        }
+      },
+      "halves": {
+        "early": {
+          "candidate": {
+            "n": 32,
+            "accuracy_all": 0.375,
+            "coverage": 0.75,
+            "accuracy_covered": 0.5,
+            "balanced_accuracy": 0.3818,
+            "labels": {
+              "UP": 11,
+              "DOWN": 13,
+              "ABSTAIN": 8,
+              "ERROR": 0
+            }
+          },
+          "cached_source": {
+            "n": 32,
+            "accuracy_all": 0.3125,
+            "coverage": 1.0,
+            "accuracy_covered": 0.3125,
+            "balanced_accuracy": 0.5,
+            "labels": {
+              "UP": 32,
+              "DOWN": 0,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "always_up": {
+            "n": 32,
+            "accuracy_all": 0.3125,
+            "coverage": 1.0,
+            "accuracy_covered": 0.3125,
+            "balanced_accuracy": 0.5,
+            "labels": {
+              "UP": 32,
+              "DOWN": 0,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "momentum20": {
+            "n": 32,
+            "accuracy_all": 0.5625,
+            "coverage": 1.0,
+            "accuracy_covered": 0.5625,
+            "balanced_accuracy": 0.5455,
+            "labels": {
+              "UP": 14,
+              "DOWN": 18,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "news_rule": {
+            "n": 32,
+            "accuracy_all": 0.2812,
+            "coverage": 0.5938,
+            "accuracy_covered": 0.4737,
+            "balanced_accuracy": 0.3955,
+            "labels": {
+              "UP": 14,
+              "DOWN": 5,
+              "ABSTAIN": 13,
+              "ERROR": 0
+            }
+          }
+        },
+        "late": {
+          "candidate": {
+            "n": 40,
+            "accuracy_all": 0.4,
+            "coverage": 0.65,
+            "accuracy_covered": 0.6154,
+            "balanced_accuracy": 0.406,
+            "labels": {
+              "UP": 9,
+              "DOWN": 17,
+              "ABSTAIN": 14,
+              "ERROR": 0
+            }
+          },
+          "cached_source": {
+            "n": 40,
+            "accuracy_all": 0.525,
+            "coverage": 0.975,
+            "accuracy_covered": 0.5385,
+            "balanced_accuracy": 0.5,
+            "labels": {
+              "UP": 39,
+              "DOWN": 0,
+              "ABSTAIN": 0,
+              "ERROR": 1
+            }
+          },
+          "always_up": {
+            "n": 40,
+            "accuracy_all": 0.525,
+            "coverage": 1.0,
+            "accuracy_covered": 0.525,
+            "balanced_accuracy": 0.5,
+            "labels": {
+              "UP": 40,
+              "DOWN": 0,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "momentum20": {
+            "n": 40,
+            "accuracy_all": 0.5,
+            "coverage": 1.0,
+            "accuracy_covered": 0.5,
+            "balanced_accuracy": 0.5113,
+            "labels": {
+              "UP": 11,
+              "DOWN": 29,
+              "ABSTAIN": 0,
+              "ERROR": 0
+            }
+          },
+          "news_rule": {
+            "n": 40,
+            "accuracy_all": 0.475,
+            "coverage": 0.675,
+            "accuracy_covered": 0.7037,
+            "balanced_accuracy": 0.4774,
+            "labels": {
+              "UP": 15,
+              "DOWN": 12,
+              "ABSTAIN": 13,
+              "ERROR": 0
+            }
+          }
+        }
+      },
+      "paired_vs_source": {
+        "difference": -0.0417,
+        "origin_cluster_bootstrap_95": [
+          -0.1806,
+          0.0972
+        ],
+        "clusters": 9,
+        "note": "Descriptive dev screening only; overlapping origins remain correlated."
+      },
+      "seconds": 346.187,
+      "median_decision_seconds": 4.7575,
+      "limits": [
+        "Known dev outcomes; not an independent evaluation",
+        "Upstream reports cached, not rerun",
+        "First/last-origin smoke subset is diagnostic, not a performance estimate",
+        "Same source/revision/news-availability limits as the replay benchmark",
+        "No second-source cross-check added; date audit is not a complete leakage proof"
+      ],
+      "shortlist_rule": "Full cached window only. Shortlisted when at most 2 replies fail or are malformed and the ranking skill (AUC of log P(UP) minus log P(DOWN) against the outcome, errors scored 0) is above 0.55 over all scored cases and above 0.50 in both halves of the origins; 0.50 is no skill whatever the market did. Python calls UP when P(UP) / (P(UP) + P(DOWN)) is at least 0.6, DOWN when at most 0.4, otherwise ABSTAIN. References (20-session return, net headline labels) are context, not targets. A shortlisted candidate becomes a replay variant; nothing is adopted from dev results.",
+      "ranking": {
+        "auc": 0.5114,
+        "early": 0.5545,
+        "late": 0.4912,
+        "origin_cluster_bootstrap_95": [
+          0.4123,
+          0.6113
+        ],
+        "flat_outcomes_excluded": 0,
+        "floored": {
+          "UP": 0,
+          "DOWN": 6
+        },
+        "references_context_only": {
+          "momentum20_return": 0.406,
+          "net_headline_labels": 0.5563
+        }
+      },
+      "python_call": {
+        "all": {
+          "n": 72,
+          "accuracy_all": 0.4861,
+          "coverage": 0.9306,
+          "accuracy_covered": 0.5224,
+          "balanced_accuracy": 0.478,
+          "labels": {
+            "UP": 29,
+            "DOWN": 38,
+            "ABSTAIN": 5,
+            "ERROR": 0
+          }
+        },
+        "early": {
+          "n": 32,
+          "accuracy_all": 0.4688,
+          "coverage": 0.9688,
+          "accuracy_covered": 0.4839,
+          "balanced_accuracy": 0.45,
+          "labels": {
+            "UP": 15,
+            "DOWN": 16,
+            "ABSTAIN": 1,
+            "ERROR": 0
+          }
+        },
+        "late": {
+          "n": 40,
+          "accuracy_all": 0.5,
+          "coverage": 0.9,
+          "accuracy_covered": 0.5556,
+          "balanced_accuracy": 0.5038,
+          "labels": {
+            "UP": 14,
+            "DOWN": 22,
+            "ABSTAIN": 4,
+            "ERROR": 0
+          }
+        }
+      },
+      "failures": 0,
       "shortlist": false
     }
   },
