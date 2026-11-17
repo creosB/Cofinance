@@ -148,7 +148,8 @@ def unsupported_terms(candidate: str, evidence: str) -> List[str]:
             if low in COMMON and (index == 0 or base[1:].islower()):
                 continue
             # "GPT" from the evidence's "GPT-6": the word regex splits on the hyphen, normalise keeps it whole
-            if not _supported(low, ev) and f" {low}-" not in ev:
+            # and "Classical" from "Quantum-Classical" (live 2026-11-17: a Team Lead answer fell back on it)
+            if not _supported(low, ev) and f" {low}-" not in ev and not re.search(rf"-{re.escape(low)}(?:[ -])", ev):
                 found.append(base)
         if NEGATION.search(sentence):
             continue

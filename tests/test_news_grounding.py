@@ -131,6 +131,13 @@ class TestWordingEquivalents(unittest.TestCase):
         self.assertEqual(unsupported_terms("Its CEO resigned.", "its chief executive resigned"), [])
         self.assertEqual(unsupported_terms("A model did better than GPT.", "21% better than GPT-6 Astra"), [])
 
+    def test_hyphenated_name_parts_are_supported(self):
+        # live 2026-11-17: the Team Lead answer fell back on "Classical" and "Correction" from this headline
+        ev = "Launch Quantum-Classical Codesign Platform, Plus Error-Correction Breakthrough"
+        self.assertEqual(unsupported_terms("A Quantum-Classical platform and an Error-Correction advance.", ev), [])
+        self.assertEqual(unsupported_terms("A Classical platform.", ev), [])
+        self.assertIn("Classic", unsupported_terms("A Classic platform.", ev))
+
     def test_escalations_are_rejected(self):
         ev = "Bitcoin Core discloses TCP out-of-memory vulnerability; China withholds import approval"
         self.assertIn("outage", unsupported_terms("The outage hit users.", ev))
