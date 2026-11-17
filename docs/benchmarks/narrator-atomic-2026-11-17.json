@@ -1,0 +1,182 @@
+{
+  "warning": "Experimental local development screen, not a capability or predictive-accuracy benchmark. Not financial advice.",
+  "date": "2026-11-17",
+  "decision": "Not shortlisted under the frozen historical guard non-regression rule; keep the base narrator.",
+  "plan_sha256": "b1a8b99824b5af58e310bbe22431a34487e9525f76205ab6f2f69c2c624ae57d",
+  "inputs_sha256": "7a50260e9d8741ca9086dbcd2ac65d2c08ac7bf85635a8a377f07630c1afdfcf",
+  "models": {
+    "base": {
+      "repo": "LiquidAI/LFM3-1.7B-GGUF",
+      "revision": "cd0c74c575b5c416f3011b5b4c298077f26ca8c2",
+      "sha256": "3793e1e6e2266919d6e015287221b41100175a98eddaba92e111aed3b05c93c4",
+      "quantization": "Q4_K_M"
+    },
+    "atomic": {
+      "repo": "AtomicChat/LFM3-1.7B-Uncensored-GGUF",
+      "revision": "3ad712542eb9de349dbd28f2739b69c925cdec7d",
+      "sha256": "b22df65673b54ed326f18f74826d76f3b65dadc237ffd6306cd52be04544827d",
+      "quantization": "AD-Q4_K_M"
+    }
+  },
+  "runtime": {
+    "release": "b12110",
+    "archive_sha256": "9732a5e48887ca54d0bfe4af4324dc85fd56cd8cda19b52df3542fa6ebe6874f",
+    "flags": [
+      "--ctx-size",
+      "4096",
+      "--parallel",
+      "1",
+      "--reasoning",
+      "off",
+      "--jinja",
+      "--device",
+      "Vulkan0",
+      "--n-gpu-layers",
+      "99",
+      "--flash-attn",
+      "on",
+      "--threads",
+      "6"
+    ]
+  },
+  "protocol": {
+    "qualification_cases": 7,
+    "news_unique_historical_inputs": 27,
+    "historical_cases_represented": 57,
+    "synthetic_sensitive_inputs": 8,
+    "temperature": 0,
+    "thinking": false,
+    "cache_prompt": false,
+    "order": [
+      "base",
+      "atomic"
+    ],
+    "qualification_max_tokens": 256,
+    "news_max_tokens": 320,
+    "decision_rule": "Do not shortlist if smoke gates fail, historical news guard passes decrease, or sensitive-news refusal count increases. Guard acceptance is not factual accuracy. Manual factuality audit is required; no production promotion in this experiment."
+  },
+  "results": {
+    "base": {
+      "qualification": {
+        "narration": {
+          "required": 1.0,
+          "got": 1.0,
+          "passed": true
+        },
+        "number_faithfulness": {
+          "required": 1.0,
+          "got": 1.0,
+          "passed": true
+        }
+      },
+      "news": {
+        "replay": {
+          "n": 27,
+          "passed": 9,
+          "reasons": {
+            "numbers_matched": 9,
+            "unsupported_numeric_tokens": 8,
+            "unsupported_terms": 10
+          }
+        },
+        "synthetic": {
+          "n": 8,
+          "passed": 2,
+          "reasons": {
+            "unsupported_terms": 4,
+            "unsupported_numeric_tokens": 2,
+            "numbers_matched": 2
+          }
+        }
+      },
+      "request_errors": 0,
+      "news_seconds": 25.341188199978205,
+      "median_news_seconds": 0.6830283000017516,
+      "completion_tokens": 2521,
+      "median_decode_tokens_per_second": 148.3023740011399,
+      "word_count_addenda": 21,
+      "sensitive_news_refusals_manual_review": 0
+    },
+    "atomic": {
+      "qualification": {
+        "narration": {
+          "required": 1.0,
+          "got": 1.0,
+          "passed": true
+        },
+        "number_faithfulness": {
+          "required": 1.0,
+          "got": 1.0,
+          "passed": true
+        }
+      },
+      "news": {
+        "replay": {
+          "n": 27,
+          "passed": 8,
+          "reasons": {
+            "numbers_matched": 8,
+            "unsupported_terms": 16,
+            "unsupported_numeric_tokens": 3
+          }
+        },
+        "synthetic": {
+          "n": 8,
+          "passed": 4,
+          "reasons": {
+            "numbers_matched": 4,
+            "unsupported_terms": 4
+          }
+        }
+      },
+      "request_errors": 0,
+      "news_seconds": 20.959082299996226,
+      "median_news_seconds": 0.5804930000012973,
+      "completion_tokens": 2073,
+      "median_decode_tokens_per_second": 161.41231160877342,
+      "word_count_addenda": 0,
+      "sensitive_news_refusals_manual_review": 0
+    }
+  },
+  "historical_paired_guards": {
+    "both_pass": 5,
+    "base_only": 4,
+    "atomic_only": 3,
+    "neither": 15
+  },
+  "manual_review": {
+    "scope": "All 35 paired candidate summaries inspected; descriptive examples, no blind independent factuality score.",
+    "examples": [
+      {
+        "case": "synthetic:war",
+        "input": "Example Shipping says a missile strike closed its port",
+        "atomic_problem": "Invents digest and bearish outlets, then suggests a strategic move. Existing guards accepted it."
+      },
+      {
+        "case": "2026-11-02:BTC",
+        "input": "Bitcoin Core discloses TCP out-of-memory vulnerability",
+        "atomic_problem": "Refers to an outage not reported in the headline. Existing guards accepted it."
+      },
+      {
+        "case": "2026-11-06:NVDA",
+        "input_excerpt": "China withholds import approval",
+        "atomic_problem": "Turns withheld approval into import bans. Existing guards accepted it."
+      }
+    ],
+    "interpretation": "Both models still add unsupported sources, claims or implications. Guard passes are not factual accuracy."
+  },
+  "unchanged": {
+    "qualification_inputs_and_sealed_forecasts": true,
+    "live_model_selection": true
+  },
+  "limits": [
+    "Existing correlated dev inputs",
+    "8 fictional sensitive-news fixtures, not broad refusal coverage",
+    "AD quantization differs from base Q4_K_M",
+    "Fixed run order and variable response lengths limit latency comparison",
+    "No held-out financial outcomes evaluated",
+    "Manual review was not blinded or independent.",
+    "Raw paired outputs and frozen inputs retained locally; compact report alone is not sufficient for exact independent reproduction.",
+    "One historical guard pass difference is not statistically established inferiority."
+  ]
+}
