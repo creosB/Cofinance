@@ -1,0 +1,124 @@
+{
+  "warning": "Experimental. Dev numbers use known outcomes; the window arm is sealed and unscored. Not a trading signal or financial advice.",
+  "technique": "headline-v1 (unchanged prompt, readout, sum aggregation and call line)",
+  "models": {
+    "base": "LiquidAI/LFM3-1.7B-GGUF Q4_K_M, Vulkan b12110",
+    "atomic": {
+      "id": "atomicchat-lfm3-1.7b-uncensored-ad-q4km",
+      "repo": "AtomicChat/LFM3-1.7B-Uncensored-GGUF",
+      "revision": "3ad712542eb9de349dbd28f2739b69c925cdec7d",
+      "model_sha256": "b22df65673b54ed326f18f74826d76f3b65dadc237ffd6306cd52be04544827d",
+      "quantization": "AD-Q4_K_M",
+      "runtime": "b12110",
+      "backend": "vulkan",
+      "flags": [
+        "--ctx-size",
+        "4096",
+        "--parallel",
+        "1",
+        "--reasoning",
+        "off",
+        "--jinja",
+        "--device",
+        "Vulkan0",
+        "--n-gpu-layers",
+        "99",
+        "--flash-attn",
+        "on",
+        "--threads",
+        "6"
+      ],
+      "cpu_only": false
+    }
+  },
+  "dev_screen": {
+    "cases": 72,
+    "headlines": 40,
+    "same_label": 34,
+    "base_gpu": {
+      "labels": {
+        "UP": 17,
+        "DOWN": 11,
+        "ABSTAIN": 12,
+        "ERROR": 0
+      },
+      "failures": 0,
+      "shortlist": true,
+      "ranking": {
+        "auc": 0.5744,
+        "early": 0.5477,
+        "late": 0.619,
+        "origin_cluster_bootstrap_95": [
+          0.5053,
+          0.652
+        ]
+      }
+    },
+    "atomic": {
+      "labels": {
+        "UP": 13,
+        "DOWN": 9,
+        "ABSTAIN": 18,
+        "ERROR": 0
+      },
+      "failures": 0,
+      "shortlist": true,
+      "ranking": {
+        "auc": 0.6247,
+        "early": 0.6205,
+        "late": 0.6165,
+        "origin_cluster_bootstrap_95": [
+          0.5923,
+          0.6723
+        ]
+      }
+    },
+    "gate_label_reference_auc": 0.5563,
+    "mean_aggregation_post_hoc": {
+      "base_gpu": {
+        "auc": 0.6593,
+        "early": 0.6932,
+        "late": 0.6892,
+        "origin_cluster_bootstrap_95": [
+          0.5924,
+          0.7392
+        ]
+      },
+      "atomic": {
+        "auc": 0.6939,
+        "early": 0.7023,
+        "late": 0.6867,
+        "origin_cluster_bootstrap_95": [
+          0.6468,
+          0.7562
+        ]
+      }
+    }
+  },
+  "window_arm": {
+    "window": [
+      "2026-11-09",
+      "2026-11-13"
+    ],
+    "cases": 40,
+    "headlines": 34,
+    "sealed_at": "2026-11-17T10:04:50.827023+00:00",
+    "plan_sha256": "beb296aec5fa71452b7c6f0cf55806da5eaaa526627bbdd3c23707878b7cc8ed",
+    "judgments_sha256": "6b4e45906947b0c371f936e2a958d51986ad8c58c1e166678bdcf9468dc484b9",
+    "calls_sha256": "d85708fb5b47d2b335e5aa33f69fa9f41e2f54cb34907b8ce11b4e356c19daea",
+    "calls": {
+      "UP": 10,
+      "DOWN": 12,
+      "ABSTAIN": 18
+    },
+    "arm_rule": "Second arm on the sealed 11/09 to 11/13 window, sealed after the base arm and its mean addendum. Same headline-v1 prompt, readout, sum and plus or minus 0.5 call line. Scored in the same single look as the base. AtomicChat may replace the base for live headline judging only if its window AUC is above 0.50 with the origin-cluster interval excluding 0.50 AND its AUC is at least the base sum arm AUC. Three hypotheses on one small correlated window: no general claim either way.",
+    "arm_rule_file_sha256": "b1cb7e1250e33f437ec28350e4dcc6a71a50b6ab383a53ed976bb685257ffe98",
+    "base_arm_seal_sha256": "d51f3f76ace211f88bb2abc4bb80b5e75ea61b099595cbf521acdc93245b0e94"
+  },
+  "limits": [
+    "Dev screen: 72 correlated cases from 9 origins, outcomes known before the run; screened under the rule frozen for headline-v1.",
+    "Base screen ran earlier on the same GPU runtime; not interleaved.",
+    "Window arm sealed after the base arm and after the first exit date had passed; no price after 2026-11-13 was on disk, and no window outcome was viewed.",
+    "AtomicChat differs from the base in both weights and quantization."
+  ]
+}
