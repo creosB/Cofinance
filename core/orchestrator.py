@@ -537,6 +537,22 @@ class TeamLeadOrchestrator:
         self.tools = tools
         self.bus = bus or EventBus()
 
+    NEWS_ONLY = "python_news_answer"
+
+    def _news_only(self, routed: RoutedQuery, risk_mode: str, delegated: List[str], news_rep: SpecialistReport,
+                   cues: Sequence[Mapping[str, Any]], session_id: str) -> TeamRunResult:
+        """Digest + the closed risk list, both from Python. Faithful unless the digest itself failed its number check."""
+        risks = [str(c["text"]) for c in cues]
+        answer = news_rep.summary + (" Risk the reports support: " + "; ".join(risks) + "." if risks else "")
+        reason = news_rep.validation.get("validation_reason")
+        faithful = reason in ("python_digest", "no_news")
+        self.bus.publish(A2AEvent(session_id, "GATE_CHECK", self.NAME, {
+            "faithful_synthesis": faithful, "method": self.NEWS_ONLY, "validation_reason": self.NEWS_ONLY if faithful else reason,
+            "allowed_numbers_count": len(news_rep.allowed_numbers), "risks": risks}))
+        return TeamRunResult(routed=routed, risk_mode=risk_mode, delegated_agents=delegated, data_report=None,
+                             news_report=news_rep, final_synthesis=answer, faithful_synthesis=faithful,
+                             events=list(self.bus.history))
+
     def run(self, user_query: str, session_id: str = "default", fallback_tickers: Sequence[str] = (),
             context: str = "") -> TeamRunResult:
         """`context` is the previous accepted answer in this conversation (local chat history, not a
@@ -608,6 +624,11 @@ class TeamLeadOrchestrator:
         previous = " ".join(context.split())[:1400]
         # Closed risk list from tool facts (core/risk_cues.py): the Lead may name only these, or none.
         cues = risk_cues(data_rep.raw_facts if data_rep else {}, news_rep.raw_facts if news_rep else {})
+        # News-only question (Baris, 2026-11-17): the answer is the Python digest plus the listed risks, no Lead call.
+        # Live, the Lead only restated the digest and twice failed the risk guard ("the reports do not name a
+        # particular risk" while one was listed), so the model had nothing to add except ways to be wrong.
+        if news_rep is not None and data_rep is None:
+            return self._news_only(routed, risk_mode, delegated, news_rep, cues, session_id)
         synth_prompt = (
             f"User question: {' '.join(user_query.split())[:600]}\n"
             + (f"Conversation memory, earlier accepted answers (context only): {previous}\n" if previous else "")

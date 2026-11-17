@@ -192,5 +192,38 @@ class TestNewsDigest(unittest.TestCase):
         self.assertEqual(source_label("some_feed"), "some feed")
 
 
+class TestNewsOnlyAnswer(unittest.TestCase):
+    """Baris, 2026-11-17: a news-only question is answered by Python (digest + listed risks), no Team Lead call."""
+
+    def orchestrator(self):
+        from core.gliner_decide import GlinerQueryRouter
+        from core.orchestrator import DataAnalystAgent, TeamLeadOrchestrator
+        from tests.test_orchestrator import StubGliner, StubTools, Stub1BLLM
+        llm, tools = Stub1BLLM(), StubTools()
+        rows = [outcome("NVIDIA Unveils Minerva for AI Factories", "nvidia_newsroom")]
+        orch = TeamLeadOrchestrator(GlinerQueryRouter(StubGliner(), {"NVDA"}), DataAnalystAgent(llm, tools),
+                                    NewsResearcherAgent(llm, Store(rows)), llm, tools)
+        return orch, llm
+
+    def test_news_question_never_calls_a_model_and_names_the_listed_risk(self):
+        orch, llm = self.orchestrator()
+        res = orch.run("What news is moving NVDA this week?")
+        self.assertEqual(res.delegated_agents, ["News Researcher"])
+        self.assertEqual(llm.calls, [])
+        self.assertTrue(res.final_synthesis.startswith(res.news_report.summary))
+        self.assertIn("Risk the reports support: ", res.final_synthesis)
+        self.assertIn("issuer claims", res.final_synthesis)
+        self.assertTrue(res.faithful_synthesis)
+        gate = [e for e in res.events if e.event_type == "GATE_CHECK" and e.agent == "Market Team Lead"]
+        self.assertEqual(gate[-1].payload["method"], "python_news_answer")
+
+    def test_questions_with_market_data_still_get_the_team_lead(self):
+        orch, llm = self.orchestrator()
+        res = orch.run("Give me a full thesis review on NVDA")
+        self.assertEqual(res.delegated_agents, ["Data Analyst", "News Researcher"])
+        self.assertTrue(any("Market Team Lead" in system for system in llm.calls))  # the Lead still narrates
+        self.assertNotEqual(res.events[-1].payload.get("method"), "python_news_answer")
+
+
 if __name__ == "__main__":
     unittest.main()
