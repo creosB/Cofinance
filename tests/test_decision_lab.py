@@ -127,5 +127,79 @@ class TestDecisionLab(unittest.TestCase):
         self.assertEqual(missing['scored'], 2)
 
 
+class TestFactCard(unittest.TestCase):
+    def setUp(self):
+        from tests.test_replay import make_root
+        self.tmp, self.root = make_root()
+        self.addCleanup(self.tmp.cleanup)
+        self.out = self.root / 'screen'
+        news = [{'title': 'Nvidia wins a contract', 'available_at': 1.0, 'action': 'alert', 'direction': 'bullish'},
+                {'title': 'Regulator opens a probe', 'available_at': 1.0, 'action': 'digest', 'direction': 'bearish'},
+                {'title': 'Conference schedule posted', 'available_at': 1.0, 'action': 'digest', 'direction': 'neutral'}]
+        self.rows = [{**row(s, o), 'news_served': news} for s, o in
+                     (('NVDA', '2026-10-28'), ('NVDA', '2026-10-29'), ('BTC', '2026-10-29'))]
+        self.source = self.root / 'predictions_v2.jsonl'
+        write_lines(self.source, self.rows)
+        dump(self.root / 'predictions_v2.seal.json',
+             {'cases': len(self.rows), 'predictions_sha256': digest(self.source.read_bytes())})
+
+    def screen(self):
+        prompts = []
+        def call(system, prompt, **kw):
+            self.assertIn('fact card', system)
+            prompts.append(prompt)
+            return '{"label":"ABSTAIN"}'
+        D.run(self.root, self.out, 'v2', 'signals-v1', 'full', call, {'test': True})
+        return prompts
+
+    def test_card_keeps_tool_values_and_gate_labels_without_future_or_hidden_fields(self):
+        prompts = self.screen()
+        self.assertEqual(len(prompts), 3)
+        series, _, _ = D.R.load_market(self.root)
+        for prompt, r in zip(prompts, D.select_cases(self.rows, 'full')):
+            self.assertTrue(prompt.startswith(D.cached_prompt(r)), 'The card is added to the cached reports, not instead of them.')
+            bars = [b for b in series[r['symbol']] if b['date'] <= r['origin']]
+            price = bars[-1]['close']
+            change = round((price / bars[-2]['close'] - 1) * 100, 4)
+            drawdown = round((1 - price / max(max(b['high'] for b in bars), price)) * 100, 4)
+            self.assertIn(f'Last session change: {change:+.2f}%', prompt)
+            self.assertIn(f'Below the all-time high by {drawdown:.2f}%', prompt, 'Card values must come from bars on or before T.')
+            self.assertIn('[alert, bullish] Nvidia wins a contract', prompt)
+            self.assertIn('[digest, bearish] Regulator opens a probe', prompt)
+            self.assertIn('1 bullish, 1 bearish, 1 neutral or unclear', prompt)
+            for hidden in ('99999', 'HIDDEN', '2026-'):
+                self.assertNotIn(hidden, prompt, 'The card may carry only point-in-time tool values and served headlines.')
+        self.assertEqual(json.loads((self.out / 'plan.json').read_text())['input'], 'card')
+        D.verified(self.root, self.out)
+
+    def test_card_states_missing_price_and_news_plainly(self):
+        text = D.fact_card({'news_served': []}, {'status': 'unavailable'})
+        self.assertIn('Price data unavailable', text)
+        self.assertIn('Accepted headlines: none', text)
+        self.assertIn('0 bullish, 0 bearish, 0 neutral or unclear', text)
+
+    def test_changed_price_input_is_rejected_at_scoring(self):
+        self.screen()
+        path = self.root / 'raw' / 'NVDA.json'
+        raw = json.loads(path.read_text())
+        res = raw['chart']['result'][0]
+        i = next(i for i, t in enumerate(res['timestamp']) if D.R.utc_day(t) == '2026-10-29')
+        res['indicators']['quote'][0]['close'][i] *= 1.1
+        path.write_text(json.dumps(raw))
+        with self.assertRaisesRegex(ValueError, 'Model input differs'):
+            D.verified(self.root, self.out)
+
+    def test_shortlist_rule_needs_valid_replies_and_both_halves_above_always_up(self):
+        def rep(err, overall, early, late):
+            arm = lambda b: {'balanced_accuracy': b, 'labels': {'ERROR': err}}
+            return {'arms': {'candidate': arm(overall)},
+                    'halves': {'early': {'candidate': arm(early)}, 'late': {'candidate': arm(late)}}}
+        self.assertTrue(D.shortlisted(rep(2, .56, .52, .6)))
+        self.assertFalse(D.shortlisted(rep(3, .56, .52, .6)))
+        self.assertFalse(D.shortlisted(rep(0, .5, .52, .6)))
+        self.assertFalse(D.shortlisted(rep(0, .56, .49, .6)))
+        self.assertFalse(D.shortlisted(rep(0, .56, None, .6)))
+
+
 if __name__ == '__main__':
     unittest.main()
