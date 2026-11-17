@@ -89,6 +89,24 @@ The contract candidate tied the source on the early day and worsened on the late
 
 [Compact results, per-asset and split checks](decision-screen-2026-11-17.json)
 
+### signals-v1: a Python fact card, all 72 cached cases
+
+The narrative reports compress or drop per-headline gate labels and price facts. signals-v1 keeps the contract-v1 output schema and appends a card that Python builds from the same point-in-time tool outputs: last-session change, position in the 52-week range, distance below the all-time high, fear and greed for BTC, and every served headline with its gate label, plus label counts. No dates, outcomes or baselines. The shortlist rule was committed before the run: at most two malformed replies, and balanced accuracy above 0.500 overall and in both halves of the origins.
+
+| Arm | Correct / 72 | UP / DOWN / ABSTAIN / error | Correct among calls | Balanced accuracy |
+| --- | --- | --- | --- | --- |
+| Cached v2 reference | 31 | 71 / 0 / 0 / 1 | 31 / 71 | 0.500 |
+| signals-v1 | 28 | 20 / 30 / 22 / 0 | 28 / 50 | 0.381 |
+| Always-UP | 31 | 72 / 0 / 0 / 0 | 31 / 72 | 0.500 |
+| Momentum20 | 38 | 25 / 47 / 0 / 0 | 38 / 72 | 0.507 |
+| News rule | 28 | 29 / 17 / 26 / 0 | 28 / 46 | 0.404 |
+
+**Not shortlisted.** Balanced accuracy was 0.382 and 0.406 in the two halves; abstentions count as misses in that metric. The paired all-case difference versus cached v2 was -0.042 (origin-cluster interval -0.181 to 0.097, nine correlated clusters), which includes zero.
+
+What changed is behavior: the same model on the same upstream reports moved from 71 UP to 20 UP, 30 DOWN and 22 ABSTAIN with zero malformed replies, and agreed with the news rule on 47 of 72. On the 50 cases it called, it was right on 28; always-UP was right on 22 and momentum20 on 26 of those same cases. DOWN calls were right 18 of 30 and UP calls 10 of 20, in a window where most outcomes fell. This is descriptive dev evidence that information lost in the summaries limited the Decision step. It is **not** a predictive improvement.
+
+The screen took 6.0 minutes for 72 cases (median 4.97 seconds per Decision call, excluding model startup), versus about 35 minutes for a full-team replay at the v2 median.
+
 ## Limits
 
 - Known dev outcomes and overlapping origins make these descriptive measurements, not independent performance estimates.
