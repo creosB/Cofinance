@@ -23,7 +23,8 @@ from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Proto
 
 import re
 
-from .claims import direction_conflicts, unsupported_terms
+from .claims import attribution_problems, direction_conflicts, is_refusal, unsupported_terms
+from .urgency import OFFICIAL
 from .risk_cues import cue_block, risk_cues, unsupported_risks
 from .gliner_decide import ExtractorBackend, GlinerQueryRouter, RoutedQuery
 from .signals import Action, Outcome
@@ -145,9 +146,27 @@ def first_paragraph(text: str) -> str:
 ROLE_TAG = re.compile(r"^\s*(?:[^\w\s\[]{1,3}\s*)?\[(?:Data Analyst|News Researcher|Market Team Lead)\]\s*[:,\-]?\s*")
 
 
+# Removed, never added (2026-11-17 news diagnostic): the base narrator appended word counts such as "(28 words)" to 21
+# of 35 summaries, which then failed the number check; reasoning-tag leftovers; em and en dashes, which the UI must not
+# show (Rules page). A dash between digits becomes a hyphen ("2025-2026"), any other becomes a comma.
+WORD_COUNT = re.compile(r"\s*[\(\[]\s*(?:about\s+|approx\.?\s+|~\s*)?\d+\s+words?\s*[\)\]]", re.I)
+THINK = re.compile(r"<think>.*?</think>|</?think>", re.S | re.I)
+_DIGIT_DASH = re.compile(r"(?<=\d)\s*[\u2013\u2014]\s*(?=\d)")
+_DASH = re.compile(r"\s*[\u2013\u2014]+\s*")
+
+
+def plain_text(text: str) -> str:
+    text = THINK.sub("", text or "")
+    text = WORD_COUNT.sub("", text)
+    text = text.replace("\u202f", " ").replace("\u00a0", " ").replace("\u2011", "-")
+    text = _DIGIT_DASH.sub("-", text)
+    text = _DASH.sub(", ", text)
+    return re.sub(r",\s*([,.;:!?])", r"\1", text).replace(" ,", ",")
+
+
 def clean_narration(text: str) -> str:
-    """Role tag echoed from the system prompt, markdown emphasis and repeated blocks are removed."""
-    return first_paragraph(ROLE_TAG.sub("", (text or "").replace("**", "")))
+    """Role tag echoed from the system prompt, markdown emphasis, word counts, dashes and repeated blocks are removed."""
+    return first_paragraph(plain_text(ROLE_TAG.sub("", THINK.sub("", text or "").lstrip().replace("**", ""))))
 
 
 def check_wording(clean: str, evidence: str, faithful: bool, validation: Dict[str, Any]) -> bool:
@@ -339,21 +358,56 @@ class DataAnalystAgent:
         return " ".join(parts) or "Market data unavailable. No values were substituted."
 
 
+# Issuer sources publish the company's own claims; every official feed in core.urgency is one (test_news_grounding).
+ISSUER_SOURCES = frozenset(OFFICIAL) | {"company_release"}
+SOURCE_NAMES = {"apple_newsroom": "Apple Newsroom", "nvidia_newsroom": "NVIDIA Newsroom", "hackernews": "Hacker News",
+                "company_release": "company release"}
+
+
+def source_label(source: str) -> str:
+    """What the narrator and the fallback call a headline's one source."""
+    name = SOURCE_NAMES.get(source, str(source).replace("_", " "))
+    if source in ISSUER_SOURCES:
+        return f"{name}, company announcement"
+    if source == "hackernews":
+        return f"{name}, shared link"
+    return name
+
+
 class NewsResearcherAgent:
     """Specialist Agent 2: Market News & Catalyst Researcher (1B over GLiNER-gated signals)."""
 
     NAME = "News Researcher"
     SYSTEM = (
         "You are 📰 [News Researcher], a financial catalyst specialist. "
-        "In at most two sentences and under sixty words, summarize what the accepted headlines say and their direction. "
-        "Group similar headlines instead of listing each one. Use product and company names exactly as the headlines do, "
-        "and do not add product categories or claims about momentum, volume, or price. "
-        "Company announcements are issuer claims. Never invent facts, dates, or numbers."
+        "In at most two sentences and under sixty words, say what the headlines report. "
+        "Group similar headlines instead of listing each one. Use product and company names exactly as the headlines do. "
+        "A company announcement is the company's own claim; say the company announced it. Allegations stay allegations. "
+        "Each headline has exactly one source: never mention outlets, media, analysts, consensus, sentiment, or tone. "
+        "Do not add causes, implications, product categories, or claims about momentum, volume, or price. "
+        "Never invent facts, dates, or numbers."
     )
+    # One source per headline, named for what it is. No gate tier or direction labels: the narrator read them as
+    # reporting ("digest and bearish outlets", "the consensus is bullish", 2026-11-17). Python keeps them in raw facts.
+    HEADER = "Headlines from the local news store, each with its one source:\n"
+    RETRY_REASONS = {"unsupported_terms", "unsupported_numeric_tokens", "unsupported_attribution"}
 
-    def __init__(self, llm: SmallLLMBackend, store: NewsStorePort) -> None:
+    def __init__(self, llm: SmallLLMBackend, store: NewsStorePort, retry: bool = True) -> None:
         self.llm = llm
         self.store = store
+        self.retry = retry
+
+    @staticmethod
+    def feedback(validation: Mapping[str, Any]) -> str:
+        reason = validation.get("validation_reason")
+        if reason == "unsupported_numeric_tokens":
+            return "\nStrict: copy every number exactly as a headline writes it, or leave it out."
+        key = "unsupported_terms" if reason == "unsupported_terms" else "unsupported_attribution"
+        items = "; ".join(str(x)[:60] for x in (validation.get(key) or [])[:6])
+        if reason == "unsupported_terms":
+            return f"\nStrict: these words are not in the headlines, so do not use them: {items}. Use the headlines' own words."
+        return (f"\nStrict: do not use these words: {items}. Each headline has one source; "
+                "name only the company or the source listed with it.")
 
     def run(self, tickers: Sequence[str], bus: EventBus, session_id: str) -> SpecialistReport:
         facts: Dict[str, Any] = {}
@@ -379,19 +433,55 @@ class NewsResearcherAgent:
                 allowed.extend(numbers_in(row["title"]))
                 allowed.append(float(row["material_p"]))
 
-        # Headlines only, with tier and direction words. Scores and dates stay in the trace and UI.
-        lines = [f"- {tkr}: {row['title']} (source: {row['source'].replace('_', ' ')}; {row['tier']}; {row['direction']})"
-                 for tkr, rows in facts.items() for row in rows]
-        prompt = "Accepted headlines from the local news store:\n" + "\n".join(lines)
-        try:
-            raw = self.llm.complete(self.SYSTEM, prompt, max_tokens=320) if any(facts.values()) else ""
-            clean = clean_narration(final_answer(raw) or "")
-        except Exception:
-            clean = ""
-        nums = numbers_in(clean)
-        faithful = bool(clean) and bool(any(facts.values())) and ((not nums) or score_numbers_faithful(clean, allowed))
-        validation = number_review(clean, allowed, faithful)
-        faithful = check_wording(clean, prompt, faithful, validation)
+        # Headlines and their one source only. Tier, direction, scores and dates stay in the trace and UI.
+        rows_all = [row for rows in facts.values() for row in rows]
+        lines = [f"- {tkr}, {source_label(row['source'])}: {row['title']}" for tkr, rows in facts.items() for row in rows]
+        prompt = self.HEADER + "\n".join(lines)
+        titles = [row["title"] for row in rows_all]
+        independent = sum(row["source"] not in ISSUER_SOURCES for row in rows_all)
+
+        def narrate(user_prompt: str) -> Optional[str]:
+            try:
+                return clean_narration(final_answer(self.llm.complete(self.SYSTEM, user_prompt, max_tokens=320)) or "")
+            except Exception:
+                return None
+
+        def judge(text: Optional[str]) -> Tuple[bool, Dict[str, Any]]:
+            """Each failure keeps its own reason: model_error, empty_candidate, refusal, unsupported_numeric_tokens,
+            unsupported_terms, unsupported_attribution. Wording evidence is the headline prompt, never the feedback."""
+            text = text or ""
+            ok = bool(text) and ((not numbers_in(text)) or score_numbers_faithful(text, allowed))
+            val = number_review(text, allowed, ok)
+            val["unsupported_attribution"] = []
+            if is_refusal(text):
+                val.update(unsupported_terms=[], validation_reason="refusal")
+                return False, val
+            ok = check_wording(text, prompt, ok, val)
+            problems = attribution_problems(text, titles, independent) if ok else []
+            if problems:
+                val.update(unsupported_attribution=problems, validation_reason="unsupported_attribution")
+            return ok and not problems, val
+
+        if not rows_all:
+            clean, faithful = "", False
+            validation = {**number_review("", allowed, False), "unsupported_terms": [], "unsupported_attribution": [],
+                          "validation_reason": "no_news"}
+        else:
+            draft = narrate(prompt)
+            faithful, validation = judge(draft)
+            if draft is None:
+                validation["validation_reason"] = "model_error"
+            clean = draft or ""
+            # One feedback retry naming what was rejected, like the Team Lead's. Same guards; then the fallback.
+            reason = validation.get("validation_reason")
+            if not faithful and self.retry and clean and reason in self.RETRY_REASONS:
+                second = narrate(prompt + self.feedback(validation))
+                second_ok, second_val = judge(second)
+                summary = {"reason": reason, "retry_passed_guards": second_ok, "used": "retry" if second_ok else "fallback",
+                           **({} if second_ok else {"retry_reason": second_val.get("validation_reason")})}
+                if second_ok:
+                    clean, faithful, validation = second or "", True, second_val
+                validation["guard_retry"] = summary
         if not faithful:
             clean = self._deterministic_fallback(facts)
 
@@ -420,7 +510,7 @@ class NewsResearcherAgent:
         items = []
         for tkr, rows in facts.items():
             for r in rows:
-                items.append(f"{tkr}: {r['title']} ({r['source'].replace('_', ' ')}, {r['tier']}, {r['direction']})")
+                items.append(f"{tkr}: {r['title']} ({source_label(r['source'])})")
         return ("Accepted news: " + "; ".join(items) + ".") if items else (
             "No accepted news is available in the local store. This does not establish that no catalysts exist.")
 

@@ -65,7 +65,7 @@ class Stub1BLLM:
                 return "<think>crypto mode</think>📊 [Data Analyst] BTC trades at 62500.0 with Fear & Greed at 81.0 and drawdown at 12.0%."
             return "📊 [Data Analyst] Shares trade at 138.5 with a P/E of 34.2."
         if "📰 [News Researcher]" in system:
-            return "📰 [News Researcher] Guidance was raised by 12% in a bullish catalyst."
+            return "📰 [News Researcher] Guidance was raised by 12%, the headline says."  # no tone words (test_news_grounding)
         if self.hallucinate_lead:
             return "🧠 [Market Team Lead] Shares jumped 999% to 5000.0!"
         return "🧠 [Market Team Lead] At 138.5 (P/E 34.2), the 12% guidance raise supports a constructive view."
