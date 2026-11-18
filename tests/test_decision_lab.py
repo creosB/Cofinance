@@ -445,6 +445,69 @@ class TestWindow(unittest.TestCase):
             report = D.score_window(self.root, self.out)  # a checkout that only changed line endings is the same copy
         self.assertIn('headline-v1-mean', report['addenda'])
 
+    def arms(self, tag, base_auc, arm_auc, interval, prices=('p1', 'p1')):
+        base, arm = self.root / f'base_{tag}', self.root / f'arm_{tag}'
+        for out in (base, arm):
+            D.seal_window(self.root, out, '2026-10-29', '2026-10-29', 'headline-v1', self.judge, {'test': True})
+        dump(arm / 'arm.json', {'rule': 'published rule', 'base_arm_seal_sha256': digest((base / 'seal.json').read_bytes()),
+                                'atomic_seal_sha256': digest((arm / 'seal.json').read_bytes())})
+        for out, auc, iv, p in ((base, base_auc, [.4, .7], prices[0]), (arm, arm_auc, interval, prices[1])):
+            dump(out / 'report.json', {'prices_sha256': p, 'confirmed': True,
+                                       'ranking': {'auc': auc, 'origin_cluster_bootstrap_95': iv}})
+        return base, arm
+
+    def test_switch_rule_is_applied_in_python_once_both_arms_are_scored(self):
+        # arm.json (11/17): switch only if the arm's AUC > 0.5 with its interval excluding 0.5 AND AUC >= the base arm
+        cases = (('up', .60, .65, [.55, .74], True), ('below', .60, .59, [.55, .70], False),
+                 ('touch', .40, .62, [.50, .75], False), ('tie', .62, .62, [.51, .70], True),
+                 ('nobase', None, .62, [.51, .70], False), ('noiv', .40, .62, None, False))
+        for tag, b, a, iv, want in cases:
+            base, arm = self.arms(tag, b, a, iv)
+            res = D.compare_arms(base, arm)
+            self.assertEqual(res['switch'], want, tag)
+            self.assertEqual(json.loads((arm / 'switch.json').read_text())['switch'], want, tag)
+            self.assertEqual(res['rule'], 'published rule')
+        with self.assertRaises(FileExistsError):  # decided once
+            D.compare_arms(base, arm)
+
+    def test_switch_rule_refuses_unscored_mixed_or_rebound_arms(self):
+        base, arm = self.arms('unscored', .6, .7, [.6, .8])
+        (arm / 'report.json').unlink()
+        with self.assertRaisesRegex(ValueError, 'not scored yet'):
+            D.compare_arms(base, arm)
+        for tag, prices in (('mixed', ('p1', 'p2')), ('noreceipt', (None, None))):
+            base, arm = self.arms(tag, .6, .7, [.6, .8], prices)
+            with self.assertRaisesRegex(ValueError, 'same price download'):
+                D.compare_arms(base, arm)
+        base, arm = self.arms('rebound', .6, .7, [.6, .8])
+        doc = json.loads((arm / 'arm.json').read_text())
+        dump(arm / 'arm.json', {**doc, 'base_arm_seal_sha256': '0' * 64})
+        with self.assertRaisesRegex(ValueError, 'different seals'):
+            D.compare_arms(base, arm)
+        base, arm = self.arms('tampered', .6, .7, [.6, .8])
+        calls = arm / 'calls.jsonl'
+        calls.write_text(calls.read_text().replace('"label": "DOWN"', '"label": "UP"', 1))
+        with self.assertRaisesRegex(ValueError, 'changed after sealing'):
+            D.compare_arms(base, arm)
+        self.assertFalse(any((self.root / f'arm_{t}' / 'switch.json').exists()
+                             for t in ('unscored', 'mixed', 'noreceipt', 'rebound', 'tampered')))
+
+    def test_score_window_records_its_price_download(self):
+        self.seal()
+        (self.root / 'collection.json').write_text('{"fetch_to": "x", "sources": {}}', encoding='utf-8')
+        report = D.score_window(self.root, self.out)
+        self.assertEqual(report['prices_sha256'], digest((self.root / 'collection.json').read_bytes()))
+
+    def test_compare_arms_cli(self):
+        with patch('sys.argv', ['d', 'compare-arms', '--base', 'b', '--out', 'a']), \
+                patch.object(D, 'compare_arms', return_value={}) as got, patch('builtins.print'):
+            D.main()
+        got.assert_called_once_with(Path('b'), Path('a'))
+        with patch('sys.argv', ['d', 'compare-arms', '--out', 'a']), patch.object(D, 'compare_arms') as got, \
+                patch('sys.stderr'), self.assertRaises(SystemExit):
+            D.main()
+        got.assert_not_called()
+
     def test_aggregations(self):
         self.assertEqual((D.aggregate([.5, -.1, .2], 'mean'), D.aggregate([], 'mean'), D.aggregate([.5, -.1], 'sum')), (.2, 0.0, .4))
         with self.assertRaises(ValueError):

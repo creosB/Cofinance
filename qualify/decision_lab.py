@@ -693,6 +693,8 @@ def score_window(prices_root, out):
     report = {'warning': 'Experimental one-look result on an unseen window. Not a trading signal or financial advice.',
               'cases': seal['cases'], 'scored': len(rows), 'missing_outcomes': missing, 'up_rate':
               round(sum(r['return'] > 0 for r in rows) / len(rows), 4) if rows else None}
+    receipt = Path(prices_root) / 'collection.json'  # the download's receipt: arms compared must share it
+    report['prices_sha256'] = digest(receipt.read_bytes()) if receipt.exists() else None
     report.update(ranking(rows, series, origins[:max(1, len(origins) // 2)]))
     judged = lines(out / 'judgments.jsonl')
     report['failures'] = sum(not j['ok'] for j in judged)
@@ -710,9 +712,37 @@ def score_window(prices_root, out):
     return report
 
 
+def compare_arms(base_out, arm_out):
+    """Apply a second arm's switch rule (its arm.json, published with the seals) once both arms had their one look.
+    Python makes the call from the two reports; the published rule text is carried along for the record."""
+    arm = json.loads((arm_out / 'arm.json').read_text(encoding='utf-8'))
+    if (digest((base_out / 'seal.json').read_bytes()) != arm['base_arm_seal_sha256']
+            or digest((arm_out / 'seal.json').read_bytes()) != arm['atomic_seal_sha256']):
+        raise ValueError('arm.json is bound to different seals')
+    reports = {}
+    for name, out in (('base', base_out), ('arm', arm_out)):
+        sealed_window(out)
+        if not (out / 'report.json').exists():
+            raise ValueError(f'The {name} arm is not scored yet; score both arms first')
+        reports[name] = json.loads((out / 'report.json').read_text(encoding='utf-8'))
+    prices = {r.get('prices_sha256') for r in reports.values()}
+    if None in prices or len(prices) != 1:
+        raise ValueError('The arms were not scored on one and the same price download')
+    b, a = reports['base']['ranking']['auc'], reports['arm']['ranking']['auc']
+    interval = reports['arm']['ranking'].get('origin_cluster_bootstrap_95')
+    confirmed = bool(a is not None and a > .5 and interval and interval[0] > .5)  # recomputed, not read from the report
+    result = {'format': 'cofinance-decision-window-switch/1', 'rule': arm['rule'], 'base_auc': b, 'arm_auc': a,
+              'arm_interval': interval, 'arm_confirmed': confirmed,
+              'switch': bool(confirmed and b is not None and a >= b), 'prices_sha256': prices.pop()}
+    with (arm_out / 'switch.json').open('x', encoding='utf-8') as fh:  # decided once
+        fh.write(json.dumps(result, indent=2, allow_nan=False) + '\n')
+    return result
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('action', choices=['run', 'score', 'seal-window', 'score-window', 'register-addendum'])
+    ap.add_argument('action', choices=['run', 'score', 'seal-window', 'score-window', 'register-addendum', 'compare-arms'])
+    ap.add_argument('--base', type=Path, help='compare-arms: the base arm window folder (--out is the second arm)')
     ap.add_argument('--addendum', choices=sorted(ADDENDA))
     ap.add_argument('--first')
     ap.add_argument('--last')
@@ -726,6 +756,11 @@ def main():
     a = ap.parse_args()
     if a.action == 'score-window' and a.prices_root is None:
         ap.error('score-window needs --prices-root (a fresh download, collected after the window matured)')
+    if a.action == 'compare-arms':
+        if a.base is None:
+            ap.error('compare-arms needs --base (the base arm window); --out is the second arm')
+        print(json.dumps(compare_arms(a.base, a.out), indent=2))
+        return
     if a.action != 'score-window' and a.root is None:
         ap.error(f'{a.action} needs --root')
     if a.action == 'register-addendum':
