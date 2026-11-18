@@ -65,8 +65,12 @@ EXTRA_NARRATORS = {
                 "license_sha256": "4d28ca14dedc0b3d0fcc2b3339f0e79931faa33874f3d24f522183a8fc70068c",
                 "license_file": "LICENSE-AtomicChat-LFM.txt",
                 "source": "https://huggingface.co/AtomicChat/LFM3-1.7B-Uncensored-GGUF",
-                "note": "Refusal-direction edit of LFM3 1.7B. Shorter replies; headline judgments ranked dev outcomes better than the base. Not confirmed on unseen data."},
+                "note": "Default narrator. Refusal-direction edit of LFM3 1.7B. Shorter replies; headline judgments ranked dev outcomes better than the base. Not confirmed on unseen data."},
 }
+# Baris, 2026-11-18: AtomicChat is the default. A fresh install downloads it; the base is an optional download from
+# Models. Only the fallback changes: a remembered choice (base included) is restored as before, and the base keeps
+# its fingerprint, so existing base qualifications stay valid.
+DEFAULT_NARRATOR = ATOMIC_ID
 
 
 def narrators():
@@ -74,8 +78,10 @@ def narrators():
     base = {"name": "LFM3 1.7B", "publisher": "Liquid AI", "quantization": "Q4_K_M", "repo": "LiquidAI/LFM3-1.7B-GGUF",
             "revision": REVISION, "filename": FILENAME, "sha": MODEL_SHA, "size": MODEL_SIZE, "url": MODEL_URL,
             "license_url": LICENSE_URL, "license_blob": LICENSE_BLOB, "license_file": "LICENSE-LFM.txt",
-            "source": "https://huggingface.co/LiquidAI/LFM3-1.7B-GGUF", "note": "Original LFM3 1.7B release."}
-    return {MODEL_ID: base, **EXTRA_NARRATORS}
+            "source": "https://huggingface.co/LiquidAI/LFM3-1.7B-GGUF",
+            "note": "Optional. The original LFM3 1.7B release; download it here if you prefer it to the default."}
+    catalog = {MODEL_ID: base, **EXTRA_NARRATORS}
+    return {DEFAULT_NARRATOR: catalog[DEFAULT_NARRATOR], **catalog}  # the default is listed first
 
 
 def narrator_spec(model):
@@ -176,7 +182,8 @@ class LocalModels:
         self.key = ""
         self.ready = False
         self.busy = False
-        self.state = {"phase": "not_downloaded", "stage": "", "downloaded_bytes": 0, "total_bytes": MODEL_SIZE + RUNTIMES_SIZE,
+        self.state = {"phase": "not_downloaded", "stage": "", "downloaded_bytes": 0,
+                      "total_bytes": narrator_spec(DEFAULT_NARRATOR)["size"] + RUNTIMES_SIZE,
                       "speed_bps": 0, "error": "", "qualification": None, "selected": "facts", "router": "not_loaded",
                       "preferred": "facts", "selection_note": ""}
         path = self.root / "state.json"
@@ -227,7 +234,7 @@ class LocalModels:
         for key in ("selected", "preferred"):
             if self.state.get(key) in catalog:
                 return self.state[key]
-        return MODEL_ID
+        return DEFAULT_NARRATOR
 
     def path_of(self, model=None):
         return self.root / narrator_spec(model or self.narrator_id)["filename"]
@@ -281,7 +288,8 @@ class LocalModels:
                 listed.append({"id": model, "name": s["name"], "publisher": s["publisher"], "quantization": s["quantization"],
                                "size_bytes": s["size"], "revision": s["revision"], "source": s["source"], "note": s["note"],
                                "downloaded": path.is_file() and path.stat().st_size == s["size"],
-                               "qualified": self.qualified(model=model), "loaded": self.is_loaded(model), "active": model == active})
+                               "qualified": self.qualified(model=model), "loaded": self.is_loaded(model), "active": model == active,
+                               "default": model == DEFAULT_NARRATOR})
             result.update(id=active, name=spec["name"], quantization=spec["quantization"], size_bytes=spec["size"],
                           revision=spec["revision"], runtime="llama.cpp " + RUNTIME_TAG + " / " + BACKENDS[self.active_backend]["label"],
                           backend=self.active_backend, loaded=self.is_loaded(), loaded_model=self.loaded_model if self.is_loaded() else None,

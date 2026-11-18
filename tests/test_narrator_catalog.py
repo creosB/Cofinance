@@ -42,7 +42,27 @@ class CatalogTests(unittest.TestCase):
             for name in ("qualify/cases.jsonl", "qualify/gates_narrator.json", "qualify/scorers.py"):
                 h.update((REPO / name).read_bytes())
             self.assertEqual(self.models.fingerprint(backend, MODEL_ID), h.hexdigest())
-            self.assertEqual(self.models.fingerprint(backend), h.hexdigest())
+            # 11/18: with no choice the fingerprint is the default narrator's (AtomicChat), not the base's
+            self.assertEqual(self.models.fingerprint(backend), self.models.fingerprint(backend, ATOMIC_ID))
+            self.assertNotEqual(self.models.fingerprint(backend), h.hexdigest())
+
+    def test_fresh_install_defaults_to_atomic_and_lists_the_base_as_optional(self):
+        self.assertEqual(L.DEFAULT_NARRATOR, ATOMIC_ID)
+        self.assertEqual(self.models.narrator_id, ATOMIC_ID)
+        self.assertEqual(self.models.model_path.name, L.ATOMIC_FILE)  # what the main Download button fetches
+        snap = self.models.snapshot()
+        self.assertEqual((snap["id"], snap["total_bytes"]), (ATOMIC_ID, L.EXTRA_NARRATORS[ATOMIC_ID]["size"] + L.RUNTIMES_SIZE))
+        self.assertEqual(snap["selected"], "facts")  # still nothing loads or narrates until qualified and chosen
+        listed = snap["narrators"]
+        self.assertEqual([(n["id"], n["default"]) for n in listed], [(ATOMIC_ID, True), (MODEL_ID, False)])
+        self.assertTrue(listed[1]["note"].startswith("Optional."))
+        self.assertFalse(listed[1]["downloaded"])
+
+    def test_a_remembered_base_choice_wins_over_the_default(self):
+        self.models.update(preferred=MODEL_ID)
+        again = LocalModels(self.root, REPO)
+        self.assertEqual(again.narrator_id, MODEL_ID)
+        self.assertIn("model file is missing", again.state["selection_note"])  # says why, never switches silently
 
     def test_one_narrators_report_never_qualifies_another(self):
         legacy = {"passed": True, "fingerprint": self.models.fingerprint("vulkan", MODEL_ID)}  # old reports name no model

@@ -24,7 +24,7 @@ class TestNarratorPersistence(unittest.TestCase):
     def qualified_manager(self):
         (self.root / local_models.FILENAME).write_bytes(b"x" * SIZE)
         models = LocalModels(self.root, REPO)
-        models.update(qualification={"passed": True, "fingerprint": models.fingerprint()})
+        models.update(qualification={"passed": True, "fingerprint": models.fingerprint(model=MODEL_ID)})
         return models
 
     def restart(self):

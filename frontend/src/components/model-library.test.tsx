@@ -35,4 +35,12 @@ describe('narrator choice',()=>{
   expect(missing).toContain('disabled')
   expect(renderToStaticMarkup(<NarratorRows narrators={[{...atomic,qualified:true}]} locked={false} act={act}/>)).not.toContain('<button')
  })
+ it('marks AtomicChat as the default and offers the base as an optional download',()=>{
+  const act=vi.fn()
+  const html=renderToStaticMarkup(<NarratorRows narrators={[{...atomic,default:true,active:true,qualified:true},{...base,active:false,loaded:false,downloaded:false,default:false}]} locked={false} act={act}/>)
+  expect(html).toMatch(/1\.05 GiB \/ default \/ active narrator/)
+  expect(html).toMatch(/1\.02 GiB \/ optional</)
+  expect(html).toContain('Download LFM3 1.7B<')
+  expect(renderToStaticMarkup(<NarratorRows narrators={[base]} locked={false} act={act}/>)).not.toMatch(/default|optional/)  // older servers
+ })
 })

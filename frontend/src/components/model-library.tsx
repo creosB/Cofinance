@@ -24,7 +24,7 @@ const status=(n:NarratorState)=>n.loaded?'Loaded':!n.downloaded?'Not downloaded'
 // One row per pinned narrator. A narrator that is not the active one can be downloaded or qualified here, so it can be
 // chosen afterwards; load and unload stay with the active narrator below.
 export function NarratorRows({narrators,locked,act}:{narrators:NarratorState[];locked:boolean;act:(action:string,model:string)=>void}){
- return <>{narrators.map(n=><div key={n.id} className="model-library-row"><Layers size={19}/><div className="model-row-copy"><h3>{n.name} <span className="quiet">{n.publisher} / {n.quantization}</span></h3><p>{n.note||'Data Analyst, News Researcher, and Market Team Lead narrator'}</p><span className="quiet">{bytes(n.size_bytes||1)}{n.active?' / active narrator':''}</span>
+ return <>{narrators.map(n=><div key={n.id} className="model-library-row"><Layers size={19}/><div className="model-row-copy"><h3>{n.name} <span className="quiet">{n.publisher} / {n.quantization}</span></h3><p>{n.note||'Data Analyst, News Researcher, and Market Team Lead narrator'}</p><span className="quiet">{bytes(n.size_bytes||1)}{n.default===undefined?'':n.default?' / default':' / optional'}{n.active?' / active narrator':''}</span>
   {!n.active&&(!n.downloaded||!n.qualified)&&<div className="model-actions">{!n.downloaded?<Button variant="outline" disabled={locked} onClick={()=>act('download',n.id)}><Download size={15}/>Download {n.name}</Button>:<Button variant="outline" disabled={locked} onClick={()=>act('qualify',n.id)}><FlaskConical size={15}/>Verify & test {n.name}</Button>}</div>}</div>
   <Badge variant="outline" className={n.loaded?'state-complete':''}>{status(n)}</Badge></div>)}</>
 }
@@ -43,7 +43,7 @@ export function ModelLibrary({chat}:{chat:ChatController}){
    {(m.phase==='downloading'||m.phase==='paused')&&<progress aria-label="Model and runtime download" value={m.downloaded_bytes} max={m.total_bytes}><span>{percent.toFixed(1)}%</span></progress>}
    {m.error&&<p className="error-text" role="alert">{m.error}</p>}
    <div className="model-actions">
-    {['not_downloaded','paused','error'].includes(m.phase)&&<Button variant="outline" disabled={chat.busy||!!chat.workspace?.active_job} onClick={()=>action('download')}><Download size={15}/>{m.phase==='paused'?'Resume download':m.phase==='error'?'Retry download':'Download model'}</Button>}
+    {['not_downloaded','paused','error'].includes(m.phase)&&<Button variant="outline" disabled={chat.busy||!!chat.workspace?.active_job} onClick={()=>action('download')}><Download size={15}/>{m.phase==='paused'?'Resume download':m.phase==='error'?'Retry download':'Download '+(m.name||'model')}</Button>}
     {working(m)?<Button variant="outline" disabled={chat.busy||m.phase!=='downloading'} onClick={()=>action('pause')}><Pause size={15}/>Pause download</Button>:<>
      {!['not_downloaded','paused'].includes(m.phase)&&<Button variant="outline" disabled={locked} onClick={()=>action('qualify')}><FlaskConical size={15}/>Verify & test</Button>}
      {m.can_select&&!m.loaded&&<Button variant="outline" disabled={locked} onClick={()=>action('load')}><Play size={15}/>Load narrator</Button>}

@@ -24,7 +24,7 @@ The same run's execution map. Unused narrator steps remain explicitly unused, no
 
 1. Double-click `run-dashboard.cmd` in the repository root.
 2. Open <http://127.0.0.1:8878> in a regular browser. Keep the terminal open.
-3. In **Models**, verify/qualify a narrator and select it: **LFM3 1.7B** or **LFM3 1.7B Uncensored** (AtomicChat). Tool-only reports remain available.
+3. In **Models**, download, verify/qualify and select the default narrator, **LFM3 1.7B Uncensored** (AtomicChat). The original **LFM3 1.7B** is an optional download in the same view. Tool-only reports remain available.
 4. Collect news explicitly, then chat about an asset. Open the answer's run map to inspect sources, routing, model calls, guard checks and fallbacks.
 
 The launcher builds the React frontend and starts the Python service. Node.js is needed for the build; Python and the local inference packages must already be installed. Do not start a second server if the address is already in use.
@@ -65,8 +65,8 @@ Detailed memory semantics and failure handling: [remember/forget design](docs/de
 | Component | Role | Runtime policy |
 | --- | --- | --- |
 | `fastino/GLiNER2.5-Decide` (486,444,053 parameters) | Route questions and classify headlines | Pinned local cache; no generated answers |
-| **LFM3 1.7B, Q4_K_M** | Narrate specialist reports and team-lead answers; judge headlines | Default narrator; pinned llama.cpp Vulkan GPU runtime with qualified CPU fallback |
-| **LFM3 1.7B Uncensored, AD-Q4_K_M** (AtomicChat) | Same jobs, selectable instead of the base | Pinned by SHA-256 and qualified on its own; [comparison](docs/benchmarks/NARRATOR-CANDIDATE.md) |
+| **LFM3 1.7B Uncensored, AD-Q4_K_M** (AtomicChat) | Narrate the Data Analyst report and team-lead answers; judge headlines | Default narrator; pinned by SHA-256 and qualified on its own; llama.cpp Vulkan GPU runtime with qualified CPU fallback; [comparison](docs/benchmarks/NARRATOR-CANDIDATE.md) |
+| **LFM3 1.7B, Q4_K_M** (Liquid AI) | Same jobs, selectable instead of the default | Optional download; pinned and qualified on its own |
 | Hy-Memory lite + Qwen3-Embedding-0.6B | Semantic conversation recall | Optional local worker; keyword fallback |
 
 The agent roles use separate calls to the selected narrator, not separate downloaded models. Headline judgments are stored per narrator, so switching never sums two models' judgments together. Spidermonkey/Jev inspired the gating pattern; no hosted Spidermonkey service runs.
