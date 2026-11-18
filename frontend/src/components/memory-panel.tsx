@@ -10,7 +10,7 @@ import { canForget, itemStatus, NOTE_MAX, noteProblem } from '@/lib/memory'
 import type { ChatController } from '@/lib/use-chat'
 import '../memory.css'
 
-export function MemoryPanel({chat}:{chat:ChatController}){
+export function MemoryPanel({chat,labeled=false}:{chat:ChatController;labeled?:boolean}){
  const [open,setOpen]=useState(false),[note,setNote]=useState(''),[message,setMessage]=useState(''),[bad,setBad]=useState(false),[confirm,setConfirm]=useState(false)
  const memory=chat.memory&&chat.memory.session_id===chat.conversation?.id?chat.memory:null
  const items=memory?.items||[],live=items.filter(i=>i.state!=='forgotten').length
@@ -32,7 +32,7 @@ export function MemoryPanel({chat}:{chat:ChatController}){
   catch(e){report(e instanceof Error?e.message:'Could not forget this conversation.',true)}
  }
  return <Dialog open={open} onOpenChange={v=>{setOpen(v);if(!v){setConfirm(false);setMessage('')}}}>
-  <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" aria-label="Conversation memory" disabled={!chat.conversation} onClick={()=>setOpen(true)}><Brain size={16}/></Button></TooltipTrigger><TooltipContent>Conversation memory</TooltipContent></Tooltip>
+  <Tooltip><TooltipTrigger asChild><Button variant="ghost" size={labeled?'default':'icon'} aria-label="Conversation memory" disabled={!chat.conversation} onClick={()=>setOpen(true)}><Brain size={16}/>{labeled&&'Conversation memory'}</Button></TooltipTrigger><TooltipContent>Conversation memory</TooltipContent></Tooltip>
   <DialogContent className="memory-dialog">
    <DialogHeader><DialogTitle>Conversation memory</DialogTitle><DialogDescription>What this conversation can recall. Forgetting removes it from memory only; the answer stays in the chat history.</DialogDescription></DialogHeader>
    {!memory?<p className="memory-empty">Memory is not available right now. Chat still works.</p>:<>

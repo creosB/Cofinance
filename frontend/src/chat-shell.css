@@ -1,0 +1,71 @@
+/* Preserve-mode chat cleanup. DeepSeek-inspired hierarchy, existing Cofinance tokens and controls.
+   DESIGN_VARIANCE=3; MOTION_INTENSITY=1; VISUAL_DENSITY=4. No added animation or dependencies. */
+.workspace-layout{grid-template-columns:248px minmax(0,1fr)}
+.workspace-layout.sidebar-collapsed{grid-template-columns:minmax(0,1fr)}
+.workspace-layout.sidebar-collapsed>.workspace-sidebar{display:none}
+.workspace-sidebar,.navigation-drawer{min-width:0;background:var(--sidebar);padding:12px;gap:8px;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
+.sidebar-brand{display:flex;align-items:center;gap:10px;min-height:44px;flex-shrink:0}
+.sidebar-brand strong{font-size:16px;font-weight:550;letter-spacing:-.02em}
+.sidebar-brand>button{margin-left:auto;width:44px;height:44px;color:var(--muted-foreground)}
+.primary-new-chat{width:100%;min-height:46px;flex-shrink:0;justify-content:flex-start;gap:10px;background:var(--secondary);border-color:var(--border);color:var(--foreground);box-shadow:none;font-weight:500}
+.workspace-sidebar .side-section,.navigation-drawer .side-section{margin-top:8px;flex:1;min-height:0}
+.workspace-sidebar .side-heading,.navigation-drawer .side-heading{height:36px;padding:0 8px;font-size:14px}
+.history-search{position:relative;margin-bottom:4px;flex-shrink:0}
+.history-search>svg{position:absolute;top:14px;left:10px;pointer-events:none;color:var(--muted-foreground)}
+.history-search input{height:44px;padding-left:34px;background:transparent;border-color:var(--border);box-shadow:none;font-size:14px}
+.workspace-sidebar .side-list,.navigation-drawer .side-list{flex:1;min-height:44px}
+.workspace-sidebar .side-row,.navigation-drawer .side-row{height:44px!important;min-height:44px;padding:0 10px!important}
+.workspace-sidebar .conversation-row,.navigation-drawer .conversation-row{height:44px;flex-shrink:0}
+.workspace-sidebar .row-delete,.navigation-drawer .row-delete{width:44px!important;height:44px!important;margin-right:0}
+.workspace-sidebar .conversation-row.confirming,.navigation-drawer .conversation-row.confirming{height:auto;min-height:48px;flex-wrap:wrap;padding:4px 8px}
+.workspace-sidebar .conversation-row.confirming button,.navigation-drawer .conversation-row.confirming button{min-height:44px;height:44px}
+.row-confirm-text{flex-basis:100%}
+.history-options{margin-top:8px;flex-shrink:0}
+.history-options>summary,.workspace-tools>summary{display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 10px;cursor:pointer;list-style:none;color:var(--muted-foreground);border-radius:var(--radius)}
+.history-options>summary::-webkit-details-marker,.workspace-tools>summary::-webkit-details-marker,.chat-options>summary::-webkit-details-marker{display:none}
+.history-options>summary>svg,.disclosure-chevron{margin-left:auto}
+.history-options>button{width:100%;justify-content:flex-start;min-height:44px;font-weight:400;color:var(--destructive)}
+.workspace-tools{flex-shrink:0;border-top:1px solid var(--card);padding-top:4px}
+.workspace-tools[open] .disclosure-chevron{transform:rotate(180deg)}
+.workspace-tools nav{max-height:38dvh;overflow-y:auto;padding-top:4px}
+.workspace-tools .nav-item,.back-chat{height:44px!important;min-height:44px;gap:10px!important}
+.workspace-tools .find-button{margin:0;color:var(--muted-foreground)}
+.workspace-tools .find-button kbd{margin-left:auto;font-size:12px}
+.workspace-sidebar .sidebar-bottom,.navigation-drawer .sidebar-bottom{margin-top:0;padding-top:0;border:0;flex-shrink:0}
+.workspace-sidebar .sidebar-bottom button,.navigation-drawer .sidebar-bottom button{min-height:44px}
+.workspace-layout .topbar{height:60px;min-height:60px;display:flex;flex-wrap:nowrap;padding:8px 24px;gap:12px}
+.header-leading{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.workspace-layout .breadcrumb{min-width:0}
+.workspace-layout .chat-title{font-size:15px;font-weight:500;flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.workspace-layout .topbar-actions{flex-shrink:0;margin-left:auto;gap:4px}
+.open-mobile-sidebar{display:none}
+.header-leading>button,.workspace-layout .topbar-actions>button{height:44px;width:44px;flex-shrink:0}
+.chat-options{position:relative}
+.chat-options>summary{display:flex;align-items:center;justify-content:center;width:44px;height:44px;list-style:none;cursor:pointer;border-radius:var(--radius);color:var(--muted-foreground)}
+.chat-options>summary:hover,.chat-options[open]>summary,.workspace-tools>summary:hover,.history-options>summary:hover{background:var(--secondary);color:var(--foreground)}
+.chat-options-panel{position:absolute;right:0;top:calc(100% + 4px);z-index:30;min-width:240px;max-width:calc(100vw - 32px);background:var(--popover);padding:6px;border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 24px oklch(0.1 0.004 90 / .3)}
+.chat-options-panel>button{width:100%;min-height:44px;justify-content:flex-start;font-weight:400;gap:10px;color:var(--foreground)}
+.workspace-layout .composer-bar{flex-wrap:wrap;gap:8px}
+.workspace-layout .model-picker-compact{min-width:0;max-width:calc(100% - 60px)}
+.workspace-layout .model-picker-compact button{max-width:100%;min-height:44px;height:44px;min-width:0}
+.workspace-layout .model-picker-compact [data-slot=select-value]{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.workspace-layout .send-button{width:44px!important;height:44px!important;flex-shrink:0}
+.workspace-layout .chat-welcome h2{font-size:26px;margin-bottom:24px}
+.workspace-layout .starter-questions button{min-height:44px;height:auto;white-space:normal;text-align:left}
+.navigation-drawer[data-slot=dialog-content]{position:fixed;left:0;top:0;right:auto;bottom:0;translate:none!important;transform:none!important;width:min(88vw,304px);max-width:304px;max-height:100dvh;height:100dvh;display:flex;gap:8px;border:0;border-right:1px solid var(--border);border-radius:0!important;margin:0;box-shadow:none}
+@media(max-width:700px){
+ .workspace-layout{display:block}
+ .workspace-layout>.workspace-sidebar{display:none}
+ .workspace-layout .open-mobile-sidebar{display:inline-flex}
+ .workspace-layout .open-desktop-sidebar{display:none}
+ .workspace-layout .topbar{height:60px;min-height:60px;display:flex;grid-template-columns:none;padding:8px 12px;flex-wrap:nowrap;gap:8px}
+ .workspace-layout .topbar .breadcrumb{display:flex;min-width:0}
+ .workspace-layout .topbar-actions{margin-left:auto;justify-content:flex-end}
+ .workspace-layout .chat-column{padding-left:16px;padding-right:16px}
+ .workspace-layout .chat-welcome{padding:24px 0 40px}
+ .workspace-layout .chat-welcome h2{font-size:24px}
+ .workspace-layout .chat-dock{padding-bottom:max(12px,env(safe-area-inset-bottom))}
+ .workspace-layout .composer textarea{max-height:28dvh}
+ .workspace-layout .composer-bar{gap:4px}
+ .workspace-layout .composer-bar>button:not(.send-button){flex-shrink:0}
+}

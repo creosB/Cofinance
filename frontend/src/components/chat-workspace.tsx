@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import '../conversations.css'
 import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ModelPicker } from './model-library'
 import { AnswerProcess, TraceActivity } from './run-map'
@@ -18,6 +17,8 @@ import { ago, evidenceUrl, statusLabel } from '@/lib/domain'
 import { canForget, contextLine, itemFor } from '@/lib/memory'
 import { refText, segments, targetId } from '@/lib/citations'
 import { MemoryPanel } from './memory-panel'
+import { Input } from '@/components/ui/input'
+import { ChevronDown, MoreHorizontal, Search } from 'lucide-react'
 import type { ChatController, Message, Snapshot } from '@/lib/use-chat'
 
 const activeStatuses=['queued','running','cancelling']
@@ -97,8 +98,9 @@ function Answer({message,inspect,chat}:{message:Message;inspect:(id:string,spanI
 
 /** Sidebar list. Delete (per row, inline confirm) and Clear all (dialog) are permanent: the server deletes memory copies,
  *  messages, runs and run traces, and refuses while a run or its memory write is in flight. */
-export function ConversationList({chat}:{chat:ChatController}){
- const sessions=chat.workspace?.sessions||[]
+export function ConversationList({chat,onSelect}:{chat:ChatController;onSelect?:()=>void}){
+ const sessions=chat.workspace?.sessions||[],[search,setSearch]=useState('')
+ const matches=sessions.filter(s=>s.title.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
  const [confirmId,setConfirmId]=useState(''),[clearOpen,setClearOpen]=useState(false),[working,setWorking]=useState('')
  const [notice,setNotice]=useState<{text:string;bad?:boolean}|null>(null)
  const runSession=chat.workspace?.active_job?.session_id,anyRun=!!chat.workspace?.active_job
@@ -114,12 +116,9 @@ export function ConversationList({chat}:{chat:ChatController}){
   try{const r=await chat.clearConversations() as {deleted?:number};const n=r?.deleted??0;done(r,'Deleted '+n+' conversation'+(n===1?'':'s')+'.');setClearOpen(false)}
   catch(e){fail(e,'The conversations could not be cleared.')}finally{setWorking('')}
  }
- return <div className="side-section"><div className="side-heading"><span>Conversations</span><span className="side-heading-actions">
-   <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" aria-label="Clear all conversations" disabled={chat.busy||anyRun||!sessions.length||!!working} onClick={()=>{setNotice(null);setClearOpen(true)}}><ListX size={15}/></Button></TooltipTrigger><TooltipContent side="right">{anyRun?'Wait for the active run to finish':'Clear all conversations'}</TooltipContent></Tooltip>
-   <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" aria-label="New chat" disabled={chat.busy} onClick={()=>{void chat.create().catch(()=>{})}}><Plus size={15}/></Button></TooltipTrigger><TooltipContent side="right">New chat</TooltipContent></Tooltip>
-  </span></div>
+ return <div className="side-section conversation-history"><div className="history-search"><Search size={16} aria-hidden="true"/><Input aria-label="Search conversations" placeholder="Search conversations" value={search} onChange={e=>setSearch(e.target.value)}/></div><div className="side-heading"><span>Conversations</span></div>
   {notice&&<p className="side-notice" role={notice.bad?'alert':'status'} data-bad={notice.bad?'true':undefined}>{notice.text}</p>}
-  <div className="side-list">{sessions.map(s=>{
+  <div className="side-list">{matches.map(s=>{
    const current=chat.selected===s.id,running=runSession===s.id
    if(confirmId===s.id)return <div key={s.id} className="conversation-row confirming" role="group" aria-label={'Delete '+s.title}
      onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();setConfirmId('')}}}>
@@ -127,13 +126,14 @@ export function ConversationList({chat}:{chat:ChatController}){
      <Button variant="destructive" size="sm" onClick={()=>void remove(s.id)}>Delete</Button>
      <Button variant="ghost" size="sm" autoFocus onClick={()=>setConfirmId('')}>Cancel</Button></div>
    return <div key={s.id} className={'conversation-row'+(current?' side-row-active':'')} data-working={working===s.id?'true':undefined}>
-    <button type="button" title={s.title} aria-current={current?'true':undefined} className="side-row conversation-item" onClick={()=>chat.select(s.id)}>
+    <button type="button" title={s.title} aria-current={current?'true':undefined} className="side-row conversation-item" onClick={()=>{chat.select(s.id);onSelect?.()}}>
      <span className="side-row-title">{working===s.id?'Deleting':s.title}</span><span className="side-row-time">{ago(s.updated)}</span></button>
     <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="row-delete" aria-label={'Delete conversation: '+s.title}
      disabled={chat.busy||running||!!working} onClick={()=>{setNotice(null);setConfirmId(s.id)}}><Trash2 size={14}/></Button></TooltipTrigger>
      <TooltipContent side="right">{running?'A run is active in this conversation':'Delete conversation'}</TooltipContent></Tooltip>
    </div>})}
-   {chat.workspace&&!sessions.length&&<p className="sidebar-empty">No conversations yet.</p>}</div>
+   {chat.workspace&&!sessions.length&&<p className="sidebar-empty">No conversations yet.</p>}{sessions.length>0&&!matches.length&&<p className="sidebar-empty">No matching conversations.</p>}</div>
+  <details className="history-options"><summary>History options<ChevronDown size={14}/></summary><Button variant="ghost" disabled={chat.busy||anyRun||!sessions.length||!!working} onClick={()=>{setNotice(null);setClearOpen(true)}}><ListX size={16}/>Clear all conversations</Button>{anyRun&&<p className="sidebar-empty">Wait for the active run to finish.</p>}</details>
   <Dialog open={clearOpen} onOpenChange={v=>{if(working!=='*')setClearOpen(v)}}>
    <DialogContent className="clear-dialog">
     <DialogHeader><DialogTitle>Clear all conversations?</DialogTitle>
@@ -146,14 +146,18 @@ export function ConversationList({chat}:{chat:ChatController}){
  </div>
 }
 
-export function ChatActions({chat}:{chat:ChatController}){
- const conversation=chat.conversation
+export function ChatActions({chat,onRefresh}:{chat:ChatController;onRefresh:()=>void}){
+ const conversation=chat.conversation,menu=useRef<HTMLDetailsElement>(null)
+ useEffect(()=>{const close=(e:PointerEvent)=>{if(!menu.current?.contains(e.target as Node))menu.current?.removeAttribute('open')};document.addEventListener('pointerdown',close);return()=>document.removeEventListener('pointerdown',close)},[])
  const exportChat=()=>{
   if(!conversation)return
   const blob=new Blob([JSON.stringify(conversation,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a')
   a.href=url;a.download='cofinance-conversation.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)
  }
- return <><MemoryPanel chat={chat}/><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" aria-label="New chat" className="topbar-new-chat" disabled={chat.busy} onClick={()=>{void chat.create().catch(()=>{})}}><Plus size={16}/></Button></TooltipTrigger><TooltipContent>New chat</TooltipContent></Tooltip><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" aria-label="Export conversation" disabled={!conversation} onClick={exportChat}><Download size={16}/></Button></TooltipTrigger><TooltipContent>Export conversation (JSON)</TooltipContent></Tooltip></>
+ return <details ref={menu} className="chat-options" onKeyDown={e=>{if(e.key==='Escape'){menu.current?.removeAttribute('open');menu.current?.querySelector('summary')?.focus()}}}><summary aria-label="Conversation options"><MoreHorizontal size={20}/></summary><div className="chat-options-panel" onClick={e=>{if((e.target as HTMLElement).closest('button'))menu.current?.removeAttribute('open')}}>
+  {conversation&&<><MemoryPanel chat={chat} labeled/><Button variant="ghost" aria-label="Export conversation" onClick={()=>{exportChat();menu.current?.removeAttribute('open')}}><Download size={16}/>Export conversation</Button></>}
+  <Button variant="ghost" onClick={()=>{onRefresh();menu.current?.removeAttribute('open')}}><RotateCcw size={16}/>Refresh local data</Button>
+ </div></details>
 }
 
 export function ChatWorkspace({chat,inspect}:{chat:ChatController;inspect:(id:string,spanId?:string)=>void}){
@@ -164,11 +168,11 @@ export function ChatWorkspace({chat,inspect}:{chat:ChatController;inspect:(id:st
  const blocked=chat.busy||!!globalJob||runningModel||newsRunning
  const lastJob=conversation?.jobs[0],failed=!ownJob&&lastJob&&['error','interrupted','cancelled'].includes(lastJob.status)?lastJob:null
  useEffect(()=>{const el=scroller.current;if(el)el.scrollTop=el.scrollHeight},[conversation?.id,conversation?.messages.length,ownJob?.id])
+ useEffect(()=>{setDraft('');textarea.current?.focus()},[chat.draftRevision])
  const send=async(retry=false)=>{if((!draft.trim()&&!retry)||chat.busy)return;try{await chat.send(draft.trim(),retry);setDraft('');textarea.current?.focus()}catch{}}
  const notice=runningModel?(model?.stage||model?.phase)+'. Research can start when this finishes.':newsRunning?'News collection is running. Research can start when it finishes.':globalJob&&!ownJob?'A run in another conversation is active.':''
  return <div className="chat-view">
   <div className="chat-scroll" ref={scroller} role="log" aria-label="Conversation messages" aria-live="polite"><div className="chat-column">
-   <div className="mobile-conversation"><Select value={chat.selected||undefined} onValueChange={chat.select}><SelectTrigger aria-label="Choose conversation"><SelectValue placeholder="New research"/></SelectTrigger><SelectContent>{chat.workspace?.sessions.map(s=><SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>)}</SelectContent></Select></div>
    {chat.error&&<div role="alert" className="error-banner"><span>{chat.error}</span><Button variant="outline" onClick={chat.refresh}>Refresh</Button></div>}
    {conversation?.message_count&&conversation.message_count>100?<p className="quiet history-note">Showing the latest 100 messages.</p>:null}
    {conversation?.messages.length?conversation.messages.map(message=><Answer key={message.id} message={message} chat={chat} inspect={inspect}/>):<div className="chat-welcome"><h2>What should we research?</h2><div className="starter-questions">{['What is NVDA trading at?','Review the NVDA thesis','Compare Apple and Nvidia'].map(question=><Button key={question} variant="outline" size="sm" onClick={()=>{setDraft(question);textarea.current?.focus()}}>{question}</Button>)}</div></div>}

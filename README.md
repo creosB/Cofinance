@@ -58,7 +58,7 @@ Chat (Clock 2)
 - **News:** headlines are quoted verbatim and grouped by their one source (company announcements, shared links). The narrator rewrote them into new claims in four tested prompt and guard variants, so this step is code.
 - **Visibility:** the run map shows actual model calls, dispatch decisions, tool outputs, retries and validation. A missing step is never shown as successful. No hidden reasoning is exposed or invented.
 - **Token usage:** each new answer shows runtime-reported narrator input, output and total tokens, with a per-role breakdown. Retries and rejected output count; missing usage is unavailable or partial, never estimated. These are summed call totals, not context-window occupancy. GLiNER routing, memory embeddings and separate news collection are excluded. Older answers have no counts.
-- **Conversations:** persistent history, cancellation, same-asset follow-ups and explicit asset tracking. Research never adds to the watchlist on its own.
+- **Conversations:** persistent, searchable history; New chat opens a blank draft and saves nothing until you send. Cancellation, same-asset follow-ups and explicit asset tracking. Research, Execution, Models and Dataset sit under Workspace tools; memory and export under Conversation options. The sidebar collapses on desktop and becomes a drawer on phones. Research never adds to the watchlist on its own.
 - **Memory:** hybrid keyword + Hy-Memory lite by default, with keyword fallback. Notes and recalled turns are context only, never evidence. Override with `COFINANCE_MEMORY=keyword`, `hymemory` or `hybrid`. Remember a note, forget one item or a conversation's memory, delete a conversation or clear all. [Memory design](docs/designs/remember_forget.md)
 
 ## Models

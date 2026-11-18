@@ -38,9 +38,9 @@ class TestFeatureMap(unittest.TestCase):
         self.assertEqual(sorted(claimed - routes()), [], 'The map claims a route nothing serves or calls. ' + HINT)
 
     def test_every_view_belongs_to_a_feature(self):
-        app = (ROOT / 'frontend/src/App.tsx').read_text(encoding='utf-8')
+        app = (ROOT / 'frontend/src/components/workspace-navigation.tsx').read_text(encoding='utf-8')
         views = set(re.findall(r"\{id:'([a-z_-]+)',name:", app))
-        self.assertTrue(views, 'Could not read the views list in App.tsx')
+        self.assertTrue(views, 'Could not read the views list in workspace-navigation.tsx')
         self.assertEqual(sorted(views - {f['view'] for f in FEATURES}), [], 'A view has no feature. ' + HINT)
 
     def test_every_ui_component_belongs_to_a_feature(self):

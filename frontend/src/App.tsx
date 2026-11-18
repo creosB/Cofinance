@@ -10,7 +10,9 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Menu, PanelLeftOpen } from 'lucide-react'
+import { WorkspaceNavigation, views, type View } from '@/components/workspace-navigation'
+import './chat-shell.css'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Inspector, StateBadge } from '@/components/inspector'
@@ -23,8 +25,6 @@ import { LabelWorkbench } from '@/components/label-workbench'
 import { RunMap, SystemGuide } from '@/components/run-map'
 import { ago, date, duration, flatten, label, modelGroups, object, statusLabel, text, type Corpus, type Kind, type Run, type Span } from '@/lib/domain'
 
-const views=[{id:'chat',name:'Chat',icon:Bot},{id:'research',name:'Research',icon:FileText},{id:'execution',name:'Execution',icon:Activity},{id:'models',name:'Models',icon:Layers},{id:'dataset',name:'Dataset',icon:Database}] as const
-type View=typeof views[number]['id']
 const icons:Record<Kind,LucideIcon>={run:Activity,route:GitBranch,agent:Bot,model:Layers,decision:GitBranch,tool:Wrench,gate:ShieldCheck,handoff:ArrowUpRight}
 const filters=[['all','All steps'],['agent','Agents'],['model','Models'],['decision','Decisions'],['tool','Tools'],['gate','Gates']] as const
 function RunGlyph({status}:{status:string}){
@@ -64,6 +64,11 @@ export default function App(){
   const data=useDashboard(),chat=useChat(),[view,setView]=useState<View>('chat'),[step,setStep]=useState<string|null>(null),[query,setQuery]=useState(''),[filter,setFilter]=useState('all'),[finder,setFinder]=useState(false),[find,setFind]=useState('')
   const search=useRef<HTMLInputElement>(null),inspector=useRef<HTMLDivElement>(null)
   const [executionMode,setExecutionMode]=useState<'map'|'steps'>('map')
+  const [collapsed,setCollapsed]=useState(()=>{try{return localStorage.getItem('cofinance.sidebar')==='closed'}catch{return false}}),[mobileOpen,setMobileOpen]=useState(false)
+  const toggleSidebar=()=>setCollapsed(old=>{try{localStorage.setItem('cofinance.sidebar',old?'open':'closed')}catch{}return !old})
+  const navigate=(v:View)=>{setView(v);setMobileOpen(false)}
+  const newChat=()=>{chat.startNew();setView('chat');setMobileOpen(false)}
+  useEffect(()=>{const m=matchMedia('(min-width: 701px)'),close=()=>{if(m.matches)setMobileOpen(false)};m.addEventListener('change',close);return()=>m.removeEventListener('change',close)},[])
   const spans=data.run?.spans||[],active=spans.find(s=>s.id===step)||null
   const visible=useMemo(()=>flatten(spans).filter(s=>(filter==='all'||s.kind===filter||(filter==='decision'&&s.kind==='route'))&&JSON.stringify(s).toLowerCase().includes(query.toLowerCase())),[spans,filter,query])
   const choose=(id:string)=>{setStep(null);setQuery('');setFilter('all');data.select(id);setFinder(false);setView('research')}
@@ -75,7 +80,7 @@ export default function App(){
       if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='k'){ev.preventDefault();setFind('');setFinder(v=>!v);return}
       if(finder)return
       const target=ev.target as HTMLElement
-      if(target.isContentEditable||target.closest('input,textarea,select,[role="combobox"]'))return
+      if(target.isContentEditable||target.closest('input,textarea,select,[role="combobox"],[role="dialog"]'))return
       if(ev.ctrlKey||ev.metaKey||ev.altKey)return
       if(ev.key==='/'){ev.preventDefault();setView('execution');setExecutionMode('steps');requestAnimationFrame(()=>search.current?.focus())}
       if(['1','2','3','4'].includes(ev.key))setView(views[Number(ev.key)].id)
@@ -89,14 +94,12 @@ export default function App(){
   const crumb=view==='chat'?chat.conversation?.title||'':(view==='research'||view==='execution')?data.run?.title||'':''
   const findRuns=data.runs.filter(r=>(r.title+' '+r.status+' '+r.mode).toLowerCase().includes(find.toLowerCase()))
   const tracked=chat.workspace?.watchlist.map(w=>w.ticker)||[]
-  return <div className="app-shell"><aside className="sidebar" aria-label="Workspace navigation">
-    <div className="brand"><span className="brand-mark">C</span><strong>Cofinance</strong></div>
-    <Button variant="outline" className="find-button" onClick={()=>{setFind('');setFinder(true)}}><Search size={14}/>Find a run<kbd>Ctrl K</kbd></Button>
-    <nav>{views.map((v,i)=><Tooltip key={v.id}><TooltipTrigger asChild><Button variant="ghost" className={'nav-item '+(view===v.id?'nav-active':'')} onClick={()=>setView(v.id)} aria-current={view===v.id?'page':undefined}><v.icon size={16}/><span>{v.name}</span></Button></TooltipTrigger><TooltipContent side="right">{v.name} <kbd>{i===0?'C':i}</kbd></TooltipContent></Tooltip>)}</nav>
-    {view==='chat'?<ConversationList chat={chat}/>:<div className="side-section"><div className="side-heading"><span>Runs</span><span>{data.runs.length||''}</span></div><div className="side-list">{data.loading&&!data.runs.length?<><Skeleton className="run-skeleton"/><Skeleton className="run-skeleton"/></>:data.runs.length?data.runs.map(r=><Button key={r.id} variant="ghost" title={r.title+' ('+statusLabel(r.status)+', '+r.mode+')'} onClick={()=>choose(r.id)} className={'side-row run-entry '+(data.selected===r.id?'side-row-active':'')}><RunGlyph status={r.status}/><span className="side-row-title">{r.title}</span><span className="side-row-time">{r.mode==='live'?ago(r.started_at):r.mode}</span></Button>):<p className="sidebar-empty">No recorded runs yet.</p>}</div></div>}
-    <div className="sidebar-bottom"><NewsStatus chat={chat} open={()=>setView('dataset')}/>{tracked.length>0&&<div className="side-meta"><span>Tracking</span><span className="mono">{tracked.join(', ')}</span></div>}{data.error&&<div className="side-meta side-status-error" role="status"><span className="connection-dot disconnected"/>Connection interrupted</div>}</div>
-  </aside>
-    <main className={'main-area'+(view==='chat'?' main-chat':'')}><header className="topbar"><div className="breadcrumb"><Icon size={15}/><strong>{meta.name}</strong>{crumb&&<><ChevronRight size={14}/><span className="crumb-title" title={crumb}>{crumb}</span></>}{(view==='research'||view==='execution')&&data.run&&<StateBadge value={data.run.status}/>}</div><div className="topbar-actions"><div className="mobile-nav"><Select value={view} onValueChange={v=>setView(v as View)}><SelectTrigger aria-label="Navigate workspace"><SelectValue/></SelectTrigger><SelectContent>{views.map(v=><SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent></Select></div>{view==='chat'&&<ChatActions chat={chat}/>}<Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" aria-label="Refresh local data" onClick={()=>{data.refresh();chat.refresh()}}><RefreshCw size={15}/></Button></TooltipTrigger><TooltipContent>Refresh local data</TooltipContent></Tooltip><Button variant="outline" className="mobile-find" onClick={()=>{setFind('');setFinder(true)}}><Search size={15}/>Find run</Button></div></header>
+  const navigation=(mobile=false)=><WorkspaceNavigation view={view} onView={navigate} onNew={newChat} onFind={()=>{setFind('');setMobileOpen(false);setFinder(true)}} onCollapse={()=>mobile?setMobileOpen(false):toggleSidebar()} busy={chat.busy} bottom={<><NewsStatus chat={chat} open={()=>navigate('dataset')}/>{tracked.length>0&&<div className="side-meta"><span>Tracking</span><span className="mono">{tracked.join(', ')}</span></div>}{data.error&&<div className="side-meta side-status-error" role="status">Connection interrupted</div>}</>}>
+   {view==='chat'?<ConversationList chat={chat} onSelect={()=>setMobileOpen(false)}/>:<div className="side-section"><div className="side-heading"><span>Runs</span></div><div className="side-list">{data.loading&&!data.runs.length?<Skeleton className="run-skeleton"/>:data.runs.length?data.runs.map(r=><Button key={r.id} variant="ghost" title={r.title+' ('+statusLabel(r.status)+', '+r.mode+')'} onClick={()=>{choose(r.id);setMobileOpen(false)}} className={'side-row run-entry '+(data.selected===r.id?'side-row-active':'')}><RunGlyph status={r.status}/><span className="side-row-title">{r.title}</span><span className="side-row-time">{r.mode==='live'?ago(r.started_at):r.mode}</span></Button>):<p className="sidebar-empty">No recorded runs yet.</p>}</div></div>}
+  </WorkspaceNavigation>
+  return <div className={'app-shell workspace-layout'+(collapsed?' sidebar-collapsed':'')}><aside className="sidebar workspace-sidebar" aria-label="Workspace navigation">{navigation()}</aside>
+   <Dialog open={mobileOpen} onOpenChange={setMobileOpen}><DialogContent className="navigation-drawer" placement="left" showCloseButton={false} onCloseAutoFocus={e=>{e.preventDefault();document.querySelector<HTMLButtonElement>('.open-mobile-sidebar')?.focus()}}><DialogHeader className="sr-only"><DialogTitle>Workspace navigation</DialogTitle><DialogDescription>Conversations and workspace tools</DialogDescription></DialogHeader>{navigation(true)}</DialogContent></Dialog>
+    <main className={'main-area'+(view==='chat'?' main-chat':'')}><header className="topbar"><div className="header-leading"><Button variant="ghost" size="icon" className="open-mobile-sidebar" aria-label="Open sidebar" aria-haspopup="dialog" aria-expanded={mobileOpen} onClick={()=>setMobileOpen(true)}><Menu size={20}/></Button>{collapsed&&<Button variant="ghost" size="icon" className="open-desktop-sidebar" aria-label="Open sidebar" onClick={toggleSidebar}><PanelLeftOpen size={20}/></Button>}<div className="breadcrumb">{view==='chat'?<strong className="chat-title" title={crumb||'New chat'}>{crumb||'New chat'}</strong>:<><Icon size={15}/><strong>{meta.name}</strong>{crumb&&<><ChevronRight size={14}/><span className="crumb-title" title={crumb}>{crumb}</span></>}</>}{(view==='research'||view==='execution')&&data.run&&<StateBadge value={data.run.status}/>}</div></div><div className="topbar-actions">{view==='chat'?<ChatActions chat={chat} onRefresh={()=>{data.refresh();chat.refresh()}}/>:<Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" aria-label="Refresh local data" onClick={()=>{data.refresh();chat.refresh()}}><RefreshCw size={17}/></Button></TooltipTrigger><TooltipContent>Refresh local data</TooltipContent></Tooltip>}</div></header>
       {view==='chat'?<ChatWorkspace chat={chat} inspect={inspectRun}/>:<div className="page-body">{data.error&&<div className="error-banner" role="alert"><span>{data.error}</span><Button variant="outline" onClick={data.refresh}>Retry</Button></div>}
       {data.run&&(view==='research'||view==='execution')&&<Mode run={data.run}/>}
       {data.loading&&!data.run&&(view==='research'||view==='execution')?<div className="loading-state" role="status" aria-label="Loading local trace"><Skeleton className="line-skeleton"/><Skeleton className="line-skeleton"/><Skeleton className="line-skeleton"/></div>:<>

@@ -63,12 +63,12 @@ async function request(path:string,signal:AbortSignal,body?:unknown,csrf=''){
 export function useChat(){
  const [workspace,setWorkspace]=useState<WorkspaceState|null>(null),[conversation,setConversation]=useState<Conversation|null>(null)
  const [selected,setSelected]=useState(()=>{try{return localStorage.getItem('cofinance.chat')||''}catch{return ''}})
- const selectedRef=useRef(selected),[error,setError]=useState(''),[busy,setBusy]=useState(false),[version,setVersion]=useState(0)
+ const selectedRef=useRef(selected),newDraft=useRef(!selected),[draftRevision,setDraftRevision]=useState(0),[error,setError]=useState(''),[busy,setBusy]=useState(false),[version,setVersion]=useState(0)
  const alive=useRef(true),pending=useRef<{session_id:string;query:string;request_id:string;model:string}|null>(null)
  const newId=useRef<string|null>(null),[hasRetry,setHasRetry]=useState(false),[memory,setMemory]=useState<MemoryState|null>(null)
  useEffect(()=>{alive.current=true;return()=>{alive.current=false}},[])
  const refresh=useCallback(()=>setVersion(v=>v+1),[])
- const select=useCallback((value:string)=>{selectedRef.current=value;setSelected(value);setConversation(null);setMemory(null);try{localStorage.setItem('cofinance.chat',value)}catch{}},[])
+ const select=useCallback((value:string)=>{if(value&&selectedRef.current===value)return;newDraft.current=!value;selectedRef.current=value;setSelected(value);setConversation(null);setMemory(null);try{localStorage.setItem('cofinance.chat',value)}catch{}},[])
  useEffect(()=>{
   let disposed=false
   const stop=new AbortController()
@@ -79,7 +79,7 @@ export function useChat(){
     if(disposed)return
     setWorkspace(old=>JSON.stringify(old)===JSON.stringify(state)?old:state)
     let sid=selectedRef.current
-    if(!sid&&state.sessions[0]){sid=state.sessions[0].id;select(sid)}
+    if(!sid&&!newDraft.current&&state.sessions[0]){sid=state.sessions[0].id;select(sid)}
     if(sid){
      if(!state.sessions.some(s=>s.id===sid)){selectedRef.current='';setSelected('');setConversation(null);try{localStorage.removeItem('cofinance.chat')}catch{};throw Error('The selected conversation is no longer available.')}
      const next=parseConversation(await request('/api/conversation?id='+sid,controller.signal))
@@ -149,6 +149,7 @@ export function useChat(){
   const result=await post('/api/sessions/clear',{request_id:once('clear')},300000);delete memoryRequests.current.clear
   select('');return result
  },[post,select])
- return {workspace,conversation,memory,selected,error,busy,hasRetry,select,create,send,post,refresh,collectNews,rememberNote,forget,removeConversation,clearConversations}
+ const startNew=()=>{pending.current=null;setHasRetry(false);select('');setDraftRevision(v=>v+1)}
+ return {workspace,conversation,memory,selected,error,busy,hasRetry,select,create,startNew,draftRevision,send,post,refresh,collectNews,rememberNote,forget,removeConversation,clearConversations}
 }
 export type ChatController=ReturnType<typeof useChat>
