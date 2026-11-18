@@ -51,7 +51,7 @@ The shortlisted technique is sealed on the unseen window 2026-11-09 to 2026-11-1
 | Polymarket crowd calibration | Brier 0.176, 0.168, 0.094 at 1, 7, 30 days; two cheap-outcome patterns not confirmed on a fresh sample | [Polymarket](benchmarks/POLYMARKET.md) |
 | Bitcoin threshold odds, model vs crowd | crowd better a day out (Brier 0.1340 vs 0.1378) | [BTC vs crowd](benchmarks/BTC_VS_CROWD.md) |
 | Forward weekly ledger | in progress; no claim before 26 matured batches | [Forward](benchmarks/FORWARD.md) |
-| Polymarket replay, team probability vs crowd price | rules frozen 2026-11-18 before any market was fetched; recording not started; no claim before 100 events | [Protocol](benchmarks/pm-replay-protocol.json) |
+| Polymarket replay, team probability vs crowd price | rules frozen 2026-11-18 before any market was fetched (v2: a synthetic-input probe showed the narrator writes YES as "Y" + "ES", so the first-token readout now counts split answers; v1 recorded nothing); recording not started; no claim before 100 events | [Protocol v2](benchmarks/pm-replay-protocol-v2.json) |
 
 ## What this page does not show
 

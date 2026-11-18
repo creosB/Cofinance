@@ -11,7 +11,7 @@ import subprocess
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from core.local_models import BACKENDS,FILENAME,MODEL_SHA,REVISION,RUNTIME_TAG,digest,local_json,server_command,server_flags
+from core.local_models import BACKENDS,FILENAME,MODEL_SHA,REVISION,RUNTIME_TAG,digest,local_json,narrator_spec,server_command,server_flags
 from .historical import predict,evaluate
 
 MODEL_META={'id':'lfm3-1.7b-q4km','revision':REVISION,'model_sha256':MODEL_SHA,'runtime':RUNTIME_TAG}
@@ -27,11 +27,14 @@ def default_backend(model_root:Path):
 
 
 @contextmanager
-def narrator(model_root:Path,log_path:Path,alias:str='lfm3-history',backend:str|None=None):
-    """Own a private llama-server for a benchmark. Yields (call, model_meta); always stops the server."""
+def narrator(model_root:Path,log_path:Path,alias:str='lfm3-history',backend:str|None=None,model_id:str|None=None):
+    """Own a private llama-server for a benchmark. Yields (call, model_meta); always stops the server.
+    model_id picks a pinned catalog narrator (default: the base LFM3, so older benchmarks are unchanged)."""
     backend=backend or default_backend(model_root)
-    model=(model_root/FILENAME).resolve();runtime=(model_root/BACKENDS[backend]['dir']).resolve()
-    if digest(model)!=MODEL_SHA:raise ValueError('Narrator checksum mismatch')
+    spec=narrator_spec(model_id) if model_id else {'filename':FILENAME,'sha':MODEL_SHA,'revision':REVISION}
+    meta=dict(MODEL_META) if not model_id else {'id':model_id,'revision':spec['revision'],'model_sha256':spec['sha'],'runtime':RUNTIME_TAG}
+    model=(model_root/spec['filename']).resolve();runtime=(model_root/BACKENDS[backend]['dir']).resolve()
+    if digest(model)!=spec['sha']:raise ValueError('Narrator checksum mismatch')
     servers=list(runtime.rglob('llama-server.exe'))
     if len(servers)!=1:raise ValueError('Expected one managed llama-server executable')
     with socket.socket() as s:s.bind(('127.0.0.1',0));port=s.getsockname()[1]
@@ -59,7 +62,7 @@ def narrator(model_root:Path,log_path:Path,alias:str='lfm3-history',backend:str|
                 choice=res['choices'][0]
                 if choice.get('finish_reason')!='stop' and not kwargs.get('allow_length'):raise ValueError('Incomplete forecast')
                 return choice if kwargs.get('return_choice') else choice['message']['content']
-            yield call,dict(MODEL_META,backend=backend,flags=server_flags(backend),cpu_only=backend=='cpu')
+            yield call,dict(meta,backend=backend,flags=server_flags(backend),cpu_only=backend=='cpu')
         finally:
             if proc.poll() is None:
                 proc.terminate()

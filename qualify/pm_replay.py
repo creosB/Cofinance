@@ -5,7 +5,9 @@ for the first listed outcome beat the crowd's price at T? Recorded forward, beca
 (the live store expires old rows), so a replay over past markets would leak. The protocol is frozen and published before
 any market is fetched; a changed protocol is refused and needs a new --root.
 
-    python -m qualify.pm_replay freeze --root data/pm_replay --publish docs/benchmarks/pm-replay-protocol.json
+    python -m qualify.pm_replay freeze --root data/pm_replay2 --publish docs/benchmarks/pm-replay-protocol-v2.json
+    python -m qualify.pm_replay record --root data/pm_replay2 --publish docs/benchmarks/pm-replay-ledger.jsonl
+    python -m qualify.pm_replay score  --root data/pm_replay2
 
 The rules below are executable: selection, probability readout, outcome and verdict are pure functions with tests.
 """
@@ -16,12 +18,18 @@ import json
 import math
 import random
 import re
-from datetime import datetime, timezone
+import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .historical import digest, dump
 
-FORMAT = 'cofinance-pm-replay/1'
+# v1 (frozen 2026-11-18, docs/benchmarks/pm-replay-protocol.json) read whole YES/NO tokens only. A synthetic-input probe
+# before any market fetch showed AtomicChat splits YES into 'Y' + 'ES', so v1 would have ignored about 97% of the YES
+# mass. v2 changes only the readout and is frozen in a new root; v1 recorded nothing.
+FORMAT = 'cofinance-pm-replay/2'
+SUPERSEDES = {'format': 'cofinance-pm-replay/1', 'sha256': '7c664068df1a5b801b3b0a1a62e876512dc12498407a80693a9fc46074c82af2',
+              'reason': 'first-token readout missed split YES tokens; found on synthetic inputs before any market was fetched'}
 WARNING = 'Experimental forward benchmark. Not a trading signal, not financial advice. Cofinance never places orders.'
 # Tracked assets and the words that name them in a question (whole words, case-insensitive).
 ALIASES = {'AAPL': ('apple', 'aapl'), 'NVDA': ('nvidia', 'nvda'), 'MSFT': ('microsoft', 'msft'),
@@ -71,8 +79,10 @@ def protocol(narrator_id, narrator_sha):
         'narrator': {'id': narrator_id, 'sha256': narrator_sha, 'must_be_qualified': True,
                      'system_blind': SYSTEM_BLIND, 'system_shown': SYSTEM_SHOWN,
                      'decoding': {'temperature': 0, 'thinking': False, 'max_tokens': 1, 'top_logprobs': 20},
-                     'readout': 'P = p(YES) / (p(YES) + p(NO)) over the first token; neither present: failure, scored 0.5 '
-                                'and counted'},
+                     'readout': 'P = YES mass / (YES mass + NO mass) over the first token, where a top-20 token counts '
+                                'for an answer when, stripped and upper-cased, it can start that answer (Y, YE, YES; N, NO) '
+                                'and distinct tokens are summed; no such token: failure, scored 0.5 and counted'},
+        'supersedes': SUPERSEDES,
         'outcome': f'first listed outcome won, from clean settlement (final prices 1 and 0) within {SETTLE_DAYS} days of the '
                    'scheduled end; anything else is excluded and counted',
         'metrics': {'brier': 'per arm', 'primary': 'paired Brier difference team_blind minus crowd, one market per event, '
@@ -148,16 +158,20 @@ def select(markets, now, seen_events=()):
 # ------------------------------------------------------------------ readout and outcome
 
 def readout(top_logprobs):
-    """(probability, failed) from the first token's top logprobs: [(token, logprob), ...]."""
-    best = {}
+    """(probability, failed) from the first token's top logprobs: [(token, logprob), ...].
+    v2: a first token counts for an answer when it can start it (AtomicChat writes YES as 'Y' + 'ES', so 'Y' carries
+    almost all of the YES mass while NO is one token); the masses of distinct tokens are summed."""
+    mass = {'YES': 0.0, 'NO': 0.0}
     for token, lp in top_logprobs or []:
         t = str(token).strip().upper()
-        if t in ('YES', 'NO') and lp is not None and math.isfinite(lp):
-            best[t] = max(best.get(t, -math.inf), lp)
-    if not best:
+        if not t or lp is None or not math.isfinite(lp):
+            continue
+        for answer in mass:
+            if answer.startswith(t):
+                mass[answer] += math.exp(lp)
+    if not any(mass.values()):
         return .5, True
-    y, n = math.exp(best.get('YES', -math.inf)), math.exp(best.get('NO', -math.inf))
-    return y / (y + n), False
+    return mass['YES'] / (mass['YES'] + mass['NO']), False
 
 
 def outcome(market, scheduled_end):
@@ -211,14 +225,196 @@ def score(rows):
     return report
 
 
+# ------------------------------------------------------------------ record and score: I/O around the frozen rules
+
+GENESIS = '0' * 64
+PAGE, MAX_OFFSET = 100, 2000  # Gamma pages hold 100 rows and refuse offsets past about 2,000
+
+
+def ledger(root):
+    """The hash-chained records, verified against head.json. Returns (entries, head sha)."""
+    path, prev, out = Path(root) / 'ledger.jsonl', GENESIS, []
+    if path.exists():
+        for raw in path.read_bytes().splitlines():
+            if not raw.strip():
+                continue
+            entry = json.loads(raw)
+            if entry.get('prev_sha256') != prev:
+                raise ValueError('Broken replay ledger chain')
+            prev = digest(raw)
+            out.append(entry)
+    head_path = Path(root) / 'head.json'
+    head = json.loads(head_path.read_text(encoding='utf-8')) if head_path.exists() else None
+    if (out or head) and (not head or head.get('sha256') != prev or head.get('records') != len(out)):
+        raise ValueError('Replay ledger head mismatch')
+    return out, prev
+
+
+def open_markets(now, lister):
+    """Every page Gamma returns for open markets ending in the frozen window. (raw rows, listing truncated?)"""
+    stamp = lambda t: t.strftime('%Y-%m-%dT%H:%M:%SZ')
+    lo, hi = now + timedelta(hours=END_HOURS[0]), now + timedelta(hours=END_HOURS[1])
+    raw, offset = [], 0
+    while offset < MAX_OFFSET:
+        page = lister(active='true', closed='false', limit=PAGE, offset=offset, volume_num_min=MIN_VOLUME,
+                      end_date_min=stamp(lo), end_date_max=stamp(hi))
+        raw.extend(page)
+        offset += len(page)
+        if len(page) < PAGE:
+            return raw, False
+    return raw, True
+
+
+def price_facts(bars):
+    """Completed daily bars, oldest first, to the frozen price inputs; None with fewer than 21 sessions."""
+    if len(bars) < 21:
+        return None
+    last = bars[-1]
+    year = [b for b in bars if b['timestamp'] >= last['timestamp'] - 365 * 86400]
+    return {'last_close': round(last['close'], 4), 'last_close_date': last['date'],
+            'return_20_sessions_pct': round((last['close'] / bars[-21]['close'] - 1) * 100, 2),
+            'one_year_high': round(max(b['high'] for b in year), 4), 'one_year_low': round(min(b['low'] for b in year), 4)}
+
+
+def prompt_for(case, shown):
+    body = {'question': case['question'], 'first_outcome': case['outcomes'][0], 'end_utc': case['end'],
+            'prices': case['prices'], 'headlines': case['digest']}
+    if shown:
+        body['crowd_price'] = case['crowd']
+    return json.dumps(body, sort_keys=True)
+
+
+def first_token_logprobs(choice):
+    content = ((choice or {}).get('logprobs') or {}).get('content') or []
+    tops = (content[0] if content else {}).get('top_logprobs') or []
+    return [(t.get('token'), t.get('logprob')) for t in tops]
+
+
+def daily_bars(symbol, now):
+    from .forward import completed, fetch, parse
+    return completed(parse(fetch(symbol, int(now - 400 * 86400), int(now))), now)
+
+
+def record(root, *, narrator, narrator_id, narrator_sha, clock=time.time, lister=None, prices=daily_bars,
+           news_db=Path('data/news.db'), publish=None):
+    """One record at T: select with the frozen rules, build the frozen inputs, ask the narrator twice per market, and
+    seal everything into the ledger before any outcome exists."""
+    from core.orchestrator import news_digest
+    from core.polymarket import list_markets, parse_market
+    from .forward import last_collection, news_for
+    root = Path(root)
+    protocol_sha = freeze(root, narrator_id, narrator_sha)
+    entries, prev = ledger(root)
+    now = clock()
+    now_dt = datetime.fromtimestamp(now, timezone.utc)
+    if entries and now - entries[-1]['sealed_at_epoch'] < MIN_GAP_DAYS * 86400:
+        raise ValueError(f'The last record is under {MIN_GAP_DAYS} days old')
+    seen = {c['event'] for e in entries for c in e['cases']}
+    raw, truncated = open_markets(now_dt, lister or list_markets)
+    chosen = select([parse_market(m) for m in raw], now_dt, seen)
+    if not chosen:
+        raise ValueError('No open market met the frozen selection rules')
+    facts = {a: price_facts(prices(a, now)) for a in sorted({m['asset'] for m in chosen})}
+    cases = []
+    for m in chosen:
+        ticker = m['asset'].removesuffix('-USD')
+        news = news_for(news_db, ticker, now)
+        cases.append({'id': m['id'], 'event': m['event'], 'asset': m['asset'], 'question': m['question'],
+                      'outcomes': m['outcomes'], 'end': m['end'], 'crowd': m['crowd'], 'volume': m['volume'],
+                      'prices': facts[m['asset']], 'news_rows': len(news), 'digest': news_digest({ticker: news}),
+                      'errors': {}, 'top_logprobs': {}})
+    with narrator() as (call, meta):
+        if meta.get('model_sha256') != narrator_sha:
+            raise ValueError('The narrator weights differ from the frozen protocol')
+        for c in cases:
+            for arm, system, shown in (('team_blind', SYSTEM_BLIND, False), ('team_shown', SYSTEM_SHOWN, True)):
+                try:
+                    tops = first_token_logprobs(call(system, prompt_for(c, shown), max_tokens=1, top_logprobs=20,
+                                                     return_choice=True, allow_length=True, timeout=60))
+                except Exception as exc:
+                    tops, c['errors'][arm] = [], f'{type(exc).__name__}: {exc}'[:200]
+                p, failed = readout(tops)
+                c[arm], c['failed_' + arm.removeprefix('team_')] = round(p, 6), failed
+                c['top_logprobs'][arm] = [[t, lp] for t, lp in tops]
+    sealed = clock()
+    if sealed < now:
+        raise ValueError('Clock moved backwards')
+    entry = {'format': FORMAT, 'record': len(entries) + 1, 'data_as_of_utc': now_dt.isoformat(),
+             'sealed_at_utc': datetime.fromtimestamp(sealed, timezone.utc).isoformat(), 'sealed_at_epoch': sealed,
+             'protocol_sha256': protocol_sha, 'model': meta, 'news_last_collection_utc': last_collection(news_db),
+             'markets_returned': len(raw), 'listing_truncated': truncated,
+             'markets_sha256': digest(json.dumps(raw, sort_keys=True).encode('utf-8')), 'cases': cases, 'prev_sha256': prev}
+    line = json.dumps(entry, sort_keys=True, allow_nan=False).encode('utf-8')
+    with (root / 'ledger.jsonl').open('ab') as fh:
+        fh.write(line + b'\n')
+    sha = digest(line)
+    dump(root / 'head.json', {'records': entry['record'], 'sha256': sha})
+    public = {'record': entry['record'], 'sealed_at_utc': entry['sealed_at_utc'], 'ledger_sha256': sha,
+              'protocol_sha256': protocol_sha, 'warning': WARNING,
+              'markets': [{k: c[k] for k in ('id', 'asset', 'end', 'crowd', 'team_blind', 'team_shown')} for c in cases]}
+    if publish:
+        Path(publish).parent.mkdir(parents=True, exist_ok=True)
+        with Path(publish).open('a', encoding='utf-8', newline='\n') as fh:
+            fh.write(json.dumps(public, sort_keys=True) + '\n')
+    return public
+
+
+def score_ledger(root, *, getter=None, clock=time.time):
+    """Fetch each recorded market's settlement and score every settled one with the frozen rules."""
+    from core.polymarket import GAMMA, fetch, parse_market
+    getter = getter or (lambda market_id: fetch(f'{GAMMA}/markets/{market_id}'))
+    root = Path(root)
+    entries, head = ledger(root)
+    if not entries:
+        raise ValueError('No records yet')
+    protocol_sha = digest((root / 'protocol.json').read_bytes())
+    if any(e['protocol_sha256'] != protocol_sha for e in entries):
+        raise ValueError('Ledger protocol mismatch')
+    now, rows, pending, excluded = clock(), [], [], []
+    for e in entries:
+        for c in e['cases']:
+            try:
+                y = outcome(parse_market(getter(c['id'])) or {}, c['end'])
+            except Exception:
+                y = None  # a failed lookup is retried on the next score, never counted as an outcome
+            if y is None:
+                end = when(c['end'])
+                (pending if end and now < end.timestamp() + SETTLE_DAYS * 86400 else excluded).append(c['id'])
+                continue
+            rows.append({'id': c['id'], 'event': c['event'], 'y': y, 'crowd': c['crowd'], 'team_blind': c['team_blind'],
+                         'team_shown': c['team_shown'], 'failed_blind': c['failed_blind'],
+                         'failed_shown': c['failed_shown']})
+    report = {**score(rows), 'records': len(entries), 'ledger_head_sha256': head, 'protocol_sha256': protocol_sha,
+              'pending': pending, 'excluded': excluded,
+              'scored_at_utc': datetime.fromtimestamp(now, timezone.utc).isoformat()}
+    dump(root / 'report.json', report)
+    return report
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('action', choices=['freeze'])
-    ap.add_argument('--root', type=Path, default=Path('data/pm_replay'))
-    ap.add_argument('--publish', type=Path)
+    ap.add_argument('action', choices=['freeze', 'record', 'score'])
+    ap.add_argument('--root', type=Path, default=Path('data/pm_replay2'))
+    ap.add_argument('--model-root', type=Path, default=Path('data/local_models'))
+    ap.add_argument('--news-db', type=Path, default=Path('data/news.db'))
+    ap.add_argument('--publish', type=Path, help='freeze: protocol copy; record: public ledger line')
     a = ap.parse_args()
-    from core.local_models import DEFAULT_NARRATOR, narrator_spec
-    print(freeze(a.root, DEFAULT_NARRATOR, narrator_spec(DEFAULT_NARRATOR)['sha'], a.publish))
+    from core.local_models import DEFAULT_NARRATOR, LocalModels, narrator_spec
+    sha = narrator_spec(DEFAULT_NARRATOR)['sha']
+    if a.action == 'freeze':
+        print(freeze(a.root, DEFAULT_NARRATOR, sha, a.publish))
+    elif a.action == 'record':
+        from .history_runtime import default_backend, narrator
+        backend = default_backend(a.model_root)
+        if not LocalModels(a.model_root, Path(__file__).resolve().parents[1]).qualified(backend, DEFAULT_NARRATOR):
+            raise SystemExit(f'{DEFAULT_NARRATOR} is not qualified on {backend}; qualify it in Models first')
+        out = record(a.root, narrator=lambda: narrator(a.model_root, a.root / 'model-runtime.server.log', alias='pm-replay',
+                                                       backend=backend, model_id=DEFAULT_NARRATOR),
+                     narrator_id=DEFAULT_NARRATOR, narrator_sha=sha, news_db=a.news_db, publish=a.publish)
+        print(json.dumps(out, indent=2))
+    else:
+        out = score_ledger(a.root)
+        print(json.dumps({k: v for k, v in out.items() if k not in ('pending', 'excluded')}, indent=2))
 
 
 if __name__ == '__main__':
