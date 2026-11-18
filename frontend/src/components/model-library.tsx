@@ -24,7 +24,7 @@ const status=(n:NarratorState)=>n.loaded?'Loaded':!n.downloaded?'Not downloaded'
 // One row per pinned narrator. A narrator that is not the active one can be downloaded or qualified here, so it can be
 // chosen afterwards; load and unload stay with the active narrator below.
 export function NarratorRows({narrators,locked,act}:{narrators:NarratorState[];locked:boolean;act:(action:string,model:string)=>void}){
- return <>{narrators.map(n=><div key={n.id} className="model-library-row"><Layers size={19}/><div className="model-row-copy"><h3>{n.name} <span className="quiet">{n.publisher} / {n.quantization}</span></h3><p>{n.note||'Data Analyst, News Researcher, and Market Team Lead narrator'}</p><span className="quiet">{bytes(n.size_bytes||1)}{n.default===undefined?'':n.default?' / default':' / optional'}{n.active?' / active narrator':''}</span>
+ return <>{narrators.map(n=><div key={n.id} className="model-library-row"><Layers size={19}/><div className="model-row-copy"><h3>{n.name} <span className="quiet">{n.publisher} / {n.quantization}</span></h3><p>{n.note||'Data Analyst and Market Team Lead narrator, headline judge'}</p><span className="quiet">{bytes(n.size_bytes||1)}{n.default===undefined?'':n.default?' / default':' / optional'}{n.active?' / active narrator':''}</span>
   {!n.active&&(!n.downloaded||!n.qualified)&&<div className="model-actions">{!n.downloaded?<Button variant="outline" disabled={locked} onClick={()=>act('download',n.id)}><Download size={15}/>Download {n.name}</Button>:<Button variant="outline" disabled={locked} onClick={()=>act('qualify',n.id)}><FlaskConical size={15}/>Verify & test {n.name}</Button>}</div>}</div>
   <Badge variant="outline" className={n.loaded?'state-complete':''}>{status(n)}</Badge></div>)}</>
 }
