@@ -13,6 +13,7 @@ import { AnswerProcess, TraceActivity } from './run-map'
 import { PriceChart } from './price-chart'
 import { CrowdOdds } from './crowd-odds'
 import { HeadlineSignal } from './headline-signal'
+import { TokenUsage } from './token-usage'
 import { ago, evidenceUrl, statusLabel } from '@/lib/domain'
 import { canForget, contextLine, itemFor } from '@/lib/memory'
 import { refText, segments, targetId } from '@/lib/citations'
@@ -89,6 +90,7 @@ function Answer({message,inspect,chat}:{message:Message;inspect:(id:string,spanI
   {p.coverage_note&&<div className="coverage"><Newspaper size={14} aria-hidden="true"/><span>{p.coverage_note}</span>{news&&!news.health.collected&&news.phase!=='running'&&<Button variant="ghost" size="sm" disabled={chat.busy||!!chat.workspace?.active_job} onClick={()=>{void chat.collectNews().catch(()=>{})}}>Collect news</Button>}{news?.phase==='running'&&<span className="quiet">Collecting news now</span>}</div>}
   {memoryLine(p.memory)&&<div className="coverage" title={(p.memory?.recalled||[]).map(r=>'Recalled: '+r.question).join('\n')||undefined}><History size={14} aria-hidden="true"/><span>{memoryLine(p.memory)}</span></div>}
   {message.role==='assistant'&&p.kind==='research'&&<div className="msg-actions">{message.run_id&&<Button variant="ghost" size="sm" onClick={()=>inspect(message.run_id!)}><Activity size={14}/>Execution</Button>}{mem&&(canForget(mem)?<Button variant="ghost" size="sm" disabled={chat.busy||!!chat.workspace?.active_job} onClick={()=>{void chat.forget(message.run_id!).catch(()=>{})}}><Eraser size={14}/>Forget from memory</Button>:<Button variant="ghost" size="sm" disabled><Check size={14}/>{mem.state==='forgotten'?'Forgotten from memory':'Blocked from recall'}</Button>)}{(p.tickers||[]).map(ticker=>{const tracked=chat.workspace?.watchlist.some(w=>w.ticker===ticker);return <Button key={ticker} variant="ghost" size="sm" disabled={chat.busy||tracked} onClick={()=>{void chat.post('/api/watchlist',{ticker}).catch(()=>{})}}>{tracked?<Check size={14}/>:<Plus size={14}/>}{tracked?'Tracking '+ticker:'Track '+ticker}</Button>})}</div>}
+  <TokenUsage usage={p.usage}/>
   {message.run_id&&<AnswerProcess id={message.run_id} onInspect={inspect}/>}
  </article>
 }
@@ -171,7 +173,7 @@ export function ChatWorkspace({chat,inspect}:{chat:ChatController;inspect:(id:st
    {conversation?.message_count&&conversation.message_count>100?<p className="quiet history-note">Showing the latest 100 messages.</p>:null}
    {conversation?.messages.length?conversation.messages.map(message=><Answer key={message.id} message={message} chat={chat} inspect={inspect}/>):<div className="chat-welcome"><h2>What should we research?</h2><div className="starter-questions">{['What is NVDA trading at?','Review the NVDA thesis','Compare Apple and Nvidia'].map(question=><Button key={question} variant="outline" size="sm" onClick={()=>{setDraft(question);textarea.current?.focus()}}>{question}</Button>)}</div></div>}
    {ownJob&&<div className="live-job" role="status"><div className="live-head"><LoaderCircle size={15} className="animate-spin" aria-hidden="true"/><strong>{ownJob.status==='cancelling'?'Stopping run':ownJob.stage}</strong><Button variant="ghost" size="sm" onClick={()=>inspect(ownJob.id)}>Open execution<ArrowUpRight size={14}/></Button></div><TraceActivity key={ownJob.id} id={ownJob.id} onInspect={inspect}/></div>}
-   {failed&&<div className="job-error" role="alert"><strong>{statusLabel(failed.status)}</strong><span>{failed.error}</span><Button variant="ghost" size="sm" onClick={()=>inspect(failed.id)}>Inspect trace</Button></div>}
+   {failed&&<div className="job-error" role="alert"><strong>{statusLabel(failed.status)}</strong><span>{failed.error}</span><TraceActivity key={failed.id} id={failed.id} onInspect={inspect} usageOnly/><Button variant="ghost" size="sm" onClick={()=>inspect(failed.id)}>Inspect trace</Button></div>}
   </div></div>
   <div className="chat-dock"><div className="chat-column">
    {notice&&<p className="dock-notice" role="status">{notice}</p>}

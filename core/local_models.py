@@ -523,6 +523,8 @@ class LocalModels:
         if stop:
             body["stop"] = list(stop)
         response = local_json(self.url + "/v1/chat/completions", body, key=self.key)
+        from .usage import record_usage
+        record_usage(response.get("usage"))  # include generated text even if a guard or cancellation rejects it
         self.check_cancel()
         choices = response.get("choices", [])
         if not choices or choices[0].get("finish_reason") != "stop":

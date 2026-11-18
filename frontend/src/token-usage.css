@@ -1,0 +1,11 @@
+.token-usage{color:var(--muted-foreground);font-size:14px;line-height:1.5;margin:8px 0;font-variant-numeric:tabular-nums}
+.token-usage>summary{cursor:pointer;min-height:44px;padding:10px 0}
+.token-usage>summary:focus-visible{outline:2px solid var(--primary);outline-offset:3px;border-radius:4px}
+.token-summary{display:inline-flex;flex-wrap:wrap;gap:4px 16px;max-width:calc(100% - 24px);vertical-align:top}
+.token-detail{max-width:68ch;padding:0 0 8px;overflow-wrap:anywhere}
+.token-detail p{margin:8px 0}
+.token-detail dl{margin:12px 0}
+.token-detail dl>div{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 16px;margin:8px 0}
+.token-detail dt{color:var(--foreground)}
+.token-detail dt small{display:block;font-size:14px;color:var(--muted-foreground)}
+.token-detail dd{margin:0}

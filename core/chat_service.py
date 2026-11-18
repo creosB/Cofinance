@@ -269,7 +269,7 @@ class ChatService:
                 trace.finish(summary={'answer':answer,'risk_mode':'not_resolved'})
                 with self.lock:
                     check()
-                    self.store.finish(job['id'],answer,{'kind':'clarification','charts':[],'evidence':[],'tickers':[],'mode':job['model']},[], 'complete')
+                    self.store.finish(job['id'],answer,{'kind':'clarification','charts':[],'evidence':[],'tickers':[],'mode':job['model'],'usage':trace.data.get('usage')},[], 'complete')
                 return
             tools=self.market_factory(cancel=cancel)
             news=NewsReader(self.root/'news.db')
@@ -318,6 +318,7 @@ class ChatService:
                 except Exception:headline=None  # an aid, never a blocker
             health=news_health(self.root/'news.db')
             payload={'kind':'research','mode':job['model'],'tickers':tickers,'charts':list(tools.charts.values()),
+                     'usage':trace.data.get('usage'),
                      'crowd_odds':odds if odds and (odds.get('markets') or odds.get('errors')) else None,
                      'headline_signal':headline,
                      'snapshots':tools.snapshots,'evidence':tools.evidence+news.evidence,

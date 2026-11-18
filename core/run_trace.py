@@ -115,6 +115,10 @@ class TraceRecorder:
                 if node["status"] != "error":
                     node["status"] = "fallback" if result.get("fallback") else "complete"
                 node["outputs"] = safe(result.get("output"))
+                if name == "Narrate evidence" and kind == "model":
+                    from .usage import counts, summarize
+                    node["usage"] = counts(result.get("usage"))
+                    self.data["usage"] = summarize(self.data["spans"], self.data["dropped_spans"])
                 node["duration_ms"] = round(max(0, self.clock() - start) * 1000, 3)
                 self.parent.reset(token)
                 self.flush()
@@ -141,6 +145,8 @@ class TraceRecorder:
                 n["status"] in {"error", "fallback"} for n in self.data["spans"]) else "complete"
             self.data["duration_ms"] = round(max(0, self.clock() - self.started) * 1000, 3)
             self.data["summary"] = safe(summary)
+            from .usage import summarize
+            self.data["usage"] = summarize(self.data["spans"], self.data["dropped_spans"])
             self.flush()
             return self.data
 
@@ -177,9 +183,17 @@ class TracedLLM:
             self.trace.event("Tool-only report", "decision", {"reason": "narrator_disabled"}, actor=self.actor, fallback=True)
             return ""
         # Do not record private system prompts or hidden reasoning tokens.
-        return self.trace.call("Narrate evidence", "model", lambda: self.backend.complete(system, prompt, max_tokens=max_tokens, **options),
-                               actor=self.actor, model=model_name(self.backend),
-                               inputs={"evidence": prompt, "system_characters": len(system), "output_token_limit": max_tokens})
+        from .usage import capture_usage
+        with self.trace.span("Narrate evidence", "model", actor=self.actor, model=model_name(self.backend),
+                             inputs={"evidence": prompt, "system_characters": len(system), "output_token_limit": max_tokens}) as result:
+            with capture_usage() as receipts:
+                try:
+                    output = self.backend.complete(system, prompt, max_tokens=max_tokens, **options)
+                    result["output"] = output
+                    return output
+                finally:
+                    # One complete() means one runtime request. Uninstrumented backends remain unknown, not zero.
+                    result["usage"] = receipts[0] if len(receipts) == 1 else None
 
 
 class TracedTools:

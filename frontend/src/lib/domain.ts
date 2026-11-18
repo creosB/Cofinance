@@ -10,7 +10,7 @@ export interface RunMeta {
   id: string; title: string; mode: 'live'|'fixture'|'replay'; started_at: string;
   status: 'running'|'complete'|'degraded'|'error'; duration_ms: number|null; revision: number;
 }
-export interface Run extends RunMeta { format: 'cofinance-trace/1'; spans: Span[]; summary?: Json; dropped_spans?: number; storage_errors?: number }
+export interface Run extends RunMeta { format: 'cofinance-trace/1'; spans: Span[]; summary?: Json; usage?: unknown; dropped_spans?: number; storage_errors?: number }
 export interface Corpus { rows: number; window_days: number; collected_at: string; by_source: Record<string,number>; by_ticker: Record<string,number> }
 export const kinds: Kind[] = ['run','route','agent','model','decision','tool','gate','handoff']
 export function object(value: unknown): RecordData { return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as RecordData : {} }

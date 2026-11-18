@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { backgroundStages, interactiveStages, isNewsRun, stageLabel, elapsed, type MapStage } from '@/lib/run-map'
 import { duration, parseRun, type Run } from '@/lib/domain'
+import { TokenUsage } from './token-usage'
 
 const icons:Record<string,typeof Bot>={request:FileText,router:GitBranch,dispatch:GitBranch,data:Bot,news:Bot,lead:Layers,guard:ShieldCheck,result:FileText,sources:Search,pregate:ShieldCheck,judge:GitBranch,signals:ShieldCheck,storage:Database}
 export function RunMap({run,selected=null,onInspect,compact=false}:{run:Run;selected?:string|null;onInspect:(id:string)=>void;compact?:boolean}){
@@ -17,7 +18,7 @@ export function RunMap({run,selected=null,onInspect,compact=false}:{run:Run;sele
   <p className="map-footnote">A role is not a separate model. The selected narrator can serve several roles in separate calls. Map branches show responsibility, not parallel execution.</p>
  </section>
 }
-export function TraceActivity({id,onInspect}:{id:string;onInspect:(runId:string,spanId?:string)=>void}){
+export function TraceActivity({id,onInspect,usageOnly=false}:{id:string;onInspect:(runId:string,spanId?:string)=>void;usageOnly?:boolean}){
  const [run,setRun]=useState<Run|null>(null),[error,setError]=useState('')
  useEffect(()=>{
   let disposed=false,timer:ReturnType<typeof setTimeout>|undefined
@@ -30,7 +31,7 @@ export function TraceActivity({id,onInspect}:{id:string;onInspect:(runId:string,
   }
   void poll();return()=>{disposed=true;stop.abort();clearTimeout(timer)}
  },[id])
- return run?<RunMap run={run} compact onInspect={spanId=>onInspect(id,spanId)}/>:<p role="status" className="muted">{error||'Loading observed execution...'}</p>
+ return run?<><TokenUsage usage={run.usage} running={run.status==='running'}/>{!usageOnly&&<RunMap run={run} compact onInspect={spanId=>onInspect(id,spanId)}/>}</>:<p role="status" className="muted">{error||'Loading observed execution...'}</p>
 }
 export function AnswerProcess({id,onInspect}:{id:string;onInspect:(runId:string,spanId?:string)=>void}){
  const [open,setOpen]=useState(false)

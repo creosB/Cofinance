@@ -57,6 +57,7 @@ Chat (Clock 2)
 - **Research:** provider-backed market snapshots, fundamentals, price charts and accepted news. Chat reads collected news; it never refreshes it silently.
 - **News:** headlines are quoted verbatim and grouped by their one source (company announcements, shared links). The narrator rewrote them into new claims in four tested prompt and guard variants, so this step is code.
 - **Visibility:** the run map shows actual model calls, dispatch decisions, tool outputs, retries and validation. A missing step is never shown as successful. No hidden reasoning is exposed or invented.
+- **Token usage:** each new answer shows runtime-reported narrator input, output and total tokens, with a per-role breakdown. Retries and rejected output count; missing usage is unavailable or partial, never estimated. These are summed call totals, not context-window occupancy. GLiNER routing, memory embeddings and separate news collection are excluded. Older answers have no counts.
 - **Conversations:** persistent history, cancellation, same-asset follow-ups and explicit asset tracking. Research never adds to the watchlist on its own.
 - **Memory:** hybrid keyword + Hy-Memory lite by default, with keyword fallback. Notes and recalled turns are context only, never evidence. Override with `COFINANCE_MEMORY=keyword`, `hymemory` or `hybrid`. Remember a note, forget one item or a conversation's memory, delete a conversation or clear all. [Memory design](docs/designs/remember_forget.md)
 
