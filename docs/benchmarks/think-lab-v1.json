@@ -1,0 +1,98 @@
+{
+  "format": "cofinance-think-lab/1",
+  "warning": "Experimental dev screen of thinking mode on the local narrator. Known dev outcomes, small n. Not a forecast, trading signal or financial advice.",
+  "protocol_sha256": "29daaddee56bc255889061650c13d3cdc050183d7ade39d957f95e34efd11c26",
+  "started_at": "2026-11-18T23:37:46.063900+00:00",
+  "finished_at": "2026-11-18T23:40:01.007086+00:00",
+  "narrator": {
+    "id": "lfm3-1.7b-atomic-ad-q4km",
+    "model_sha256": "b22df65673b54ed326f18f74826d76f3b65dadc237ffd6306cd52be04544827d"
+  },
+  "backend": "vulkan",
+  "budget": 384,
+  "smoke": {
+    "gates": {
+      "narration": {
+        "required": 1.0,
+        "got": 1.0,
+        "passed": true
+      },
+      "number_faithfulness": {
+        "required": 1.0,
+        "got": 1.0,
+        "passed": true
+      }
+    },
+    "think_cost": {
+      "calls": 7,
+      "median_seconds": 2.547,
+      "median_completion_tokens": 426
+    },
+    "off_cost": {
+      "calls": 7,
+      "median_seconds": 0.387,
+      "median_completion_tokens": 36
+    },
+    "incomplete": 0
+  },
+  "headlines": {
+    "think": {
+      "auc": 0.5079,
+      "early": 0.475,
+      "late": 0.5276,
+      "origin_cluster_bootstrap_95": [
+        0.4094,
+        0.5998
+      ]
+    },
+    "off": {
+      "auc": 0.6247,
+      "early": 0.6205,
+      "late": 0.6165,
+      "origin_cluster_bootstrap_95": [
+        0.5923,
+        0.6723
+      ]
+    },
+    "think_failures": 0,
+    "off_failures": 0,
+    "think_labels": {
+      "UP": 22,
+      "DOWN": 8,
+      "ABSTAIN": 10,
+      "ERROR": 0
+    },
+    "off_labels": {
+      "UP": 13,
+      "DOWN": 9,
+      "ABSTAIN": 18,
+      "ERROR": 0
+    },
+    "think_median_seconds": 2.922,
+    "off_median_seconds": 0.312,
+    "think_near_certain": {
+      "judged": 40,
+      "near_certain": 32,
+      "share": 0.8
+    },
+    "off_near_certain": {
+      "judged": 40,
+      "near_certain": 15,
+      "share": 0.375
+    }
+  },
+  "decisions": {
+    "chat_deep_think_switch": true,
+    "headline_thinking_candidate": false
+  },
+  "rules": {
+    "chat": "Offer an opt-in Deep think switch for chat answers only if the thinking arm passes every frozen narrator smoke gate. Default stays off. The switch never changes headline judgments, Polymarket records or any sealed benchmark. Cost (median seconds and completion tokens, thinking on versus the pinned thinking-off qualification) is reported, not gated: Baris decides whether it is worth it.",
+    "headlines": "Thinking for headline judgments becomes a candidate for the next unseen window only if, on the same 72 dev cases and Python aggregation, at most 2 judgments fail and the case-score AUC is above 0.55, above the thinking-off AUC, and above 0.50 in both halves. Otherwise headline judging stays thinking-off. Nothing is adopted from dev results."
+  },
+  "limits": [
+    "Dev evidence with known outcomes; 72 cases at 9 overlapping origins, 40 unique headlines",
+    "Smoke suite is small; it checks number faithfulness and length, not answer quality",
+    "One thinking budget (384 tokens) tested; a different budget is a new root",
+    "Thinking-off sides are existing reports on the same fingerprint, not a fresh rerun"
+  ]
+}

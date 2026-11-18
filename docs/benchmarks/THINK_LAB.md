@@ -35,7 +35,31 @@ on these inputs. Code: `qualify/think_lab.py`.
 
 ## Result
 
-Pending: one run after the rules were published.
+One run on 2026-11-19, after the rules were published. Compact result:
+[think-lab-v1.json](think-lab-v1.json).
+
+| | Thinking off | Thinking on |
+| --- | --- | --- |
+| Smoke gates (narration, number faithfulness) | passed | passed, 0 incomplete |
+| Median seconds per chat answer | 0.39 | 2.55 |
+| Median completion tokens per chat answer | 36 | 426 |
+| Headline ranking AUC, 72 dev cases | **0.625** (halves 0.621, 0.617) | **0.508** (halves 0.475, 0.528) |
+| Origin-cluster interval | 0.592 to 0.672 | 0.409 to 0.600 |
+| Headline labels UP / DOWN / ABSTAIN | 13 / 9 / 18 | 22 / 8 / 10 |
+| Near certain (top label at least 0.99) | 15 of 40 | 32 of 40 |
+| Median seconds per headline | 0.31 | 2.92 |
+
+**Decisions under the frozen rules.**
+
+- **Chat:** the thinking arm passed every gate, so an opt-in Deep think switch is allowed. It costs about 6.6
+  times the time and 12 times the output tokens per answer. Whether to build it is Baris's call; it needs the live
+  narrator restarted with thinking flags and qualified on that fingerprint.
+- **Headline judgments:** not a candidate. Thinking lost the ranking skill the thinking-off judge showed on this
+  dev window, leaned UP, and became near certain on most headlines, which flattens the graded scores the ranking
+  needs. Headline judging stays thinking-off.
+
+These are dev inputs with known outcomes; the gap is a reason not to pursue thinking for judgments, not a
+confirmed property of the model.
 
 ## Not tested
 
