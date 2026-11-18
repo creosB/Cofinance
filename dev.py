@@ -110,6 +110,7 @@ def job_state(text, mtime=None, boot=None, run=None):
 def wait(name, max_s=WAIT_DEFAULT, tick=2.0):
     """Block until a background job finishes or max_s passes. This is the loop guard for polling: one call, a hard cap,
     and a plain answer (exit 0 done, 1 failed, 2 still running) instead of repeated sleep-and-status calls."""
+    printable_stdout()
     log, started, boot = log_path(name), time.monotonic(), boot_time()
     max_s = min(max_s, WAIT_MAX)
     while True:
@@ -154,9 +155,16 @@ def summarize(text):
     return (lines[-1][:160] if lines else '(empty)')
 
 
+def printable_stdout():
+    """Logs hold arbitrary job output (vite prints a check mark); a cp1252 console or pipe must not crash the report."""
+    try:
+        sys.stdout.reconfigure(errors='replace')
+    except AttributeError:  # a test's StringIO
+        pass
+
+
 def status():
-    # Logs hold arbitrary job output; a cp1252 pipe (| findstr) must not crash the listing.
-    sys.stdout.reconfigure(errors='replace')
+    printable_stdout()
     if not LOGS.exists():
         print('No logs yet.')
         return

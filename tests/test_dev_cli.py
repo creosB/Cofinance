@@ -132,6 +132,24 @@ class TestBackgroundJobs(unittest.TestCase):
         rows = {line.split()[0]: line.split()[4] for line in out.buffer.getvalue().decode('utf-8').splitlines()}
         self.assertEqual(rows, {'tps_gpu.server': 'untracked', 'job': 'running', 'done': 'done'})
 
+    def test_wait_reports_non_ascii_output_on_a_cp1252_console(self):
+        # 11/18: `dev.py wait frontend_check3` crashed with UnicodeEncodeError on vite's check mark
+        import io, sys
+        dev.log_path('enc_probe').write_text('\u2713 built in 993ms\ndev.py exit 0\n', encoding='utf-8')  # temp LOGS
+        buf = io.BytesIO()
+        console = io.TextIOWrapper(buf, encoding='cp1252', errors='strict')  # what PCbridge's cmd gives Python
+        with mock.patch.object(sys, 'stdout', console):
+            code = dev.wait('enc_probe', 1, tick=.1)
+            console.flush()
+        self.assertEqual(code, 0)
+        self.assertIn(b'enc_probe done: ? built in 993ms', buf.getvalue())
+        buf2 = io.BytesIO()
+        console2 = io.TextIOWrapper(buf2, encoding='cp1252', errors='strict')
+        with mock.patch.object(sys, 'stdout', console2), mock.patch.object(dev, 'boot_time', return_value=None):
+            dev.status()  # the same log through the listing
+            console2.flush()
+        self.assertIn(b'? built in 993ms', buf2.getvalue())
+
     def test_detached_command_carries_the_run_id(self):
         line = dev.detached_command(['python', '-c', 'pass'], Path('C:/x/data/_logs/j.log'), 'abc123')
         self.assertIn('set DEV_RUN_ID=abc123&& python -c pass', line)
