@@ -356,7 +356,7 @@ class ChatService:
         finally:
             with self.lock:self.threads.pop(job['id'],None)  # tracked until memory is written, so close() waits for it
 
-    # -- memory items (spec: docs/designs/remember_forget_draft.md, review round 1) ---------------------------------
+    # -- memory items (spec: docs/designs/remember_forget.md, review round 1) ---------------------------------
     def backends(self):
         """(keyword, semantic or None). Keyword is always written, so the visible fallback has data."""
         m=self.memory

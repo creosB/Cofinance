@@ -177,7 +177,7 @@ class TestWriting(unittest.TestCase):
                    *files('frontend/src', '.tsx', '.ts')]
         hits = sorted(str(p.relative_to(ROOT)) for p in targets if p.exists() and DASHES.search(p.read_text(encoding='utf-8')))
         self.assertEqual(hits, [], 'Em and en dashes render badly in chat clients and read as machine prose. Use a '
-                         'colon, comma or parentheses. README.old.md is an archive and exempt.')
+                         'colon, comma or parentheses.')
 
 
 if __name__ == '__main__':

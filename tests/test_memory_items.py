@@ -1,4 +1,4 @@
-"""Remember/forget steps 1 to 4 (docs/designs/remember_forget_draft.md, review round 1): ledger identity, one tombstone
+"""Remember/forget steps 1 to 4 (docs/designs/remember_forget.md, review round 1): ledger identity, one tombstone
 predicate on every recall path, notes, forget with pending vector deletes. API and UI are steps 5 and 6."""
 import http.client
 import json

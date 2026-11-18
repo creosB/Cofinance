@@ -1,6 +1,6 @@
 """Memory ledger: one identity and one state per remembered item, whatever backends hold copies.
 
-Spec: docs/designs/remember_forget_draft.md (review round 1). Lives in data/memory_v2.db next to the keyword index.
+Spec: docs/designs/remember_forget.md (review round 1). Lives in data/memory_v2.db next to the keyword index.
   * item_id: the run id for a research turn, a fresh id for a user note. Empty run ids are never an identity.
   * state: active | delete_pending | forgotten. Anything not active is a tombstone: it is filtered from every recall
     path and never re-written, so a forget can not be undone by a delayed write, a backfill or a failed vector delete.

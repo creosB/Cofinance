@@ -145,6 +145,11 @@ Two yes/no questions per case over the signals-v1 input, "will it close higher" 
 
 The shortlisted headline-v1 ran unchanged on origins 2026-11-09 to 2026-11-13 (40 cases, 29 with news, 34 unique headlines, zero failures), using only the session calendar and the gated corpus; no prices enter its prediction. Calls: 10 UP, 12 DOWN, 18 ABSTAIN. Sealed 2026-11-17 06:37 UTC, before most of these exits (2026-11-16 to 2026-11-20) had closed and with no outcome on disk; the hashes are [published here](window-2026-11-09-headline-sealed.json). It is scored once on prices downloaded after 2026-11-20. Confirmation needs AUC above 0.50 with the origin-cluster interval excluding 0.50; five origins make that a hard bar.
 
+Two more entries were registered on the same window before any exit price was on disk, and are scored in the same single look on the same price download:
+
+- **Mean addendum.** On dev, the mean of headline impacts ranked better than the sum (AUC 0.666 versus 0.585). That was found after looking at dev outcomes, so it is registered as an addendum bound to the sealed judgments, not as a replacement: [addendum](window-2026-11-09-headline-mean-addendum.json).
+- **AtomicChat arm.** The same technique with the AtomicChat narrator as judge (dev AUC 0.625), sealed with a switch rule published next to its hashes: it replaces the base for headline judging only if its window AUC is above 0.50, its origin-cluster interval excludes 0.50 and its AUC is at least the base arm's. Python applies the rule and writes the decision once: [arm seal](window-2026-11-09-headline-atomic-sealed.json), [comparison](NARRATOR-CANDIDATE.md).
+
 ## Grounding: every number traced to a tool
 
 `qualify.grounding` runs the live citation matcher over the sealed v2 outputs, against the same point-in-time tool values and served headlines the team saw.
@@ -155,7 +160,7 @@ The shortlisted headline-v1 ran unchanged on origins 2026-11-09 to 2026-11-13 (4
 | Data Analyst summaries (72) | 533 | **0** |
 | News Researcher summaries (72) | 80 | **0** |
 
-Guards accepted 61 of 72 final answers; 11 fell back to Python-built text (5 empty candidates, 4 unsupported terms, 2 unsupported risks). Data Analyst summaries passed 72 of 72; News Researcher summaries 17 of 72, the rest are Python-built news lists. Stock fundamentals were unavailable in 63 cases and no answer carries an untraced number that could stand in for one. A planted invented number is reported by the check; 2 of 2 deliberate breaks caught.
+Guards accepted 61 of 72 final answers; 11 fell back to Python-built text (5 empty candidates, 4 unsupported terms, 2 unsupported risks). Data Analyst summaries passed 72 of 72; News Researcher summaries 17 of 72, the rest are Python-built news lists. Since 2026-11-17 the live News Researcher is always a Python digest of the served headlines, so these replay summaries describe the earlier narrated version. Stock fundamentals were unavailable in 63 cases and no answer carries an untraced number that could stand in for one. A planted invented number is reported by the check; 2 of 2 deliberate breaks caught.
 
 Limits: this is value matching with the same matcher the guards use, so it shows the rule holds end to end, not that an independent judge agrees; a number that matches the wrong field still counts as traced. [Grounding result](grounding-2026-11-17.json)
 

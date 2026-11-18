@@ -17,6 +17,8 @@ The [historical benchmark](HISTORICAL.md) cannot rule out revised data or model 
 | `momentum20` | Past 20-session return | Sign; zero counts as UP |
 | `always_up` | Nothing | UP |
 
+Both LFM3 arms use the base LFM3 1.7B Q4_K_M pinned in the protocol. The app's default narrator changed to AtomicChat's variant on 2026-11-18; that does not touch this benchmark, which keeps its frozen model.
+
 Assets: AAPL, NVDA, MSFT, BTC-USD, ETH-USD. News coverage is currently Apple and NVIDIA official newsrooms only, so the news arms mostly abstain or run price-only for the other three. That is a measured limitation, not a hidden one.
 
 The protocol (prompts, arms, windows, rules) is written to `protocol.json` on the first record. A later run with any change is refused: a new idea needs a new `--root` and starts from zero.

@@ -70,4 +70,4 @@ Secondary illustrative six-month long/cash return after the stated round-trip co
 
 [Measured report](history-2026-11-09.json) and [frozen protocol](history-2026-11-09-protocol.json) include counts and hashes. Collection: six requested symbols covered (five targets plus calendar), no generated-case exclusions. Processing: 125 generated / 125 scored, no missing forecasts. Full per-case records and source responses stay in ignored local data.
 
-Decision: do not promote this forecast prompt into the product or retune it against these outcomes. Keep LFM3 as the research narrator. The untested hypothesis is whether a timestamp-safe **full research** pipeline adds value with historical news and fundamentals; this price-only experiment does not answer it.
+Decision (2026-11-09): do not promote this forecast prompt into the product or retune it against these outcomes. LFM3 stays a research narrator, not a forecaster (its AtomicChat variant is the default narrator since 2026-11-18). The untested hypothesis is whether a timestamp-safe **full research** pipeline adds value with historical news and fundamentals; this price-only experiment does not answer it.

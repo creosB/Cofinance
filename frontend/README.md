@@ -34,9 +34,11 @@ python -S -E -B -m ui.workbench --port 8876
 - Execution: switch between Run map and Step list. Select a node or observation
   to inspect input, emitted labels or text, number validation, and accepted output.
 - Models: narrator selection, download/resume, integrity verification, qualification,
-  load/unload, the two-clock system guide, and actual model-call inventory. A read-only smoke-comparison
-  disclosure records LFM3/MiniCPM measurements and their limits. LFM3 remains the chosen narrator;
-  candidate scores do not change selection or make alternatives selectable.
+  load/unload, the two-clock system guide, and actual model-call inventory. The default narrator is
+  AtomicChat's LFM3 1.7B Uncensored; the base LFM3 1.7B is an optional download, and a saved choice of
+  either is kept. A read-only disclosure records the earlier LFM3/MiniCPM smoke comparison; it changes no selection.
+- Answer cards: crowd odds and the experimental headline signal are built by Python and shown under
+  an answer, never narrated.
 - Dataset: source/date provenance and human-review readiness, without invented labels.
 
 Maps show actual recorded activity. Missing and not-dispatched components are distinct
@@ -44,8 +46,8 @@ from successful calls. Fixture and replay modes stay explicit. Branches represen
 ownership, not concurrent execution. The current specialist workflow is sequential.
 
 Spidermonkey/Jev inspired the signal-gating pattern. No Spidermonkey hosted service runs
-behind the app. GLiNER classifies; Python owns policy; the selected base narrator can
-serve multiple specialist roles through separate calls. Model output is candidate text,
+behind the app. GLiNER classifies; Python owns policy; the selected narrator serves the
+Data Analyst and Team Lead through separate calls, and the News Researcher is a Python digest. Model output is candidate text,
 not an accepted answer until the recorded guard permits it. No private chain-of-thought
 is exposed or invented. Older traces may have a clearly labelled reconstruction of their
 numeric allowlist; new traces record the guard evidence directly.
@@ -57,7 +59,8 @@ bundled, with no external browser assets. Plotly is lazy-loaded from the local b
 when a price chart is shown. Linear-inspired composition, not an official Linear package.
 The dark identity and original keyboard controls are preserved.
 
-The managed narrator uses the approved pinned official LFM3 GGUF and llama.cpp CPU build.
+Managed narrators come only from the pinned catalog (AtomicChat LFM3 1.7B by default, base LFM3
+optional) on the pinned llama.cpp Vulkan GPU build, with a separately qualified CPU fallback.
 Model download, hash verification, qualification, and loaded state are separate concepts.
 Passing the synthetic smoke suite does not establish financial accuracy. Failed or stale
 qualification cannot enable the picker. Tool-only reporting does not count as model inference.
@@ -74,7 +77,6 @@ Full fundamentals, primary-source breadth, ongoing news collection, and human-la
 remain unfinished. Follow-ups reuse the conversation's assets and a bounded, same-asset recall of earlier
 accepted turns and your notes (hybrid keyword + Hy-Memory lite by default, `COFINANCE_MEMORY=keyword` to
 turn the semantic side off). Recalled text is context only: its numbers never pass the number guard.
-See the repo checklist for acceptance gates.
 
 ## API and security
 
@@ -84,11 +86,12 @@ may open `/`; cross-site API reads and frames are blocked. Mutations require exa
 Origin, JSON, a bounded body, and the server's request token. No wildcard CORS.
 
 Read routes: `/api/runs`, `/api/run?id=...`, `/api/corpus`, `/api/state`,
-`/api/conversation?id=...`, `/api/job?id=...`, `/api/labels`, `/api/memory?session_id=...`.
+`/api/conversation?id=...`, `/api/job?id=...`, `/api/labels`, `/api/memory?session_id=...`,
+`/api/events` (live change stream, optional `session_id`).
 
-Explicit write actions: `/api/sessions`, `/api/chat`, `/api/jobs/cancel`,
-`/api/models/action`, `/api/models/select`, `/api/watchlist`, `/api/news/collect`, `/api/labels`,
-`/api/memory/note`, `/api/memory/forget` (`item_id` of `*` forgets the whole conversation).
+Explicit write actions: `/api/sessions`, `/api/sessions/delete`, `/api/sessions/clear`, `/api/chat`,
+`/api/jobs/cancel`, `/api/models/action`, `/api/models/select`, `/api/watchlist`, `/api/news/collect`,
+`/api/labels`, `/api/memory/note`, `/api/memory/forget` (`item_id` of `*` forgets the whole conversation).
 Memory actions are refused while a run in that conversation is active, and are idempotent per request id.
 
 Only the approved pinned catalog can download or execute a managed runtime. Downloads
@@ -152,7 +155,6 @@ The original v1 UI and databases are preserved, not migrated. V2 conversations a
 files live under ignored `data/`. Orchestration changes repair numeric validation and
 remove silent watchlist writes; they are not an unmodified copy of the v1 runtime.
 Stop the React service and use `ui.workbench` for the read-only fallback.
-No commit, push, branch, PR, or public deployment is authorized by these local changes.
 
 Generated controls use shadcn 4.23.0. Official CSS helpers and MIT attribution are retained
 in `src/vendor/`; the generator itself is not installed as an application dependency.

@@ -4,11 +4,13 @@ import { NarratorComparison } from './narrator-comparison'
 import benchmark from '@/lib/narrator-benchmark.json'
 
 describe('recorded narrator comparison',()=>{
- it('retains LFM3 without presenting the experiment as a live selection',()=>{
+ it('shows the old comparison as history, not as the current selection',()=>{
   expect(benchmark.retainedNarratorId).toBe('lfm3-1.7b-q4km')
   const html=renderToStaticMarkup(<NarratorComparison/>)
-  expect(html).toContain('LFM3 remains the chosen narrator')
-  expect(html).toContain('Retained choice')
+  expect(html).toContain('Earlier narrator comparison')
+  expect(html).toContain('default narrator is now AtomicChat')
+  expect(html).not.toContain('remains the chosen')
+  expect(html).toContain('Kept in this comparison')
   expect(html).toContain('Candidate only')
   expect(html).not.toContain('<button')
   expect(html).not.toContain('<select')

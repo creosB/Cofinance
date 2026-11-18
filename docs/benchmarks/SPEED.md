@@ -3,7 +3,7 @@
 > [!WARNING]
 > **Experimental speed measurement on one PC.** Faster answers are not better decisions. Not a trading signal or financial advice. Cofinance never trades.
 
-Tokens per second limit every narrated step: headline judgments, replays and chat answers. This page measures the pinned LFM3 1.7B Q4_K_M on llama.cpp `b12110`, same model file, CPU build versus the Vulkan build of the same release.
+Tokens per second limit every narrated step: headline judgments, replays and chat answers. This page measures the pinned LFM3 1.7B Q4_K_M on llama.cpp `b12110`, same model file, CPU build versus the Vulkan build of the same release. Since 2026-11-18 the default narrator is AtomicChat's variant of the same model; it runs on the same two runtimes and is qualified on both, but its speed is not measured separately here.
 
 Method: Ryzen 5 3600X (6 cores, 12 threads), 16 GB RAM, Radeon RX 5700 XT 8 GB. Real Cofinance prompts from the sealed replay: a 562-token Decision card (24 output tokens), a 133-token headline judgment, and a 160-token narration. Temperature 0, thinking off, prompt cache off, median of 3 after one warmup. Timings are llama-server's own; wall time is the full request.
 

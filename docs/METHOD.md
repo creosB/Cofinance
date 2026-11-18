@@ -18,7 +18,7 @@ Every forecast is sealed before its outcome exists: inputs, prompt, model weight
 
 ## 2. Record forward when the past leaks
 
-A replay is only honest if every input existed at the replay time. Our live news store expires old rows and no point-in-time archive exists, so a replay over past prediction markets would quietly feed the model later news. The [Polymarket replay](benchmarks/pm-replay-protocol-v3.json) is therefore recorded forward: markets are picked and forecasts sealed at time T, and they are scored after settlement. The weekly [forward ledger](benchmarks/FORWARD.md) works the same way, hash-chained and published before the US open. Both state up front how many matured cases they need before any claim (100 events and 26 batches).
+A replay is only honest if every input existed at the replay time. Our live news store expires old rows and no point-in-time archive exists, so a replay over past prediction markets would quietly feed the model later news. The [Polymarket replay](benchmarks/PM_REPLAY.md) is therefore recorded forward: markets are picked and forecasts sealed at time T, and they are scored after settlement. The weekly [forward ledger](benchmarks/FORWARD.md) works the same way, hash-chained and published before the US open. Both state up front how many matured cases they need before any claim (100 events and 26 batches).
 
 **Transfers to:** anything with a moving information set (news, prices, documents, user behavior). Slower, but the only design that cannot leak.
 
@@ -31,6 +31,8 @@ A full replay reruns every agent: about 35 minutes for 72 cases on a CPU. Most c
 ## 4. Measure skill that ignores the base rate
 
 In a rising market, "always up" looks smart; in a falling one it looks dumb. Neither is skill. Direction is scored as **ranking AUC**: does the system put more weight on UP for the assets that then rose? A constant call scores exactly 0.50 whatever the market did. That turned up two things accuracy hid: the team's one-word call is 0.50 by construction, and a momentum rule with 52.8% accuracy ranks at 0.406, so its accuracy was window luck. Probabilities are scored by **paired Brier against the strongest available reference**. On prediction markets that reference is the crowd's price, not a coin. Abstentions and failures are counted, never dropped.
+
+A score read from a model is not a probability until it behaves like one. The Polymarket replay's first record gave about 0.99 YES to every question, including 1.99 in total to two outcomes that cannot both happen. That is visible before any outcome, so coherence checks (complementary questions, mutually exclusive ranges) come before outcome scoring, not after.
 
 **Transfers to:** any classifier or forecaster on an imbalanced or drifting target. Pick the metric whose "no skill" value cannot move.
 
@@ -48,7 +50,7 @@ The 1.7B narrator kept turning headlines into new claims: wrong sources, reversa
 
 ## 7. Count a check only after it catches a planted break
 
-A passing test proves little until it fails for the right reason. Each new rule gets one deliberate break: a script swaps in a wrong line, runs the tests, restores the file, and reports caught or missed. For example, all 16 frozen Polymarket rules each catch their break. First passes regularly find gaps: a verdict that ignored its interval, a status path with no test. They also find tooling traps worth knowing:
+A passing test proves little until it fails for the right reason. Each new rule gets one deliberate break: a script swaps in a wrong line, runs the tests, restores the file, and reports caught or missed. For example, all 21 breaks planted in the current Polymarket replay's rules were caught. First passes regularly find gaps: a verdict that ignored its interval, a status path with no test. They also find tooling traps worth knowing:
 
 - A killed run can leave its break in the file, so always confirm the restore.
 - A two-line anchor can miss on Windows line endings, which shows as "not run", not "missed".
@@ -60,4 +62,4 @@ A passing test proves little until it fails for the right reason. Each new rule 
 
 It gives no independent proof that a forecast works: no window has been scored yet. It cannot replace a human reading answers for meaning. And a small, correlated sample stays small however carefully it is sealed. Each result page states its own limits next to its numbers.
 
-[Scorecard](SCORECARD.md) · [Replay and screening](benchmarks/REPLAY.md) · [Forward ledger](benchmarks/FORWARD.md) · [Polymarket calibration](benchmarks/POLYMARKET.md) · [Polymarket replay protocol](benchmarks/pm-replay-protocol-v3.json)
+[Scorecard](SCORECARD.md) · [Replay and screening](benchmarks/REPLAY.md) · [Forward ledger](benchmarks/FORWARD.md) · [Polymarket calibration](benchmarks/POLYMARKET.md) · [Polymarket replay](benchmarks/PM_REPLAY.md)

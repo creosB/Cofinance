@@ -1,6 +1,6 @@
-# Draft: explicit "remember this" and "forget" for Cofinance v2 chat memory
+# Explicit "remember this" and "forget" for Cofinance v2 chat memory
 
-Status: DRAFT for blind review (elephant-goldfish pattern), 2026-11-08. Not approved, not built.
+Status: **built and live** (2026-11-08, steps 1 to 6 below; tests in `tests/test_memory_items.py`). This page began as a draft for blind review (elephant-goldfish pattern); the review round and the build log are kept below as the design record. Where the review round conflicts with the first sections, the review round wins. A second fresh review of the built code has not been done.
 
 ## Context (what exists today)
 

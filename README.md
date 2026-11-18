@@ -1,22 +1,22 @@
 # Cofinance
 
-A local finance-research workspace for stocks and crypto. Chat with specialist agents, inspect their evidence and decisions, and keep conversation memory on your PC.
+A local finance-research workspace for stocks and crypto. Ask about an asset, and specialist agents gather market data and collected news, a local model writes the answer, and every step, source and check is open to inspect. Conversations and memory stay on your PC.
 
-**Current version: v2, in development.** React dashboard, Python policy, local inference. Not production-ready, not an automated trading system, and not financial advice.
+**v2, in development.** React dashboard, Python policy, local inference only. Not production-ready, not a trading system and not financial advice. Cofinance never trades.
 
-[Start](#start) · [How it works](#how-it-works) · [Models](#models-and-measurements) · [Historical benchmark (experimental)](#historical-benchmark) · [Prediction markets](#prediction-markets-read-only) · [Development](#development) · [Open work](#open-work)
+[Start](#start) · [How it works](#how-it-works) · [Models](#models) · [What we measured](#what-we-measured) · [Crowd odds](#crowd-odds-read-only) · [Development](#development) · [Open work](#open-work)
 
 ## Preview
 
-Actual local UI, captured 2026-11-09 with a purpose-created public NVDA conversation. No private chats or notes are shown. This run uses real cached GLiNER routing and Yahoo market tools, with **tool-only narration** (not an LFM3 forecast).
+Captured 2026-11-09 with a purpose-created public NVDA conversation; no private chats are shown. Later builds changed the default narrator and added the experimental headline card, so details differ from the current screen.
 
 ![Cofinance chat with provider-backed NVDA data and a price chart](docs/screenshots/chat.png)
 
 Chat, source-backed figures and the locally rendered chart.
 
-![Cofinance execution map showing the recorded routing, tool and guard path](docs/screenshots/execution.png)
+![Cofinance run map showing the recorded routing, tool and guard path](docs/screenshots/execution.png)
 
-The same run's execution map. Unused narrator steps remain explicitly unused, not simulated as successful calls.
+The same run's map. Steps that did not run are shown as unused, never as passed.
 
 ## Start
 
@@ -24,160 +24,85 @@ The same run's execution map. Unused narrator steps remain explicitly unused, no
 
 1. Double-click `run-dashboard.cmd` in the repository root.
 2. Open <http://127.0.0.1:8878> in a regular browser. Keep the terminal open.
-3. In **Models**, download, verify/qualify and select the default narrator, **LFM3 1.7B Uncensored** (AtomicChat). The original **LFM3 1.7B** is an optional download in the same view. Tool-only reports remain available.
-4. Collect news explicitly, then chat about an asset. Open the answer's run map to inspect sources, routing, model calls, guard checks and fallbacks.
+3. In **Models**, download, verify and qualify the default narrator, **LFM3 1.7B Uncensored** (AtomicChat). The original **LFM3 1.7B** is an optional download in the same view; a choice you made before is kept.
+4. Collect news, then ask about an asset. Open the answer's run map to see sources, routing, model calls, guard checks and fallbacks.
 
-The launcher builds the React frontend and starts the Python service. Node.js is needed for the build; Python and the local inference packages must already be installed. Do not start a second server if the address is already in use.
-
-After a frontend build, serving does not need Node:
+The launcher builds the React frontend and starts the Python service. Node.js is needed for the build; Python and the local inference packages must already be installed. Do not start a second server if the address is already in use. After a build, serving does not need Node:
 
 ```text
 python -E -B -m ui.dashboard --port 8878
 ```
 
-This is not a fresh-install recipe. `requirements.txt` still mixes v1 and v2 dependencies, and the pinned GLiNER cache and optional Hy-Memory environment need separate setup. No Gemini, OpenRouter or other hosted-model key is needed for v2. See [dashboard setup and API details](frontend/README.md).
+This is not a fresh-install recipe yet: `requirements.txt` still mixes v1 and v2 dependencies, and the pinned GLiNER cache and the optional Hy-Memory environment need separate setup. No hosted-model key is needed. [Dashboard setup, API and security details](frontend/README.md)
 
 ## How it works
 
-Python owns dispatch, data fetching, validation, persistence and explicit writes. Models classify or narrate; they have no tool or write authority.
+Python owns dispatch, data fetching, validation, persistence and every write. Models classify or narrate; they have no tool or write authority, and no number reaches you unless a tool produced it.
 
 ```text
-News (Clock 1, manual collection)
-  Official feeds -> pre-gate -> GLiNER judge -> Python signal gate -> local news store
+News (Clock 1, collected when you click Collect news)
+  official feeds + shared links -> pre-gate -> GLiNER judge -> rule urgency -> signal gate -> local news store
+                                                         -> each new headline judged once (experimental card)
 
 Chat (Clock 2)
-  Question -> GLiNER router -> Data Analyst / News Researcher -> Market Team Lead
-           -> evidence guards -> accepted answer or deterministic fallback
+  question -> GLiNER router (loaded at startup)
+           -> Data Analyst: market tools, narrated report
+           -> News Researcher: Python digest of the served headlines, no model call
+           -> news-only question: Python answer (digest + listed risks), no model call
+           -> otherwise Team Lead: narrated answer -> number, wording and risk guards
+           -> accepted answer, one retry, or a deterministic fallback
+           -> crowd odds card, Python only, never narrated
 ```
 
-- **Research:** provider-backed market snapshots, fundamentals, price charts and accepted news. Chat reads collected news; it does not silently refresh it.
-- **Visibility:** inspect actual model calls, dispatch decisions, tool outputs, retries and validation. A missing step is not shown as successful. No hidden chain-of-thought is exposed or invented.
-- **Conversations:** persistent history, cancellation, same-asset follow-ups and explicit asset tracking. Research never silently adds to the watchlist.
-- **Memory:** hybrid keyword + Hy-Memory lite by default, with keyword fallback. Notes and recalled turns are context only, never financial evidence. Override with `COFINANCE_MEMORY=keyword`, `hymemory` or `hybrid`.
-- **Controls:** remember a note, forget one item or a conversation's memory, delete a conversation, or clear all conversations. Forget keeps chat history; delete removes history and traces too. Watchlist, collected news and models are kept.
+- **Research:** provider-backed market snapshots, fundamentals, price charts and accepted news. Chat reads collected news; it never refreshes it silently.
+- **News:** headlines are quoted verbatim and grouped by their one source (company announcements, shared links). The narrator rewrote them into new claims in four tested prompt and guard variants, so this step is code.
+- **Visibility:** the run map shows actual model calls, dispatch decisions, tool outputs, retries and validation. A missing step is never shown as successful. No hidden reasoning is exposed or invented.
+- **Conversations:** persistent history, cancellation, same-asset follow-ups and explicit asset tracking. Research never adds to the watchlist on its own.
+- **Memory:** hybrid keyword + Hy-Memory lite by default, with keyword fallback. Notes and recalled turns are context only, never evidence. Override with `COFINANCE_MEMORY=keyword`, `hymemory` or `hybrid`. Remember a note, forget one item or a conversation's memory, delete a conversation or clear all. [Memory design](docs/designs/remember_forget.md)
 
-Detailed memory semantics and failure handling: [remember/forget design](docs/designs/remember_forget_draft.md).
-
-## Models and measurements
-
-### Active stack
+## Models
 
 | Component | Role | Runtime policy |
 | --- | --- | --- |
-| `fastino/GLiNER2.5-Decide` (486,444,053 parameters) | Route questions and classify headlines | Pinned local cache; no generated answers |
-| **LFM3 1.7B Uncensored, AD-Q4_K_M** (AtomicChat) | Narrate the Data Analyst report and team-lead answers; judge headlines | Default narrator; pinned by SHA-256 and qualified on its own; llama.cpp Vulkan GPU runtime with qualified CPU fallback; [comparison](docs/benchmarks/NARRATOR-CANDIDATE.md) |
-| **LFM3 1.7B, Q4_K_M** (Liquid AI) | Same jobs, selectable instead of the default | Optional download; pinned and qualified on its own |
+| `fastino/GLiNER2.5-Decide` (486,444,053 parameters) | Route questions, classify headlines | Pinned local cache; never generates answers |
+| **LFM3 1.7B Uncensored, AD-Q4_K_M** (AtomicChat) | Narrate the Data Analyst report and Team Lead answer; judge headlines | **Default.** Pinned by SHA-256, qualified on its own; llama.cpp Vulkan GPU build with a qualified CPU fallback |
+| LFM3 1.7B, Q4_K_M (Liquid AI) | Same jobs | Optional download; pinned and qualified on its own |
 | Hy-Memory lite + Qwen3-Embedding-0.6B | Semantic conversation recall | Optional local worker; keyword fallback |
 
-The agent roles use separate calls to the selected narrator, not separate downloaded models. Headline judgments are stored per narrator, so switching never sums two models' judgments together. Spidermonkey/Jev inspired the gating pattern; no hosted Spidermonkey service runs.
+The agent roles are separate calls to the selected narrator, not separate models. Headline judgments are stored per narrator, so switching never mixes two models' judgments. The narrator is a small model: it is good at short, checkable text, not at deciding. [AtomicChat versus base](docs/benchmarks/NARRATOR-CANDIDATE.md) · [GPU and CPU speed](docs/benchmarks/SPEED.md)
 
-**Decision, 2026-11-09: keep LFM3.** It remains the chosen quality-first narrator. MiniCPM5-1B is a smaller, faster option for future consideration, not a demonstrated quality upgrade. The comparison below does not change selection or add unqualified alternatives to the picker.
+## What we measured
 
-### Narrator smoke comparison
+> [!WARNING]
+> **Experimental measurements of a research tool.** None is a trading signal or financial advice. Each links to its method, limits and result file.
 
-Measured locally on Nov 8-9, 2026. All models passed the existing narration and number-faithfulness smoke gates.
+**Short version: the system is grounded and inspectable, and no predictive edge has been demonstrated.** Direction skill is scored as ranking AUC, where 0.50 is no skill whatever the market did, and probabilities by Brier against the crowd.
 
-| Narrator (Q4_K_M) | Narration | Numbers | Narration median | Effective output tokens/s | Model file |
-| --- | --- | --- | --- | --- | --- |
-| **LFM3 1.7B (retained)** | 8/8 | 6/6 | 3.837 s | 9.5 | 1.100 GB |
-| MiniCPM5-1B (candidate only) | 8/8 | 6/6 | 2.770 s | 13.9 | 0.688 GB |
-| MiniCPM5-2B (candidate only) | 8/8 | 6/6 | 4.393 s | 5.4 | 1.561 GB |
-
-Method: Ryzen 5 3600X, approximately 16 GB RAM, CPU-only, 6 threads, llama.cpp `b12110`, 4,096-token context, temperature 0, thinking off, 256-token output cap. Each arm ran all 23 synthetic cases twice (46 calls). Narrator gates cover only 4 narration + 3 number cases, repeated twice: **7 unique cases, not 14 independent examples**. Other categories test jobs these narrators do not own.
-
-Effective tokens/s includes prompt processing and is aggregated across all cases, not raw decoding speed. Timings are indicative, not a controlled performance benchmark; dashboard activity may have affected the MiniCPM runs. GB is decimal file size, not RAM usage. This smoke set cannot establish comparative financial accuracy or overall model quality.
-
-[Recorded scores, hashes and revisions](frontend/src/lib/narrator-benchmark.json). Full local reports stay under ignored `data/bakeoff_20261108/`.
-
-### Decision-model experiment status
-
-The 91-row training split has AI-generated labels, not human ground truth. Its held-out split was already used by calibration, so no new held-out result is claimed.
-
-| Arm | Observed outcome | Meaning |
+| Question | Answer so far | Details |
 | --- | --- | --- |
-| GLiNER alone | 72.5% materiality accuracy; macro-F1 0.667; AUC 0.790; 0 request errors | Provisional training baseline, not production accuracy |
-| MiniCPM5-2B-Jev | First run: 91/91 requests timed out under a 10 s budget. Rerun 2026-11-16 with a 900 s budget: 0 errors; 76.9% accuracy; macro-F1 0.435; AUC 0.874; trap accuracy 100%; scores squeezed into 0.02 to 0.26 (best digest threshold on this set 0.05); about 48 s per row (p95 83 s) on this CPU | Ranks materiality a bit better than GLiNER (AUC 0.874 vs 0.790) but its probabilities are badly compressed, so the current gate lines would never fire, and it is far too slow for live news. Train split only, model-written labels. Not adopted; no cascade decision |
-| d1-2B | Load failed due to an incompatible Transformers import | Blocked before inference; no quality score |
+| Are the numbers in answers real? | 1,006 of 1,006 numbers in replayed answers and summaries trace to a tool value or a served headline | [Scorecard](docs/SCORECARD.md) |
+| Does a price-only forecast predict direction? | No: UP on all 125 cases, balanced accuracy 50% | [Historical](docs/benchmarks/HISTORICAL.md) |
+| Do simple rules beat always-UP over 12 years? | No direction rule passes; dual momentum cut dev drawdown from 59% to 20% | [Lab](docs/benchmarks/LAB.md) |
+| Does the full team predict direction at past dates? | No edge demonstrated: UP on every valid call | [Replay](docs/benchmarks/REPLAY.md) |
+| Best decision technique on dev data | The model judges each headline, Python sums the judgments: AUC 0.585 (base) and 0.625 (AtomicChat) on 72 correlated cases with known outcomes. Sealed on an unseen window, scored once after it matures | [Replay](docs/benchmarks/REPLAY.md) |
+| Is the Polymarket crowd calibrated? | Fairly, a day and a week out | [Polymarket](docs/benchmarks/POLYMARKET.md) |
+| Our Bitcoin threshold model versus the crowd | The crowd is better a day out | [BTC vs crowd](docs/benchmarks/BTC_VS_CROWD.md) |
+| Narrator probability versus the crowd | Recording forward, nothing scored. Record 1: about 0.99 YES on all 18 markets, including pairs that cannot both happen | [Polymarket replay](docs/benchmarks/PM_REPLAY.md) |
+| Weekly forward forecasts | In progress; no claim before 26 matured batches | [Forward](docs/benchmarks/FORWARD.md) |
+| Volatility as a risk flag | Not confirmed on new assets | [Risk lab](docs/benchmarks/RISK_LAB.md) |
 
-No judge replacement has been adopted. Downloaded model files are pinned and checksum-verified; that is not the same as a working, qualified model.
+[Every measurement side by side](docs/SCORECARD.md) · [Method note: how results are kept honest](docs/METHOD.md)
 
-## Historical benchmark
+## Crowd odds (read-only)
 
-> [!WARNING]
-> **Experimental result.** One small retrospective run (125 asset-windows over 25 weekly windows, May-Nov 2026) of a price-only, benchmark-only LFM3 forecast arm. It is not the production research pipeline, not a trading signal and not financial advice. Do not use these numbers to make investment decisions. Historical prices may be revised and model training contamination cannot be ruled out.
-
-**No predictive edge demonstrated in the first price-only experiment.** LFM3 predicted UP in all 125 cases, exactly matching the always-UP baseline. A simple trailing-momentum rule did better overall. The current production research pipeline does not issue scored forecasts; this is a benchmark-only LFM3 forecast arm, not a validation of the full app.
-
-Next-five-US-session direction, with entry at the next session open. Fixed assets: AAPL, NVDA, MSFT, BTC and ETH. Completed outcomes through 2026-11-06:
-
-| Historical slice | Sampled asset-windows | LFM3 accuracy | Always-UP | Momentum over 20 sessions |
-| --- | --- | --- | --- | --- |
-| Last 1 month | 20 | 20.0% | 20.0% | 65.0% |
-| Last 3 months | 60 | 53.3% | 53.3% | 60.0% |
-| Last 6 months | 125 | 51.2% | 51.2% | 53.6% |
-
-All 125 inputs were processed: no request errors, abstentions or dropped predictions. The six-month sample is 25 time windows across five assets, not 125 independent market periods. The three slices overlap. LFM3's balanced accuracy is 50% in every slice.
-
-Inputs use only past prices, with asset names and dates hidden from the model. Forecasts were sealed before evaluation; future prices and current news/fundamentals never enter the predictor. Historical data may still be retrospectively revised, and the model's training cutoff is unknown, so this is **not proof of contamination-free out-of-sample performance**. No price targets or full-news historical archive were tested. No model/prompt was tuned on these scores.
-
-[Method and reproduction](docs/benchmarks/HISTORICAL.md) · [Measured report](docs/benchmarks/history-2026-11-09.json) · [Frozen protocol](docs/benchmarks/history-2026-11-09-protocol.json)
-
-LFM3 remains the chosen **research narrator**, not an adopted trading signal. The useful next test is a separately frozen full-research replay with timestamped news and prospective forecasts, not tweaking this prompt until the old prices look good.
-
-### Strategy lab (12 years, time-split)
-
-> [!WARNING]
-> **Experimental result.** Retrospective prices, five assets, simple rules and small models. Not a trading signal or financial advice.
-
-To iterate fast without fooling ourselves, the lab reuses the same target on 2,826 cases from 2014 to 2026, split by time into dev (tune freely), validation and a locked test split whose every opening is logged. **First run: nothing passes the frozen gate.** On dev, always-UP had the best accuracy (54.9%); momentum, trend, logistic regression and gradient boosting did not beat it significantly on dev or validation. The one useful signal is risk, not direction: dual momentum cut dev drawdown from 59% to 20%. No direction arm has opened the test split. [Lab setup and results](docs/benchmarks/LAB.md)
-
-**Risk lab (experimental, 2026-11-16).** Same cases, a risk target instead of direction. As a forecast of how big next week's move will be, 20-session volatility was *worse* than each asset's usual risk (failed on dev and validation; the test stayed closed). As a flag, it passed a rule fixed before the look: on the unseen test split (opened once, logged), weeks flagged as elevated had bigger-than-usual moves 31.6% of the time vs 15.4% otherwise (p 0.014). It was fragile (57 flagged cases, mostly MSFT), so it was rechecked once on nine new assets with a rule fixed before their prices were fetched: the pooled flag passed again (34.4% vs 27.0%, p 0.015) but only 5 of 9 assets agreed, and 6 were required. **Not confirmed; no risk flag is shown in chat.** Not a trading signal. [Method, result and caveats](docs/benchmarks/RISK_LAB.md)
-
-### Replay benchmark: the full system at past dates
-
-> [!WARNING]
-> **Experimental, dev window.** Tuning on this window is expected; no claim rests on it. Not a trading signal or financial advice.
-
-The live research pipeline runs with prices and gated news restricted to each historical origin; an additional benchmark-only Decision call predicts the next five sessions. **No predictive edge demonstrated.** On 72 overlapping cases across eight assets, v1 scored 41.7%, v2 scored 43.1%, always-UP scored 43.1%, and momentum20 scored 52.8%. v2 removed the observed Data Analyst token-cap failures and reduced median case latency from 38.7 to 28.9 seconds, but still produced 71 UP labels and one error. v3 produced 63 abstentions and nine malformed responses, so it was not adopted. Its report inputs and short output budget prevent attributing the failure to arithmetic ability alone. The logged date-cutoff checks found no violations; this is not a complete leakage audit. [Method, results and limits](docs/benchmarks/REPLAY.md) · [Result file](docs/benchmarks/replay-v1-2026-11-16.json)
-
-Cached Decision-only checks reject weak candidates in minutes instead of a 35-minute full replay. Decision techniques are judged by ranking AUC, where 0.5 is no skill regardless of market direction. Six were screened on the dev window: a Python-built fact card changed the call mix but failed its rule, model label probabilities ranked at 0.511, and asking rise and fall separately at 0.540. **The model judging each headline on its own, with Python summing the judgments, ranked at 0.585** (interval 0.525 to 0.654), above the gate's own labels (0.556). It is shortlisted, not adopted: its calls for the unseen window 2026-11-09 to 2026-11-13 are [sealed here](docs/benchmarks/window-2026-11-09-headline-sealed.json) before the outcomes exist and are scored once. A grounding check found every one of 1,006 numbers in the replayed answers traced to a tool value or a served headline. [All measurements side by side](docs/SCORECARD.md) · [Method note: what transfers](docs/METHOD.md) These checks do not replace end-to-end validation on unseen windows.
-
-### Forward benchmark (started 2026-11-09)
-
-> [!WARNING]
-> **Experimental, in progress.** No result yet and no conclusion before 26 matured weekly batches (about six months). Recorded forecasts are measurements, not trading signals or financial advice.
-
-Every week, five arms forecast the same five assets and are sealed into a hash-chained ledger **before** the entry price exists: LFM3 with ticker + accepted news, LFM3 price-only (the historical prompt, now truly out of sample), a deterministic news-direction rule, momentum and always-UP. Labels and the ledger hash are committed to [forward-ledger.jsonl](docs/benchmarks/forward-ledger.jsonl) before the US open, so GitHub's timestamp independently shows they came first. The protocol is frozen; a changed prompt or rule needs a new run from zero. News coverage is Apple and NVIDIA only for now.
-
-[Protocol and weekly routine](docs/benchmarks/FORWARD.md)
-
-## Prediction markets (read-only)
-
-> [!WARNING]
-> **Experimental result.** A retrospective measurement of recorded Polymarket prices (markets closed Nov 2025 to Oct 2026). Crowd odds are crowd opinion, not facts, not a Cofinance forecast and not financial advice. **Cofinance never trades**: no orders, keys or wallets.
-
-Chat can show a small **Crowd odds** card for BTC, ETH and some stocks: live Polymarket prices picked and formatted by Python, never narrated by a model and never used as evidence. Lookups are keyless GETs to Polymarket's public APIs only (median 0.17 s, 0 errors in a 12-lookup check). Disable with `COFINANCE_CROWD_ODDS=off`.
-
-Before showing the odds, we checked how well past prices came true on 2,000 sampled markets (from 48,232 eligible, volume at least $50k):
-
-| Horizon before close | Markets | Brier | Brier skill vs base rate |
-| --- | --- | --- | --- |
-| 1 day | 1,049 | 0.176 | 0.28 |
-| 7 days | 525 | 0.168 | 0.28 |
-| 30 days | 119 | 0.094 | 0.38 |
-
-The crowd was reasonably calibrated at 1 and 7 days. Cheap longshots won about as often as priced, so buying them (the old bot's Strategy B) shows **no measured edge**, before spreads and fees. Two odd buckets (no winners among 70 sub-20-cent markets a month out; 20 to 30 cent outcomes winning 38% a day out) are hypotheses for a fresh sample, not findings.
-
-[Method, buckets and caveats](docs/benchmarks/POLYMARKET.md) · [Published calibration table](docs/benchmarks/polymarket-calibration.json)
-
-**Bitcoin: our model vs the crowd (experimental).** On 3,779 resolved "Bitcoin above $X" daily markets, a plain volatility model was measurably worse than the crowd a day before settlement (contested Brier 0.1378 vs 0.1340, interval excludes zero), and a 50/50 blend did not help. Six hours out they were indistinguishable. So the crowd price is the better reference; Cofinance does not show its own threshold odds. [Method and checks](docs/benchmarks/BTC_VS_CROWD.md)
+Chat can show a small **Crowd odds** card for BTC, ETH and some stocks: live Polymarket prices picked and formatted by Python, never narrated and never used as evidence. Lookups are keyless GETs to Polymarket's public APIs only; there are no orders, keys or wallets. Disable with `COFINANCE_CROWD_ODDS=off`.
 
 ## Safety and local data
 
-- **No hosted inference.** Model calls stay local; market providers and approved news/download sources still require network access.
-- **Guarded output, not perfect verification.** Number/scale, wording, direction and supported-risk checks reject unsupported candidate text. At most one team-lead retry runs before fallback. Value matching and lexical checks do not prove every financial claim.
+- **No hosted inference.** Model calls stay local; market providers and approved news and download sources still need the network.
+- **Guarded output, not perfect verification.** Number, scale, wording, direction and supported-risk checks reject unsupported text, with at most one retry before the fallback. Value matching and lexical checks do not prove every claim.
 - **Explicit side effects.** Watchlist edits, collections, model downloads and conversation controls are user actions. The API binds to loopback and checks host, origin and request tokens.
-- **Private local state.** `data/` contains databases, traces, models and corpora and is git-ignored. Memory stays within a conversation and the relevant assets. Deletion uses tombstones, vector sweeps and SQLite `secure_delete`; a failed vector delete stays pending for retry. This is not a guarantee of forensic erasure from backups or the device.
+- **Private local state.** `data/` holds databases, traces, models and corpora and is git-ignored. Deletion uses tombstones, vector sweeps and SQLite `secure_delete`; a failed vector delete stays pending for retry. This is not a guarantee of forensic erasure from backups or the device.
 
 ## Development
 
@@ -189,35 +114,34 @@ npm test
 npm run build
 ```
 
-The full backend suite needs the installed inference packages; live checks are opt-in. `COFINANCE_HYMEMORY_TESTS=1` enables real Hy-Memory checks and `COFINANCE_BROWSER_TESTS=1` enables installed-Chrome/Playwright checks. Fixtures do not replace real-model validation.
+`python dev.py` wraps the routines: `test` (add `--bg`, then `python dev.py wait suite`), `run --bg NAME -- <command>`, `status`, `wait NAME`, `news`, `forward record|score`, `dashboard` and `features`. Logs go to `data/_logs/`.
 
-For frontend development, run the Python server, then `npm run dev` in `frontend/`. Vite uses loopback port 5173 and proxies the local API. See [frontend/README.md](frontend/README.md) for security boundaries and browser checks.
+The full backend suite needs the installed inference packages; tests never touch the network unless opted in. `COFINANCE_HYMEMORY_TESTS=1` enables real Hy-Memory checks and `COFINANCE_BROWSER_TESTS=1` installed-Chrome checks. Repository rules (frozen files, import boundaries, no hosted endpoints, benchmark warnings) are tests in `tests/test_invariants.py`. For frontend work, run the Python server, then `npm run dev` in `frontend/` (Vite on loopback port 5173, proxying the local API).
 
 ## Open work
 
-v2 remains experimental. The main product gaps are:
-
-- Human-reviewed labels, reliable calibration and independent validation of the current urgency rules.
-- Compatibility testing for optional judges; no replacement for GLiNER has been adopted.
-- End-to-end prediction accuracy, broader narrator evaluation, and claim provenance beyond matching values, words and signs.
-- Broader primary-source coverage and bounded scheduled collection.
-- Reproducible fresh installation, backup/recovery and production-readiness checks.
+- **A forecasting layer that is checked before it is trusted.** Model readouts have not been shown to behave like probabilities. Next: test them on complementary and mutually exclusive questions, give forecasts the full market definition (settlement source, observation time, expiry versus touch), and compare against Python baselines from price and volatility.
+- **Evidence coverage.** News comes from the Apple and NVIDIA newsrooms plus shared links; crypto and regulatory sources are missing, and headline age and duplicate stories are not modeled.
+- **Scoring what is sealed** as it matures: the headline window, forward batches and the Polymarket replay.
+- Human-reviewed labels and independent validation of the urgency rules.
+- Reproducible fresh install, backup and recovery; claim provenance beyond matching values, words and signs.
 
 ## Repository map
 
 | Path | Purpose |
 | --- | --- |
-| `core/` | V2 routing, agents, tools, guards, services, memory and local models |
-| `qualify/` | Corpus, label workflow, calibration and qualification |
+| `core/` | v2 routing, agents, tools, guards, services, memory and local models |
+| `qualify/` | Qualification gates, benchmarks and experiments (replay, decision lab, forward ledger, Polymarket) |
 | `frontend/` | React + TypeScript + Vite dashboard |
 | `ui/` | Loopback server and read-only workbench |
-| `tests/` | Backend regression tests |
-| `docs/designs/` | Design notes and review records |
+| `tests/` | Backend tests, including the repository rules |
+| `docs/` | Scorecard, method note, benchmark write-ups with their result files, state charts, design notes |
+| `dev.py` | Routine commands for tests, background jobs, news, the forward ledger and the dashboard |
 | `data/` | Private local state and evidence (git-ignored) |
-| `app.py`, `agents/`, `tools/`, `storage/` | Historical v1 Streamlit implementation |
+| `app.py`, `agents/`, `tools/`, `storage/` | Historical v1 Streamlit app, kept for reference, not maintained |
 
 ## History and license
 
-[README.old.md](README.old.md) preserves the entire previous README, including the v1 pitch, screenshots, setup and historical claims. It is an archive, not current v2 guidance. The old application and its databases are preserved, not migrated.
+v1 was a Streamlit app on hosted models. Its README was removed from the tree on 2026-11-18 and stays in git history (`git show 21cee11:README.old.md`); its code is kept, not migrated.
 
 Please contact the author first to share or make changes anywhere. This work retains its existing [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International license](http://creativecommons.org/licenses/by-nc-sa/4.0/). Model and runtime components have their own licenses; see their pinned sources and local license copies.

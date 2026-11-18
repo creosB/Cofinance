@@ -10,9 +10,11 @@ How Cofinance v2 preserves the 3-agent team ("Data Analyst", "News Researcher", 
   1. GLiNER2.5-Decide (System-1 encoder; 486,444,053 parameters measured locally) acts as the deterministic Routing & Risk Executive:
      - Classifies intent, asset_class (stock vs crypto -> Fundamental vs Risk Guardian mode),
        and which specialist agents (`Data Analyst`, `News Researcher`) to dispatch.
-  2. Each Specialist Agent (`DataAnalystAgent`, `NewsResearcherAgent`, `TeamLeadAgent`) has:
+  2. Each Specialist Agent (`DataAnalystAgent`, `NewsResearcherAgent`, `TeamLeadOrchestrator`) has:
      - Deterministic tool pre-execution in Python (charts, fundamentals, gated news, watchlist updates).
-     - Its own isolated 1B LLM role prompt (<= 15 lines) that analyzes ONLY its domain slice.
+     - The Data Analyst and Team Lead: a short role prompt to the selected narrator over ONLY their slice.
+     - The News Researcher: no model call; `news_digest` quotes the served headlines (since 2026-11-17).
+     - A news-only question is answered in Python from the digest and listed risks, without the Team Lead call.
   3. Full A2A EventBus (`A2AMessage`, `A2AEvent`) + Glass-Box trace so the UI shows live agent handoffs.
 """
 from __future__ import annotations
