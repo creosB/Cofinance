@@ -18,7 +18,7 @@ Every forecast is sealed before its outcome exists: inputs, prompt, model weight
 
 ## 2. Record forward when the past leaks
 
-A replay is only honest if every input existed at the replay time. Our live news store expires old rows and no point-in-time archive exists, so a replay over past prediction markets would quietly feed the model later news. The [Polymarket replay](benchmarks/pm-replay-protocol-v2.json) is therefore recorded forward: markets are picked and forecasts sealed at time T, and they are scored after settlement. The weekly [forward ledger](benchmarks/FORWARD.md) works the same way, hash-chained and published before the US open. Both state up front how many matured cases they need before any claim (100 events and 26 batches).
+A replay is only honest if every input existed at the replay time. Our live news store expires old rows and no point-in-time archive exists, so a replay over past prediction markets would quietly feed the model later news. The [Polymarket replay](benchmarks/pm-replay-protocol-v3.json) is therefore recorded forward: markets are picked and forecasts sealed at time T, and they are scored after settlement. The weekly [forward ledger](benchmarks/FORWARD.md) works the same way, hash-chained and published before the US open. Both state up front how many matured cases they need before any claim (100 events and 26 batches).
 
 **Transfers to:** anything with a moving information set (news, prices, documents, user behavior). Slower, but the only design that cannot leak.
 
@@ -60,4 +60,4 @@ A passing test proves little until it fails for the right reason. Each new rule 
 
 It gives no independent proof that a forecast works: no window has been scored yet. It cannot replace a human reading answers for meaning. And a small, correlated sample stays small however carefully it is sealed. Each result page states its own limits next to its numbers.
 
-[Scorecard](SCORECARD.md) · [Replay and screening](benchmarks/REPLAY.md) · [Forward ledger](benchmarks/FORWARD.md) · [Polymarket calibration](benchmarks/POLYMARKET.md) · [Polymarket replay protocol](benchmarks/pm-replay-protocol-v2.json)
+[Scorecard](SCORECARD.md) · [Replay and screening](benchmarks/REPLAY.md) · [Forward ledger](benchmarks/FORWARD.md) · [Polymarket calibration](benchmarks/POLYMARKET.md) · [Polymarket replay protocol](benchmarks/pm-replay-protocol-v3.json)
