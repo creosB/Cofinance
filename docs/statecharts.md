@@ -47,3 +47,20 @@ stateDiagram-v2
     ready --> open: record seals the next batch
     open --> open: record refused, score counts the batch as pending
 ```
+
+## Historical GDELT collection
+
+Source: `NEXT` and `stage()` in `qualify/gdelt.py`. Only a complete, hash-verified collection can enter evaluation.
+Both end states are immutable. One writer creates the exclusive start marker; a crash leaves receipts for audit,
+not a silently reusable corpus. A changed collector or failed run needs a new folder. No UI or scheduler uses it.
+
+```mermaid
+stateDiagram-v2
+    [*] --> empty
+    empty --> frozen: rules saved
+    frozen --> collecting: collection starts
+    collecting --> complete: all intervals resolved
+    collecting --> incomplete: gap or request limit
+    complete --> [*]
+    incomplete --> [*]
+```
