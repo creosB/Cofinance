@@ -1,0 +1,308 @@
+{
+  "accounting": {
+    "cached_failed_judgments": 0,
+    "excluded": {
+      "outside_fixed_origins": 16
+    },
+    "missing_served_judgments": 0,
+    "same_provider_differences": [],
+    "same_provider_snapshot_checks": 168
+  },
+  "analysis": {
+    "arms": {
+      "always_up": {
+        "auc": 0.5,
+        "balanced_accuracy": 0.5,
+        "calls": {
+          "UP": 96
+        },
+        "coverage": 1.0,
+        "n": 96,
+        "up_outcomes": 35,
+        "within_asset": {
+          "auc": 0.5,
+          "comparable_pairs": 203
+        },
+        "within_origin": {
+          "auc": 0.5,
+          "comparable_pairs": 145
+        }
+      },
+      "gate": {
+        "auc": 0.582903981264637,
+        "balanced_accuracy": 0.4189695550351288,
+        "calls": {
+          "ABSTAIN": 35,
+          "DOWN": 24,
+          "UP": 37
+        },
+        "coverage": 0.6354166666666666,
+        "n": 96,
+        "up_outcomes": 35,
+        "within_asset": {
+          "auc": 0.5123152709359606,
+          "comparable_pairs": 203
+        },
+        "within_origin": {
+          "auc": 0.5896551724137931,
+          "comparable_pairs": 145
+        }
+      },
+      "headline": {
+        "auc": 0.6451990632318502,
+        "balanced_accuracy": 0.4351288056206089,
+        "calls": {
+          "ABSTAIN": 34,
+          "DOWN": 20,
+          "UP": 42
+        },
+        "coverage": 0.6458333333333334,
+        "n": 96,
+        "up_outcomes": 35,
+        "within_asset": {
+          "auc": 0.6477832512315271,
+          "comparable_pairs": 203
+        },
+        "within_origin": {
+          "auc": 0.6517241379310345,
+          "comparable_pairs": 145
+        }
+      },
+      "momentum20": {
+        "auc": 0.4430913348946136,
+        "balanced_accuracy": 0.5278688524590164,
+        "calls": {
+          "DOWN": 61,
+          "UP": 35
+        },
+        "coverage": 1.0,
+        "n": 96,
+        "up_outcomes": 35,
+        "within_asset": {
+          "auc": 0.16748768472906403,
+          "comparable_pairs": 203
+        },
+        "within_origin": {
+          "auc": 0.4689655172413793,
+          "comparable_pairs": 145
+        }
+      },
+      "news_count": {
+        "auc": 0.6262295081967213,
+        "balanced_accuracy": 0.4714285714285714,
+        "calls": {
+          "ABSTAIN": 22,
+          "UP": 74
+        },
+        "coverage": 0.7708333333333334,
+        "n": 96,
+        "up_outcomes": 35,
+        "within_asset": {
+          "auc": 0.6600985221674877,
+          "comparable_pairs": 203
+        },
+        "within_origin": {
+          "auc": 0.6482758620689655,
+          "comparable_pairs": 145
+        }
+      }
+    },
+    "asset_path_shuffle": {
+      "draws": 2000,
+      "fraction_at_least_observed": 0.1305,
+      "high": 0.7304449648711944,
+      "low": 0.35362997658079626,
+      "median": 0.527400468384075
+    },
+    "circular_date_shift": {
+      "aucs": [
+        0.6140515222482436,
+        0.5601873536299766,
+        0.5379391100702576,
+        0.4779859484777518,
+        0.44707259953161593,
+        0.4494145199063232,
+        0.42505854800936765,
+        0.47423887587822017,
+        0.5529274004683841,
+        0.6149882903981264,
+        0.6386416861826698
+      ],
+      "draws": 11,
+      "fraction_at_least_observed": 0.0,
+      "high": 0.6149882903981264,
+      "low": 0.42505854800936765,
+      "median": 0.5379391100702576
+    },
+    "news_only": {
+      "auc": 0.5968218773096822,
+      "balanced_accuracy": 0.5070214338507022,
+      "calls": {
+        "ABSTAIN": 12,
+        "DOWN": 20,
+        "UP": 42
+      },
+      "coverage": 0.8378378378378378,
+      "n": 74,
+      "up_outcomes": 33,
+      "within_asset": {
+        "auc": 0.6598360655737705,
+        "comparable_pairs": 122
+      },
+      "within_origin": {
+        "auc": 0.6,
+        "comparable_pairs": 100
+      }
+    },
+    "paired_auc_differences": {
+      "gate": {
+        "origin_bootstrap": {
+          "draws": 2000,
+          "high": 0.1314041745730551,
+          "low": -0.0030834914611005404,
+          "median": 0.0635615028306743
+        },
+        "point": 0.06229508196721312
+      },
+      "momentum20": {
+        "origin_bootstrap": {
+          "draws": 2000,
+          "high": 0.2693208430913349,
+          "low": 0.13325062034739454,
+          "median": 0.2032732447817837
+        },
+        "point": 0.20210772833723656
+      }
+    },
+    "parts": {
+      "dev": {
+        "auc": 0.6247049567269867,
+        "balanced_accuracy": 0.43627065302911094,
+        "calls": {
+          "ABSTAIN": 21,
+          "DOWN": 14,
+          "UP": 37
+        },
+        "coverage": 0.7083333333333334,
+        "n": 72,
+        "up_outcomes": 31,
+        "within_asset": {
+          "auc": 0.7453703703703703,
+          "comparable_pairs": 108
+        },
+        "within_origin": {
+          "auc": 0.6382113821138211,
+          "comparable_pairs": 123
+        }
+      },
+      "reused_window": {
+        "auc": 0.68125,
+        "balanced_accuracy": 0.375,
+        "calls": {
+          "ABSTAIN": 13,
+          "DOWN": 6,
+          "UP": 5
+        },
+        "coverage": 0.4583333333333333,
+        "n": 24,
+        "up_outcomes": 4,
+        "within_asset": {
+          "auc": 0.5833333333333334,
+          "comparable_pairs": 6
+        },
+        "within_origin": {
+          "auc": 0.7272727272727273,
+          "comparable_pairs": 22
+        }
+      }
+    },
+    "stress": {
+      "drop_strongest": {
+        "auc": 0.5248243559718969,
+        "balanced_accuracy": 0.10632318501170959,
+        "calls": {
+          "ABSTAIN": 73,
+          "DOWN": 13,
+          "UP": 10
+        },
+        "coverage": 0.23958333333333334,
+        "n": 96,
+        "up_outcomes": 35,
+        "within_asset": {
+          "auc": 0.43596059113300495,
+          "comparable_pairs": 203
+        },
+        "within_origin": {
+          "auc": 0.4827586206896552,
+          "comparable_pairs": 145
+        }
+      },
+      "duplicate_all": {
+        "auc": 0.6451990632318502,
+        "balanced_accuracy": 0.4494145199063232,
+        "calls": {
+          "ABSTAIN": 30,
+          "DOWN": 20,
+          "UP": 46
+        },
+        "coverage": 0.6875,
+        "n": 96,
+        "up_outcomes": 35,
+        "within_asset": {
+          "auc": 0.6477832512315271,
+          "comparable_pairs": 203
+        },
+        "within_origin": {
+          "auc": 0.6517241379310345,
+          "comparable_pairs": 145
+        }
+      },
+      "no_news": {
+        "auc": 0.5,
+        "balanced_accuracy": 0.0,
+        "calls": {
+          "ABSTAIN": 96
+        },
+        "coverage": 0.0,
+        "n": 96,
+        "up_outcomes": 35,
+        "within_asset": {
+          "auc": 0.5,
+          "comparable_pairs": 203
+        },
+        "within_origin": {
+          "auc": 0.5,
+          "comparable_pairs": 145
+        }
+      },
+      "reverse_sign": {
+        "auc": 0.3548009367681499,
+        "balanced_accuracy": 0.2557377049180328,
+        "calls": {
+          "ABSTAIN": 34,
+          "DOWN": 42,
+          "UP": 20
+        },
+        "coverage": 0.6458333333333334,
+        "n": 96,
+        "up_outcomes": 35,
+        "within_asset": {
+          "auc": 0.3522167487684729,
+          "comparable_pairs": 203
+        },
+        "within_origin": {
+          "auc": 0.3482758620689655,
+          "comparable_pairs": 145
+        }
+      }
+    }
+  },
+  "cases": 96,
+  "format": "cofinance-local-news-simulation/1",
+  "limits": "Previously inspected outcomes, 12 overlapping origins, correlated assets. Shuffles are not new data. No independent price source.",
+  "network": "Process-local Python audit hook blocks socket, DNS, subprocess and shell events. Not OS isolation.",
+  "origins": 12,
+  "production_changed": false,
+  "protocol_sha256": "ba4a6ce8095e8c5f0a0a710f835beb9df7ee84cdf561ebd4504f1d98021bcd47",
+  "warning": "Experimental diagnostic on reused outcomes. Not a forecast or financial advice."
+}
