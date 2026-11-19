@@ -87,7 +87,8 @@ The agent roles are separate calls to the selected narrator, not separate models
 | Does a price-only forecast predict direction? | No: UP on all 125 cases, balanced accuracy 50% | [Historical](docs/benchmarks/HISTORICAL.md) |
 | Do simple rules beat always-UP over 12 years? | No direction rule passes; dual momentum cut dev drawdown from 59% to 20% | [Lab](docs/benchmarks/LAB.md) |
 | Does the full team predict direction at past dates? | No edge demonstrated: UP on every valid call | [Replay](docs/benchmarks/REPLAY.md) |
-| Best decision technique on dev data | The model judges each headline, Python sums the judgments: AUC 0.585 (base) and 0.625 (AtomicChat) on 72 correlated cases with known outcomes. Sealed on an unseen window, scored once after it matures | [Replay](docs/benchmarks/REPLAY.md) |
+| Best decision technique on dev data | The model judges each headline, Python sums the judgments: AUC 0.585 (base) and 0.625 (AtomicChat) on 72 correlated cases with known outcomes | [Replay](docs/benchmarks/REPLAY.md) |
+| Does it hold on an unseen window? | Passed its frozen rule, on thin evidence: AUC 0.681 (interval 0.619 to 0.857) on 24 of 40 sealed cases, only 3 origins, a falling week (4 of 24 rose). Simply counting the gate's headline labels scored 0.663 on the same cases. Scored early on 2026-11-19, so the last 16 cases are never scored | [Result](docs/benchmarks/window-2026-11-09-headline-result.json) |
 | Is the Polymarket crowd calibrated? | Fairly, a day and a week out | [Polymarket](docs/benchmarks/POLYMARKET.md) |
 | Our Bitcoin threshold model versus the crowd | The crowd is better a day out | [BTC vs crowd](docs/benchmarks/BTC_VS_CROWD.md) |
 | Does a tuned Python baseline catch the crowd, or add to it? | No: fat tails help slightly but the crowd stays ahead, and adding the price model to the crowd's price does not help | [Baseline](docs/benchmarks/BTC_BASELINE.md) |
@@ -127,7 +128,7 @@ The full backend suite needs the installed inference packages; tests never touch
 
 - **A forecasting layer that is checked before it is trusted.** Model readouts have not been shown to behave like probabilities. Next: test them on complementary and mutually exclusive questions, give forecasts the full market definition (settlement source, observation time, expiry versus touch), and compare against Python baselines from price and volatility.
 - **Evidence coverage.** News comes from the Apple and NVIDIA newsrooms plus shared links; crypto and regulatory sources are missing, and headline age and duplicate stories are not modeled.
-- **Scoring what is sealed** as it matures: the headline window, forward batches and the Polymarket replay.
+- **Scoring what is already recorded:** forward batch 2 counts once its five US sessions close (after 2026-11-20). No new forward batches or Polymarket records are planned; testing continues on news and prices already collected.
 - Human-reviewed labels and independent validation of the urgency rules.
 - Reproducible fresh install, backup and recovery; claim provenance beyond matching values, words and signs.
 

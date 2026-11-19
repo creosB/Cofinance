@@ -143,7 +143,17 @@ Two yes/no questions per case over the signals-v1 input, "will it close higher" 
 
 ## Unseen window: headline-v1 sealed before the outcomes
 
-The shortlisted headline-v1 ran unchanged on origins 2026-11-09 to 2026-11-13 (40 cases, 29 with news, 34 unique headlines, zero failures), using only the session calendar and the gated corpus; no prices enter its prediction. Calls: 10 UP, 12 DOWN, 18 ABSTAIN. Sealed 2026-11-17 06:37 UTC, before most of these exits (2026-11-16 to 2026-11-20) had closed and with no outcome on disk; the hashes are [published here](window-2026-11-09-headline-sealed.json). It is scored once on prices downloaded after 2026-11-20. Confirmation needs AUC above 0.50 with the origin-cluster interval excluding 0.50; five origins make that a hard bar.
+The shortlisted headline-v1 ran unchanged on origins 2026-11-09 to 2026-11-13 (40 cases, 29 with news, 34 unique headlines, zero failures), using only the session calendar and the gated corpus; no prices enter its prediction. Calls: 10 UP, 12 DOWN, 18 ABSTAIN. Sealed 2026-11-17 06:37 UTC, before most of these exits (2026-11-16 to 2026-11-20) had closed and with no outcome on disk; the hashes are [published here](window-2026-11-09-headline-sealed.json). Confirmation needs AUC above 0.50 with the origin-cluster interval excluding 0.50.
+
+**Scored 2026-11-19 (one look, early).** At Baris's request the window was scored before it fully matured, on prices through 2026-11-18, the last completed US session. Origins 11/09 to 11/11 had their exits; the 16 cases at 11/12 and 11/13 did not, and they stay unscored because the scorer refuses a second look. On the 24 scored cases (3 origins, 4 of 24 rose):
+
+| Arm | AUC | Origin-cluster interval | Python call (UP / DOWN / ABSTAIN) | Under the frozen rule |
+| --- | --- | --- | --- | --- |
+| headline-v1, base judge, sum | 0.681 | 0.619 to 0.857 | 6 / 6 / 12 | confirmed |
+| Mean addendum, base judge | 0.669 | 0.619 to 0.857 | | confirmed, but below the sum: live stays on the sum |
+| headline-v1, AtomicChat judge, sum | 0.681 | 0.619 to 0.857 | 5 / 6 / 13 | confirmed, at least the base: AtomicChat stays the live judge |
+
+Read it with its limits: three origin clusters make the interval coarse, the week fell, and counting the gate's own headline labels ranked almost as well (0.663; the 20-session return 0.625). Called cases were right 7 of 12 (base) and 7 of 11 (AtomicChat); balanced accuracy over all 24 was 0.375 because abstentions count as misses. The rule passed; a general claim needs more windows. [Compact result](window-2026-11-09-headline-result.json)
 
 Two more entries were registered on the same window before any exit price was on disk, and are scored in the same single look on the same price download:
 

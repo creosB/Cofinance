@@ -1,0 +1,262 @@
+{
+  "format": "cofinance-decision-window-result/1",
+  "warning": "Experimental one-look result on a small unseen window. Not a trading signal or financial advice.",
+  "window": [
+    "2026-11-09",
+    "2026-11-13"
+  ],
+  "scored_on": "2026-11-19, at Baris's request, on prices through 2026-11-18 (the last completed US session). Origins 2026-11-12 and 2026-11-13 had no exit yet; their 16 cases are unscored for good (one look).",
+  "base_arm": {
+    "warning": "Experimental one-look result on an unseen window. Not a trading signal or financial advice.",
+    "cases": 40,
+    "scored": 24,
+    "missing_outcomes": [
+      "2026-11-12:NVDA",
+      "2026-11-12:AAPL",
+      "2026-11-12:MSFT",
+      "2026-11-12:AMZN",
+      "2026-11-12:TSLA",
+      "2026-11-12:AMD",
+      "2026-11-12:GOOGL",
+      "2026-11-12:BTC",
+      "2026-11-13:NVDA",
+      "2026-11-13:AAPL",
+      "2026-11-13:MSFT",
+      "2026-11-13:AMZN",
+      "2026-11-13:TSLA",
+      "2026-11-13:AMD",
+      "2026-11-13:GOOGL",
+      "2026-11-13:BTC"
+    ],
+    "up_rate": 0.1667,
+    "prices_sha256": "7deb459a432934e5abbad0cb49833979bb19f92abd5c6fc0d913865fce57b9a9",
+    "ranking": {
+      "auc": 0.6813,
+      "early": 0.6667,
+      "late": 0.8333,
+      "origin_cluster_bootstrap_95": [
+        0.619,
+        0.8571
+      ],
+      "flat_outcomes_excluded": 0,
+      "floored": {
+        "UP": 0,
+        "DOWN": 0
+      },
+      "references_context_only": {
+        "momentum20_return": 0.625,
+        "net_headline_labels": 0.6625
+      }
+    },
+    "python_call": {
+      "all": {
+        "n": 24,
+        "accuracy_all": 0.2917,
+        "coverage": 0.5,
+        "accuracy_covered": 0.5833,
+        "balanced_accuracy": 0.375,
+        "labels": {
+          "UP": 6,
+          "DOWN": 6,
+          "ABSTAIN": 12,
+          "ERROR": 0
+        }
+      },
+      "early": {
+        "n": 8,
+        "accuracy_all": 0.25,
+        "coverage": 0.375,
+        "accuracy_covered": 0.6667,
+        "balanced_accuracy": 0.2667,
+        "labels": {
+          "UP": 1,
+          "DOWN": 2,
+          "ABSTAIN": 5,
+          "ERROR": 0
+        }
+      },
+      "late": {
+        "n": 16,
+        "accuracy_all": 0.3125,
+        "coverage": 0.5625,
+        "accuracy_covered": 0.5556,
+        "balanced_accuracy": 0.6333,
+        "labels": {
+          "UP": 5,
+          "DOWN": 4,
+          "ABSTAIN": 7,
+          "ERROR": 0
+        }
+      }
+    },
+    "failures": 0,
+    "confirmed": true,
+    "addenda": {
+      "headline-v1-mean": {
+        "ranking": {
+          "auc": 0.6687,
+          "early": 0.6667,
+          "late": 0.8333,
+          "origin_cluster_bootstrap_95": [
+            0.619,
+            0.8571
+          ],
+          "flat_outcomes_excluded": 0,
+          "floored": {
+            "UP": 0,
+            "DOWN": 0
+          },
+          "references_context_only": {
+            "momentum20_return": 0.625,
+            "net_headline_labels": 0.6625
+          }
+        },
+        "python_call": {
+          "all": {
+            "n": 24,
+            "accuracy_all": 0.25,
+            "coverage": 0.375,
+            "accuracy_covered": 0.6667,
+            "balanced_accuracy": 0.25,
+            "labels": {
+              "UP": 3,
+              "DOWN": 6,
+              "ABSTAIN": 15,
+              "ERROR": 0
+            }
+          },
+          "early": {
+            "n": 8,
+            "accuracy_all": 0.25,
+            "coverage": 0.375,
+            "accuracy_covered": 0.6667,
+            "balanced_accuracy": 0.2667,
+            "labels": {
+              "UP": 1,
+              "DOWN": 2,
+              "ABSTAIN": 5,
+              "ERROR": 0
+            }
+          },
+          "late": {
+            "n": 16,
+            "accuracy_all": 0.25,
+            "coverage": 0.375,
+            "accuracy_covered": 0.6667,
+            "balanced_accuracy": 0.1333,
+            "labels": {
+              "UP": 2,
+              "DOWN": 4,
+              "ABSTAIN": 10,
+              "ERROR": 0
+            }
+          }
+        },
+        "failures": 0,
+        "confirmed": true,
+        "sha256": "0e2943be157e79b437d0fc2ef99886b82e584528f7677085415e5113f8ac0f9a",
+        "registered_at": "2026-11-17T08:31:04.895697+00:00"
+      }
+    },
+    "adopt_mean_live": false
+  },
+  "atomic_arm": {
+    "warning": "Experimental one-look result on an unseen window. Not a trading signal or financial advice.",
+    "cases": 40,
+    "scored": 24,
+    "missing_outcomes": [
+      "2026-11-12:NVDA",
+      "2026-11-12:AAPL",
+      "2026-11-12:MSFT",
+      "2026-11-12:AMZN",
+      "2026-11-12:TSLA",
+      "2026-11-12:AMD",
+      "2026-11-12:GOOGL",
+      "2026-11-12:BTC",
+      "2026-11-13:NVDA",
+      "2026-11-13:AAPL",
+      "2026-11-13:MSFT",
+      "2026-11-13:AMZN",
+      "2026-11-13:TSLA",
+      "2026-11-13:AMD",
+      "2026-11-13:GOOGL",
+      "2026-11-13:BTC"
+    ],
+    "up_rate": 0.1667,
+    "prices_sha256": "7deb459a432934e5abbad0cb49833979bb19f92abd5c6fc0d913865fce57b9a9",
+    "ranking": {
+      "auc": 0.6813,
+      "early": 0.6667,
+      "late": 0.8333,
+      "origin_cluster_bootstrap_95": [
+        0.619,
+        0.8571
+      ],
+      "flat_outcomes_excluded": 0,
+      "floored": {
+        "UP": 0,
+        "DOWN": 0
+      },
+      "references_context_only": {
+        "momentum20_return": 0.625,
+        "net_headline_labels": 0.6625
+      }
+    },
+    "python_call": {
+      "all": {
+        "n": 24,
+        "accuracy_all": 0.2917,
+        "coverage": 0.4583,
+        "accuracy_covered": 0.6364,
+        "balanced_accuracy": 0.375,
+        "labels": {
+          "UP": 5,
+          "DOWN": 6,
+          "ABSTAIN": 13,
+          "ERROR": 0
+        }
+      },
+      "early": {
+        "n": 8,
+        "accuracy_all": 0.25,
+        "coverage": 0.375,
+        "accuracy_covered": 0.6667,
+        "balanced_accuracy": 0.2667,
+        "labels": {
+          "UP": 1,
+          "DOWN": 2,
+          "ABSTAIN": 5,
+          "ERROR": 0
+        }
+      },
+      "late": {
+        "n": 16,
+        "accuracy_all": 0.3125,
+        "coverage": 0.5,
+        "accuracy_covered": 0.625,
+        "balanced_accuracy": 0.6333,
+        "labels": {
+          "UP": 4,
+          "DOWN": 4,
+          "ABSTAIN": 8,
+          "ERROR": 0
+        }
+      }
+    },
+    "failures": 0,
+    "confirmed": true
+  },
+  "switch": {
+    "format": "cofinance-decision-window-switch/1",
+    "rule": "Second arm on the sealed 11/09 to 11/13 window, sealed after the base arm and its mean addendum. Same headline-v1 prompt, readout, sum and plus or minus 0.5 call line. Scored in the same single look as the base. AtomicChat may replace the base for live headline judging only if its window AUC is above 0.50 with the origin-cluster interval excluding 0.50 AND its AUC is at least the base sum arm AUC. Three hypotheses on one small correlated window: no general claim either way.",
+    "base_auc": 0.6813,
+    "arm_auc": 0.6813,
+    "arm_interval": [
+      0.619,
+      0.8571
+    ],
+    "arm_confirmed": true,
+    "switch": true,
+    "prices_sha256": "7deb459a432934e5abbad0cb49833979bb19f92abd5c6fc0d913865fce57b9a9"
+  }
+}
