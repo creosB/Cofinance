@@ -1,0 +1,86 @@
+{
+  "format": "cofinance-readout-check/1",
+  "warning": "Experimental dev screen of how a probability is read from the local model. Not a forecast, trading signal or financial advice. Cofinance never trades.",
+  "protocol_sha256": "65d57b1df011a7c9e3c647e4b8c05dfa4f8791ddd7f962c30fb55afa06e9456e",
+  "model": {
+    "id": "lfm3-1.7b-atomic-ad-q4km",
+    "revision": "3ad712542eb9de349dbd28f2739b69c925cdec7d",
+    "model_sha256": "b22df65673b54ed326f18f74826d76f3b65dadc237ffd6306cd52be04544827d",
+    "runtime": "b12110",
+    "backend": "vulkan",
+    "flags": [
+      "--ctx-size",
+      "4096",
+      "--parallel",
+      "1",
+      "--reasoning",
+      "off",
+      "--jinja",
+      "--device",
+      "Vulkan0",
+      "--n-gpu-layers",
+      "99",
+      "--flash-attn",
+      "on",
+      "--threads",
+      "6"
+    ],
+    "cpu_only": false
+  },
+  "code_sha256": "79dc9018e55d318742117b5426b16bc54dfd8b8d2e6ab565044b7cf7376199f0",
+  "cases": 54,
+  "calls": 180,
+  "seconds": 90.1,
+  "run_at_utc": "2026-11-19T11:54:23.485816+00:00",
+  "arms": {
+    "prefix-v2": {
+      "known_auc": 0.6319444444444444,
+      "known_accuracy": 0.5,
+      "complement_error": 0.9924815555555555,
+      "monotone_violation_rate": 0.0,
+      "ladder_gap": -4.66666666665283e-06,
+      "swap_error": 0.0036846666666666816,
+      "calls": 63,
+      "failure_rate": 0.0,
+      "failed_gates": [
+        "known_auc",
+        "known_accuracy",
+        "complement_error"
+      ],
+      "verdict": "not coherent"
+    },
+    "label": {
+      "known_auc": 0.7291666666666666,
+      "known_accuracy": 0.4583333333333333,
+      "complement_error": 0.22871766666666668,
+      "monotone_violation_rate": 0.5,
+      "ladder_gap": -0.0774656666666667,
+      "swap_error": 0.3109612222222222,
+      "calls": 63,
+      "failure_rate": 0.0,
+      "failed_gates": [
+        "known_auc",
+        "known_accuracy",
+        "complement_error",
+        "monotone_violation_rate",
+        "swap_error"
+      ],
+      "verdict": "not coherent"
+    },
+    "stated": {
+      "known_auc": 0.4826388888888889,
+      "known_accuracy": 0.5416666666666666,
+      "complement_error": 0.08888888888888896,
+      "monotone_violation_rate": 0.16666666666666666,
+      "ladder_gap": -0.03333333333333335,
+      "calls": 54,
+      "failure_rate": 0.0,
+      "failed_gates": [
+        "known_auc",
+        "known_accuracy",
+        "monotone_violation_rate"
+      ],
+      "verdict": "not coherent"
+    }
+  }
+}

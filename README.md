@@ -91,6 +91,7 @@ The agent roles are separate calls to the selected narrator, not separate models
 | Is the Polymarket crowd calibrated? | Fairly, a day and a week out | [Polymarket](docs/benchmarks/POLYMARKET.md) |
 | Our Bitcoin threshold model versus the crowd | The crowd is better a day out | [BTC vs crowd](docs/benchmarks/BTC_VS_CROWD.md) |
 | Narrator probability versus the crowd | Recording forward, nothing scored. Record 1: about 0.99 YES on all 18 markets, including pairs that cannot both happen | [Polymarket replay](docs/benchmarks/PM_REPLAY.md) |
+| Can a probability be read from the narrator at all? | No: on questions answered by its own price card, none of three readouts is coherent (first-token YES on everything, a JSON label with half its threshold steps rising, a stated number that is mostly 55) | [Readout check](docs/benchmarks/READOUT_CHECK.md) |
 | Weekly forward forecasts | In progress; no claim before 26 matured batches | [Forward](docs/benchmarks/FORWARD.md) |
 | Volatility as a risk flag | Not confirmed on new assets | [Risk lab](docs/benchmarks/RISK_LAB.md) |
 
