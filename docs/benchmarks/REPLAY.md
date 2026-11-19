@@ -155,6 +155,13 @@ The shortlisted headline-v1 ran unchanged on origins 2026-11-09 to 2026-11-13 (4
 
 Read it with its limits: three origin clusters make the interval coarse, the week fell, and counting the gate's own headline labels ranked almost as well (0.663; the 20-session return 0.625). Called cases were right 7 of 12 (base) and 7 of 11 (AtomicChat); balanced accuracy over all 24 was 0.375 because abstentions count as misses. The rule passed; a general claim needs more windows. [Compact result](window-2026-11-09-headline-result.json)
 
+**Dev screens after the window (2026-11-19, post hoc, every outcome already seen).** Pooling the 72 dev cases and the 24 scored window cases (96 cases, 12 origins, 61 unique headlines), two cheap checks looked for a change that helps on both parts and for both judges:
+
+- **Aggregation (cached judgments, no model calls):** mean, recency weighting (half-life 2 days), strongest headline, net sign count, story dedupe and per-source averaging. None beat the live sum on both parts for both judges. The mean wins on dev but lost on the window for both judges (base 0.669 vs 0.681, AtomicChat 0.656 vs 0.681). Dedupe and per-source averaging changed nothing: no case had two copies of a story or two sources.
+- **Judge prompt with the source kind and the stored first sentence (AtomicChat, rule written before the run: at least +0.02 on both parts):** sum 0.603 on dev (live prompt 0.625) and 0.694 on the window (0.681), so it fails. Rerunning the live prompt reproduced all 61 cached judgments exactly.
+
+The live technique stays as it is. With 61 headlines over 12 origins, the data is too small to tell such changes apart; more news per asset is the lever, not a new aggregation.
+
 Two more entries were registered on the same window before any exit price was on disk, and are scored in the same single look on the same price download:
 
 - **Mean addendum.** On dev, the mean of headline impacts ranked better than the sum (AUC 0.666 versus 0.585). That was found after looking at dev outcomes, so it is registered as an addendum bound to the sealed judgments, not as a replacement: [addendum](window-2026-11-09-headline-mean-addendum.json).
