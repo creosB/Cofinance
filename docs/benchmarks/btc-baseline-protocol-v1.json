@@ -1,0 +1,45 @@
+{
+  "format": "cofinance-btc-baseline/1",
+  "warning": "Experimental. Retrospective comparison with recorded crowd prices on resolved markets. Not a forecast, trading signal or financial advice. Cofinance never trades.",
+  "question": "Can a Python-only probability from price, volatility and horizon match or beat the Polymarket crowd on daily Bitcoin threshold markets, and does it add anything on top of the crowd?",
+  "source": {
+    "root": "data/btc_crowd_20261116",
+    "sha256": {
+      "sample.jsonl": "7f29270fe9346616be91b3c3dda179b1c81ccd4eb0877d6b76d0532b53f89e8e",
+      "btc_1h.json": "b64c94d187168740fb5a3302d6d7c1a2da2079d78675e6b357d87cfdd22e90d7",
+      "crowd.0.jsonl": "a200b647eddb76b3ccc68d595bd49ed73f411547ba026f18d4fc0d77df1eb16a",
+      "crowd.1.jsonl": "f4317f2a7f5e8b9d9d9fe5060f2a4255f35b56a9aa6ca60031b70d48482d54b2",
+      "crowd.2.jsonl": "282d877b1b464e1109c0fbe740ca1c306bccb0a9757878f56e9a9976183837f1",
+      "crowd.3.jsonl": "5aa6a2b5b84ae7e259f7558e0bf8a43590ad119609819c9254383dfc3a18b096"
+    },
+    "disclosure": "The v1 crowd comparison already reported the crowd, the untuned 720 h model and their average on both halves. No fitted candidate here was scored on the second half before this run."
+  },
+  "markets": "contested at the snapshot: crowd or the v1 model between 0.05 and 0.95; same filters as v1",
+  "split": {
+    "first_half": "day before 2026-05-01 (choose and fit)",
+    "second_half": "day on or after 2026-05-01 (score once)"
+  },
+  "horizons_hours": {
+    "24h": 24,
+    "6h": 6
+  },
+  "primary": "24h",
+  "candidates": {
+    "v1": "driftless lognormal, vol = stdev of the previous 720 hourly log returns (no fit)",
+    "ewma": "driftless lognormal, EWMA hourly variance; half-life chosen from [24, 72, 168, 336] hours",
+    "student_t": "unit-variance Student-t on the v1 z-score; df chosen from [3, 4, 6, 10]",
+    "recal": "logistic recalibration: sigmoid(a + b logit(v1))",
+    "crowd_plus": "feature test, not a baseline: sigmoid(a + b logit(crowd) + c logit(v1))"
+  },
+  "fit": "grid by Brier, logistic by maximum likelihood (ridge 0.0001); probabilities clipped to [0.001, 0.999]",
+  "selection": "first half only: leave-one-month-out Brier; the lowest of v1, ewma, student_t and recal is the baseline (ties to the earlier name); then it and crowd_plus are fit on the whole first half",
+  "metrics": "Brier (primary), log loss, ranking AUC; differences with a 95% bootstrap interval resampling whole days (2000 draws, seed 20261119)",
+  "claims": {
+    "baseline_beats_v1": "second half, primary horizon: Brier(baseline) - Brier(v1) interval entirely below 0",
+    "baseline_beats_crowd": "second half, primary horizon: Brier(baseline) - Brier(crowd) interval entirely below 0",
+    "model_adds_to_crowd": "second half, primary horizon: Brier(crowd_plus) - Brier(crowd) interval entirely below 0"
+  },
+  "secondary": "the 6 h horizon is reported with the same procedure; no claim",
+  "one_look": "the second half is scored once; results.json blocks a rerun",
+  "scope": "Bitcoin daily thresholds only. Python only: no model output, no news."
+}
