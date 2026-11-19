@@ -90,6 +90,7 @@ The agent roles are separate calls to the selected narrator, not separate models
 | Best decision technique on dev data | The model judges each headline, Python sums the judgments: AUC 0.585 (base) and 0.625 (AtomicChat) on 72 correlated cases with known outcomes. Sealed on an unseen window, scored once after it matures | [Replay](docs/benchmarks/REPLAY.md) |
 | Is the Polymarket crowd calibrated? | Fairly, a day and a week out | [Polymarket](docs/benchmarks/POLYMARKET.md) |
 | Our Bitcoin threshold model versus the crowd | The crowd is better a day out | [BTC vs crowd](docs/benchmarks/BTC_VS_CROWD.md) |
+| Does a tuned Python baseline catch the crowd, or add to it? | No: fat tails help slightly but the crowd stays ahead, and adding the price model to the crowd's price does not help | [Baseline](docs/benchmarks/BTC_BASELINE.md) |
 | Narrator probability versus the crowd | Recording forward, nothing scored. Record 1: about 0.99 YES on all 18 markets, including pairs that cannot both happen | [Polymarket replay](docs/benchmarks/PM_REPLAY.md) |
 | Can a probability be read from the narrator at all? | No: on questions answered by its own price card, none of three readouts is coherent (first-token YES on everything, a JSON label with half its threshold steps rising, a stated number that is mostly 55) | [Readout check](docs/benchmarks/READOUT_CHECK.md) |
 | Weekly forward forecasts | In progress; no claim before 26 matured batches | [Forward](docs/benchmarks/FORWARD.md) |

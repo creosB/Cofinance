@@ -1,0 +1,179 @@
+{
+  "format": "cofinance-btc-baseline/1",
+  "warning": "Experimental. Retrospective comparison with recorded crowd prices on resolved markets. Not a forecast, trading signal or financial advice. Cofinance never trades.",
+  "protocol_sha256": "288f43d2d52440cd62d9043a9013a696b7584e29dd15efcff3003e2468175af2",
+  "code_sha256": "64f38d08abfa8d5bbe2a3e7b1a3f2d6a048c4a5fab008b1416c7bc1e77bfaa60",
+  "horizons": {
+    "24h": {
+      "excluded": {
+        "not_contested": 2506,
+        "no_crowd_price": 32,
+        "no_spot_or_vol": 385
+      },
+      "first_half": {
+        "n": 392,
+        "days": 125,
+        "cv_brier": {
+          "v1": 0.1346529340247768,
+          "ewma": 0.13554590887002102,
+          "student_t": 0.13424002771801785,
+          "recal": 0.13477079515790663,
+          "crowd_plus": 0.13039419646848788,
+          "crowd": 0.13061655357142857
+        }
+      },
+      "chosen": "student_t",
+      "params": {
+        "student_t": 4,
+        "crowd_plus": [
+          -0.27663221411742633,
+          1.2091483241051737,
+          -0.040853892222922884
+        ]
+      },
+      "second_half": {
+        "n": 464,
+        "days": 184,
+        "yes_rate": 0.5043103448275862,
+        "crowd": {
+          "brier": 0.13693062984913792,
+          "log_loss": 0.42695567027295656,
+          "auc": 0.8845224823485693
+        },
+        "v1": {
+          "brier": 0.14054922336673661,
+          "log_loss": 0.4412661876788514,
+          "auc": 0.8783351913786697,
+          "brier_minus_crowd": 0.0036185935175986894,
+          "ci95_minus_crowd": [
+            -0.0008869210970386327,
+            0.008075279955689588
+          ]
+        },
+        "baseline": {
+          "brier": 0.13991794607667973,
+          "log_loss": 0.4412402909360427,
+          "auc": 0.8783351913786697,
+          "brier_minus_crowd": 0.0029873162275418086,
+          "ci95_minus_crowd": [
+            -0.0015728049733093837,
+            0.007109642733771807
+          ],
+          "brier_minus_v1": -0.0006312772900568808,
+          "ci95_minus_v1": [
+            -0.0026967263911069294,
+            0.0014576892654197416
+          ]
+        },
+        "crowd_plus": {
+          "brier": 0.13830108886967576,
+          "log_loss": 0.4320126009165465,
+          "auc": 0.8846339650687477,
+          "brier_minus_crowd": 0.0013704590205378397,
+          "ci95_minus_crowd": [
+            -0.002289308050759373,
+            0.0048974674023402375
+          ],
+          "brier_minus_v1": -0.0022481344970608497,
+          "ci95_minus_v1": [
+            -0.0076086624316692745,
+            0.0029984517739973667
+          ]
+        }
+      },
+      "claims": {
+        "baseline_beats_v1": false,
+        "baseline_beats_crowd": false,
+        "model_adds_to_crowd": false
+      }
+    },
+    "6h": {
+      "excluded": {
+        "not_contested": 2935,
+        "no_spot_or_vol": 374
+      },
+      "first_half": {
+        "n": 218,
+        "days": 122,
+        "cv_brier": {
+          "v1": 0.14853981476350953,
+          "ewma": 0.14821398255240956,
+          "student_t": 0.14897556899721903,
+          "recal": 0.15187085318677093,
+          "crowd_plus": 0.15200185550439793,
+          "crowd": 0.14982791169724768
+        }
+      },
+      "chosen": "ewma",
+      "params": {
+        "ewma": 72,
+        "crowd_plus": [
+          -0.06872783690144652,
+          0.5852862631321065,
+          0.33536832302944586
+        ]
+      },
+      "second_half": {
+        "n": 252,
+        "days": 177,
+        "yes_rate": 0.5158730158730159,
+        "crowd": {
+          "brier": 0.1604498501984127,
+          "log_loss": 0.4909534851266511,
+          "auc": 0.8433480453972257
+        },
+        "v1": {
+          "brier": 0.16046849346070194,
+          "log_loss": 0.4997386088610121,
+          "auc": 0.8458385876418664,
+          "brier_minus_crowd": 1.8643262289230744e-05,
+          "ci95_minus_crowd": [
+            -0.007198377172555544,
+            0.007446154640901416
+          ]
+        },
+        "baseline": {
+          "brier": 0.15935339011056782,
+          "log_loss": 0.5014690614499385,
+          "auc": 0.8460907944514502,
+          "brier_minus_crowd": -0.0010964600878448916,
+          "ci95_minus_crowd": [
+            -0.007958424365834651,
+            0.00582199966463791
+          ],
+          "brier_minus_v1": -0.0011151033501341223,
+          "ci95_minus_v1": [
+            -0.0039046328010964864,
+            0.0016546212012767303
+          ]
+        },
+        "crowd_plus": {
+          "brier": 0.15790271849358486,
+          "log_loss": 0.48351240479066016,
+          "auc": 0.8496847414880202,
+          "brier_minus_crowd": -0.002547131704827843,
+          "ci95_minus_crowd": [
+            -0.006357843360836258,
+            0.0011403371673759156
+          ],
+          "brier_minus_v1": -0.0025657749671170738,
+          "ci95_minus_v1": [
+            -0.006956319504847126,
+            0.0015201454473370293
+          ]
+        }
+      },
+      "claims": {
+        "baseline_beats_v1": false,
+        "baseline_beats_crowd": false,
+        "model_adds_to_crowd": false
+      }
+    }
+  },
+  "claims": {
+    "baseline_beats_v1": false,
+    "baseline_beats_crowd": false,
+    "model_adds_to_crowd": false
+  },
+  "run_at_utc": "2026-11-19T12:26:05.695184+00:00"
+}
