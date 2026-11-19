@@ -67,6 +67,27 @@ class TestChatShellBrowser(unittest.TestCase):
         self.assertEqual(len(self.service.store.session_ids()),before+1)
         self.assertEqual(self.page.get_by_role('button',name='New chat',exact=True).count(),1)
 
+    def test_attach_pdf_ask_without_an_asset_see_pages_then_remove(self):
+        from tests.test_documents import REPORT
+        self.page.get_by_role('button',name='New chat',exact=True).click()
+        self.page.get_by_role('heading',name='What should we research?').wait_for()
+        before=set(self.service.store.session_ids())
+        self.page.locator('input[type=file]').set_input_files({'name':'q3-report.pdf','mimeType':'application/pdf','buffer':REPORT})
+        chip=self.page.get_by_role('list',name='Attached PDFs')
+        chip.get_by_text('q3-report.pdf').wait_for()
+        self.assertIn('3 pages',chip.inner_text())
+        (sid,)=set(self.service.store.session_ids())-before  # the file belongs to exactly one new saved conversation
+        self.assertEqual([d['name'] for d in self.service.store.session(sid)['documents']],['q3-report.pdf'])
+        box=self.page.get_by_role('textbox',name='Research question')
+        self.assertIn('PDF',box.get_attribute('placeholder'))
+        box.fill('How much revenue did the third quarter bring?'); box.press('Enter')
+        sources=self.page.get_by_label('Pages used'); sources.wait_for()
+        self.assertIn('q3-report.pdf',sources.inner_text()); self.assertIn('page 2',sources.inner_text())
+        self.assertNotIn('which asset',self.page.locator('.msg-answer').inner_text().lower())
+        self.page.get_by_role('button',name='Remove q3-report.pdf').click()
+        chip.wait_for(state='detached')
+        self.assertEqual(self.service.store.session(sid)['documents'],[])
+
     def test_tools_collapse_persistence_and_conversation_options(self):
         self.choose()
         side=self.page.locator('.workspace-sidebar')  # answers carry their own Execution action; test the sidebar only
