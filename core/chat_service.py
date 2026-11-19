@@ -106,6 +106,7 @@ class ChatService:
         self.ledger=MemoryLedger(self.root/'memory_v2.db');self.semantic_retry_after=0.0
         self._semantic_inflight=set()  # run ids whose vector copy is being written outside the ledger lock
         self.lock=threading.RLock();self.active=None;self.events={};self.threads={};self.extractor=None;self.closed=False
+        self.think_runs=set()  # run ids that asked for deep think; the flag is a per-answer choice, not stored on the job
         # One router start at a time: the startup warm-up and a first chat must never launch two GLiNER processes.
         self.router_lock=threading.Lock();self.warm_thread=None;self.warm_cancel=threading.Event();self.warm={'state':'idle','seconds':None,'error':''}
         self.deleting=set()  # conversations being deleted: no run, note or forget may start in them
@@ -210,8 +211,10 @@ class ChatService:
         explicit-={'I','A','THE','AND','OR','USD','PE','EPS','ATH','CEO','API','AI'}
         return GlinerQueryRouter(self.extractor,UNIVERSE|explicit)
 
-    def submit(self,session_id,query,request_id,model):
+    def submit(self,session_id,query,request_id,model,think=False):
         valid_id(session_id);valid_id(request_id)
+        if not isinstance(think,bool):raise ValueError('Deep think must be on or off.')
+        if think and model=='facts':raise ValueError('Deep think needs a local narrator.')
         if not isinstance(query,str) or not 1<=len(query.strip())<=3000:raise ValueError('Enter a question of up to 3000 characters.')
         query=query.strip()
         if any(ord(c)<32 and c not in '\n\t' for c in query):raise ValueError('Control characters are not allowed.')
@@ -226,10 +229,12 @@ class ChatService:
             if self.models.thread and self.models.thread.is_alive():raise ModelError('Wait for the model operation to finish.')
             if model!=self.models.state['selected']:raise ModelError('The selected model changed. Refresh and choose it again.')
             if model!= 'facts' and not self.models.qualified():raise ModelError('The narrator must pass qualification before use.')
+            if think and not self.models.think_qualified():raise ModelError('Deep think has not passed qualification. Test it in Models first.')
             session=self.store.session(session_id)
             trace=LiveTrace(query[:100],directory=self.root/'traces',progress=lambda stage:self.store.progress(trace.run_id,stage))
             job=self.store.create_job(trace.run_id,request_id,session_id,query,model)
             event=threading.Event();self.events[job['id']]=event;self.active=job['id'];self.models.busy=True
+            if think:self.think_runs.add(job['id'])
             thread=threading.Thread(target=self.execute,args=(job,session,trace,event),daemon=True)
             self.threads[job['id']]=thread;thread.start()
             return job
@@ -245,6 +250,15 @@ class ChatService:
             if job['model']!= 'facts':
                 self.store.progress(job['id'],'Loading the selected narrator')
                 self.models.load()
+            think=job['id'] in self.think_runs;deep={'requested':think,'used':False}
+            if think:
+                self.store.progress(job['id'],'Starting deep think')
+                try:self.models.load_thinker();deep['used']=True
+                except (ModelError,OSError) as exc:
+                    deep['note']='Deep think could not start ('+str(exc)[:120]+'), so this answer was written without it.'
+                    trace.event('Deep think unavailable','decision',{'reason':'start_failed','note':deep['note']},actor='Python')
+                check()
+            elif self.models.thinker_loaded():self.models.stop_thinker()  # not wanted for this answer: free its memory
             router=self.router(job['query'],trace,cancel)
             # Always validate routing output and require explicit context when none exists.
             from .run_trace import TracedExtractor
@@ -288,8 +302,12 @@ class ChatService:
                 disabled=getattr(narrator,'disabled',False)
                 def complete(self,*args,**kwargs):
                     check();result=narrator.complete(*args,**kwargs);check();return result
+            class ThinkingNarrator(CheckedNarrator):
+                """Deep think: the Market Team Lead's final answer only. Specialists and headline judging never think."""
+                def complete(self,*args,**kwargs):
+                    check();result=narrator.complete(*args,think=True,**kwargs);check();return result
             llm=CheckedNarrator()
-            orch=TeamLeadOrchestrator(FixedRouter(),DataAnalystAgent(llm,tools),NewsResearcherAgent(llm,news),llm,tools)
+            orch=TeamLeadOrchestrator(FixedRouter(),DataAnalystAgent(llm,tools),NewsResearcherAgent(llm,news),ThinkingNarrator() if deep['used'] else llm,tools)
             # Conversation context: the most recent accepted answer plus recalled earlier turns, this session only.
             # Forgotten turns are tombstoned in the ledger and are never context, not even as the previous answer.
             # Checked here, at execution time, not from the submit-time snapshot.
@@ -329,7 +347,7 @@ class ChatService:
                      'headline_signal':headline,
                      'snapshots':tools.snapshots,'evidence':tools.evidence+news.evidence,
                      'citations':cite(answer[:16000],tools.snapshots,tools.evidence+news.evidence),
-                     'faithful_synthesis':result.faithful_synthesis,'risk_mode':result.risk_mode,
+                     'faithful_synthesis':result.faithful_synthesis,'risk_mode':result.risk_mode,'deep_think':deep,
                      'coverage_note':coverage_note(health,tickers),
                      'news_collected':bool(health.get('collected')),
                      # Accepted specialist outputs, so the UI can show structure without re-parsing the answer.
@@ -359,7 +377,7 @@ class ChatService:
             with self.lock,self.models.lock:
                 self.models.busy=False
                 if self.active==job['id']:self.active=None
-                self.events.pop(job['id'],None)
+                self.events.pop(job['id'],None);self.think_runs.discard(job['id'])
                 if remember is None:self.threads.pop(job['id'],None)  # clarification, cancel and error paths
         if remember is None:return
         try:

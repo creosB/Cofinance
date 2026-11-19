@@ -80,3 +80,9 @@
 .attach-button{width:44px;height:44px;color:var(--muted-foreground)}
 .document-sources p{display:flex;align-items:center;gap:8px;margin:0}
 @media (max-width:640px){.attachment-name{max-width:140px}.attachment-remove{width:44px!important;height:44px!important}}
+
+/* Deep think (2026-11-19): composer switch and the label under an answer. */
+.deep-think-toggle{min-height:44px;gap:6px;color:var(--muted-foreground);font-size:13px}
+.deep-think-toggle[data-on]{color:var(--foreground);background:var(--accent)}
+.deep-think-label{display:inline-flex;align-items:center;gap:4px}
+.deep-think-panel{margin-top:8px}

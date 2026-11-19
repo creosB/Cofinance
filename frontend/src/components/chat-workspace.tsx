@@ -14,6 +14,7 @@ import { CrowdOdds } from './crowd-odds'
 import { HeadlineSignal } from './headline-signal'
 import { TokenUsage } from './token-usage'
 import { AttachButton, AttachmentChips, DocumentSources } from './attachments'
+import { DeepThinkNote, DeepThinkToggle, saveDeepThink, savedDeepThink, thinkOf } from './deep-think'
 import { ago, evidenceUrl, statusLabel } from '@/lib/domain'
 import { canForget, contextLine, itemFor } from '@/lib/memory'
 import { refText, segments, targetId } from '@/lib/citations'
@@ -80,7 +81,7 @@ function Answer({message,inspect,chat}:{message:Message;inspect:(id:string,spanI
  const snaps=Object.entries(p.snapshots||{}),news=chat.workspace?.news,label=legacy?'Tool-only, saved before the fix':kind(message)
  const mem=p.kind==='research'?itemFor(chat.memory,chat.conversation?.id,message.run_id):undefined
  return <article className="msg msg-answer" aria-label="Research response">
-  <div className="msg-meta"><span>{new Date(message.created*1000).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}</span>{label&&<span className="answer-kind">{label}</span>}</div>
+  <div className="msg-meta"><span>{new Date(message.created*1000).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}</span>{label&&<span className="answer-kind">{label}</span>}<DeepThinkNote use={p.deep_think}/></div>
   {!structured&&!legacy&&<div className="msg-body"><Cited message={message}/></div>}
   {snaps.map(([t,s])=><div key={t} id={'facts-'+message.id+'-'+t} tabIndex={-1} className="cite-target"><Facts ticker={t} snap={s}/></div>)}
   {structured&&p.reports?.news&&<p className="msg-body news-summary">{p.reports.news}</p>}
@@ -164,6 +165,7 @@ export function ChatActions({chat,onRefresh}:{chat:ChatController;onRefresh:()=>
 
 export function ChatWorkspace({chat,inspect}:{chat:ChatController;inspect:(id:string,spanId?:string)=>void}){
  const [draft,setDraft]=useState(''),scroller=useRef<HTMLDivElement>(null),textarea=useRef<HTMLTextAreaElement>(null)
+ const [think,setThink]=useState(savedDeepThink)  // off unless the user turned it on; stays a per-answer request
  const conversation=chat.conversation,ownJob=conversation?.jobs.find(j=>activeStatuses.includes(j.status)),globalJob=chat.workspace?.active_job
  const model=chat.workspace?.models,newsRunning=chat.workspace?.news?.phase==='running',docs=conversation?.documents||[]
  const runningModel=!!model&&['downloading','verifying','qualifying','loading'].includes(model.phase)
@@ -171,7 +173,7 @@ export function ChatWorkspace({chat,inspect}:{chat:ChatController;inspect:(id:st
  const lastJob=conversation?.jobs[0],failed=!ownJob&&lastJob&&['error','interrupted','cancelled'].includes(lastJob.status)?lastJob:null
  useEffect(()=>{const el=scroller.current;if(el)el.scrollTop=el.scrollHeight},[conversation?.id,conversation?.messages.length,ownJob?.id])
  useEffect(()=>{setDraft('');textarea.current?.focus()},[chat.draftRevision])
- const send=async(retry=false)=>{if((!draft.trim()&&!retry)||chat.busy)return;try{await chat.send(draft.trim(),retry);setDraft('');textarea.current?.focus()}catch{}}
+ const send=async(retry=false)=>{if((!draft.trim()&&!retry)||chat.busy)return;try{await chat.send(draft.trim(),retry,think&&!!thinkOf(model)?.qualified&&model?.selected!=='facts');setDraft('');textarea.current?.focus()}catch{}}
  const notice=runningModel?(model?.stage||model?.phase)+'. Research can start when this finishes.':newsRunning?'News collection is running. Research can start when it finishes.':globalJob&&!ownJob?'A run in another conversation is active.':''
  return <div className="chat-view">
   <div className="chat-scroll" ref={scroller} role="log" aria-label="Conversation messages" aria-live="polite"><div className="chat-column">
@@ -185,7 +187,7 @@ export function ChatWorkspace({chat,inspect}:{chat:ChatController;inspect:(id:st
    {notice&&<p className="dock-notice" role="status">{notice}</p>}
    <div className="composer"><AttachmentChips chat={chat} documents={docs} disabled={chat.busy||!!ownJob}/>
     <Textarea ref={textarea} id="research-question" aria-label="Research question" value={draft} onChange={e=>setDraft(e.target.value)} maxLength={3000} rows={1} placeholder={docs.length?'Ask about the attached PDF or an asset':'Ask about a stock or crypto asset'} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();if(!blocked)void send()}}}/>
-    <div className="composer-bar"><AttachButton chat={chat} disabled={chat.busy||!!ownJob}/><ModelPicker chat={chat} compact/>
+    <div className="composer-bar"><AttachButton chat={chat} disabled={chat.busy||!!ownJob}/><ModelPicker chat={chat} compact/><DeepThinkToggle chat={chat} on={think} onChange={v=>{setThink(v);saveDeepThink(v)}} disabled={chat.busy||!!ownJob}/>
      {ownJob&&<Button variant="ghost" size="sm" disabled={chat.busy||ownJob.status==='cancelling'} onClick={()=>{void chat.post('/api/jobs/cancel',{id:ownJob.id}).catch(()=>{})}}><Square size={13}/>Stop run</Button>}
      {chat.hasRetry&&<Button variant="ghost" size="sm" disabled={blocked} onClick={()=>void send(true)}><RotateCcw size={13}/>Retry submission</Button>}
      <span className="composer-spacer"/>

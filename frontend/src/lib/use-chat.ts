@@ -15,7 +15,7 @@ export interface CrowdMarket {ticker:string;event:string;question:string;outcome
 export interface CrowdOdds {source:string;fetched_at:string|null;markets:CrowdMarket[];errors:string[];calibration_study?:string|null;note:string}
 export interface HeadlineAsset {ticker:string;score:number;call:string;served:number;judged:number;headlines:{title:string;label:string|null;impact:number|null}[]}
 export interface HeadlineSignal {version:string;judge?:string;call_line:number;dev_auc:number;assets:HeadlineAsset[];note:string}
-export interface Message {id:string;role:'user'|'assistant';content:string;created:number;run_id:string|null;payload:{kind?:string;mode?:string;usage?:unknown;tickers?:string[];charts?:PriceChart[];evidence?:Evidence[];citations?:unknown;snapshots?:Record<string,Snapshot>;coverage_note?:string;crowd_odds?:CrowdOdds|null;headline_signal?:HeadlineSignal|null;news_collected?:boolean;faithful_synthesis?:boolean;reports?:{data:string|null;news:string|null;news_items:number;document?:string|null};document_sources?:DocumentSource[];memory?:{backend:string;used_previous:boolean;recalled:{question:string;run_id:string|null;score:number;kind?:string;found_by?:string[]}[]}}}
+export interface Message {id:string;role:'user'|'assistant';content:string;created:number;run_id:string|null;payload:{kind?:string;mode?:string;usage?:unknown;tickers?:string[];charts?:PriceChart[];evidence?:Evidence[];citations?:unknown;snapshots?:Record<string,Snapshot>;coverage_note?:string;crowd_odds?:CrowdOdds|null;headline_signal?:HeadlineSignal|null;news_collected?:boolean;faithful_synthesis?:boolean;reports?:{data:string|null;news:string|null;news_items:number;document?:string|null};document_sources?:DocumentSource[];deep_think?:{requested:boolean;used:boolean;note?:string};memory?:{backend:string;used_previous:boolean;recalled:{question:string;run_id:string|null;score:number;kind?:string;found_by?:string[]}[]}}}
 export interface NewsTicker {ticker:string;digest:number;alert:number;newest_item:string|null}
 export interface NewsSource {name:string;label:string;ticker:string;host:string;timestamp_kind:string}
 export interface NewsRun {started_at:string|null;fetched:number;quarantined:number;duplicates:number;actions:Record<string,number>;source_status:Record<string,Record<string,string>>;errors:Record<string,string>}
@@ -69,7 +69,7 @@ export function useChat(){
  const [workspace,setWorkspace]=useState<WorkspaceState|null>(null),[conversation,setConversation]=useState<Conversation|null>(null)
  const [selected,setSelected]=useState(()=>{try{return localStorage.getItem('cofinance.chat')||''}catch{return ''}})
  const selectedRef=useRef(selected),newDraft=useRef(!selected),[draftRevision,setDraftRevision]=useState(0),[error,setError]=useState(''),[busy,setBusy]=useState(false),[version,setVersion]=useState(0)
- const alive=useRef(true),pending=useRef<{session_id:string;query:string;request_id:string;model:string}|null>(null)
+ const alive=useRef(true),pending=useRef<{session_id:string;query:string;request_id:string;model:string;think?:true}|null>(null)
  const newId=useRef<string|null>(null),[hasRetry,setHasRetry]=useState(false),[memory,setMemory]=useState<MemoryState|null>(null)
  useEffect(()=>{alive.current=true;return()=>{alive.current=false}},[])
  const refresh=useCallback(()=>setVersion(v=>v+1),[])
@@ -120,9 +120,9 @@ export function useChat(){
   newId.current ||= crypto.randomUUID().replaceAll('-','')
   const value=parseConversation(await post('/api/sessions',{request_id:newId.current}));newId.current=null;select(value.id);setConversation(value);return value.id
  },[post,select])
- const send=useCallback(async(query:string,retry=false)=>{
+ const send=useCallback(async(query:string,retry=false,think=false)=>{
   try{
-   if(!retry||!pending.current){const sid=selectedRef.current||await create();pending.current={session_id:sid,query,request_id:crypto.randomUUID().replaceAll('-',''),model:workspace?.models.selected||'facts'}}
+   if(!retry||!pending.current){const sid=selectedRef.current||await create();pending.current={session_id:sid,query,request_id:crypto.randomUUID().replaceAll('-',''),model:workspace?.models.selected||'facts',...(think?{think:true as const}:{})}}
    const result=parseJob(await post('/api/chat',pending.current));pending.current=null;setHasRetry(false);refresh();return result
   }catch(e){setHasRetry(!!pending.current);throw e}
  },[create,post,refresh,workspace?.models.selected])

@@ -197,7 +197,7 @@ def make_dashboard_handler(dist: Path, trace_dir: Path, corpus_dir: Path, servic
                 if self.path not in routes:
                     self.reply(404, {'error':'Unknown local action.'});return
                 # A model action may name one catalog narrator (download or qualify it); every other route is exact.
-                extra = {'model'} if self.path == '/api/models/action' else set()
+                extra = {'model'} if self.path == '/api/models/action' else {'think'} if self.path == '/api/chat' else set()  # think: optional, default off
                 if not routes[self.path] <= set(body) <= routes[self.path] | extra:raise ValueError('Unexpected request fields.')
                 if self.path in {'/api/sessions/delete', '/api/sessions/clear'}:
                     # Not under the service-wide lock either: deleting memory copies can start the local embedder.

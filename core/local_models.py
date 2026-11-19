@@ -95,16 +95,39 @@ def server_flags(backend):
     return [*COMMON_FLAGS, *BACKENDS[backend]["flags"]]
 
 
-def server_command(executable, model_path, alias, port, key, backend):
-    """The one llama-server command line, shared by the live narrator and every benchmark."""
+def server_command(executable, model_path, alias, port, key, backend, flags=None):
+    """The one llama-server command line, shared by the live narrator and every benchmark. `flags` is only for the
+    deep-think server; every other caller gets the qualified server_flags(backend)."""
     return [str(executable), "--model", str(model_path), "--alias", alias, "--host", "127.0.0.1", "--port", str(port),
-            *server_flags(backend), "--no-webui", "--api-key", key]
+            *(server_flags(backend) if flags is None else flags), "--no-webui", "--api-key", key]
 
 
 def runtime_fingerprint(backend, model=None):
     """Everything that can change the narrator's output: weights, runtime build and server flags."""
     b = BACKENDS[backend]
     return "|".join([narrator_spec(model or MODEL_ID)["sha"], b["sha"], " ".join(server_flags(backend)), "greedy-thinking-off-v1"])
+
+
+# Deep think chat switch (Baris chose "build" on 2026-11-19, after the think lab: smoke gates 1.0 with thinking, about
+# 2.5 s instead of 0.4 s per answer, headline thinking rejected). A SECOND llama-server with thinking allowed, started
+# only when a chat asks for deep think and used only for the Market Team Lead's answer. The qualified server keeps
+# COMMON_FLAGS, so every frozen benchmark, headline judgment and existing fingerprint stays exactly as it was.
+# Same budget and reasoning format as the think lab (docs/benchmarks/think-lab-protocol-v1.json).
+THINK_BUDGET = 384
+THINK_FORMAT = "deepseek"  # reasoning goes to message.reasoning_content; content holds only the answer
+
+
+def thinking_server_flags(backend):
+    flags = list(server_flags(backend))
+    i = flags.index("--reasoning")
+    flags[i + 1] = "on"
+    return [*flags, "--reasoning-budget", str(THINK_BUDGET), "--reasoning-format", THINK_FORMAT]
+
+
+def thinking_runtime_fingerprint(backend, model=None):
+    """The deep-think server's own identity. Never equal to runtime_fingerprint, so one report cannot pass for the other."""
+    b = BACKENDS[backend]
+    return "|".join([narrator_spec(model or MODEL_ID)["sha"], b["sha"], " ".join(thinking_server_flags(backend)), "greedy-thinking-on-v1"])
 
 
 class ModelError(RuntimeError):
@@ -182,6 +205,7 @@ class LocalModels:
         self.key = ""
         self.ready = False
         self.busy = False
+        self.thinker = None  # deep-think server: {process, url, key, model, backend}; started only on request
         self.state = {"phase": "not_downloaded", "stage": "", "downloaded_bytes": 0,
                       "total_bytes": narrator_spec(DEFAULT_NARRATOR)["size"] + RUNTIMES_SIZE,
                       "speed_bps": 0, "error": "", "qualification": None, "selected": "facts", "router": "not_loaded",
@@ -190,7 +214,7 @@ class LocalModels:
         if path.exists():
             try:
                 saved = json.loads(path.read_text(encoding="utf-8"))
-                for key in ("phase", "qualification", "qualifications", "backend", "downloaded_bytes", "preferred"):
+                for key in ("phase", "qualification", "qualifications", "think_qualifications", "backend", "downloaded_bytes", "preferred"):
                     if key in saved:
                         self.state[key] = saved[key]
                 if self.state["phase"] in {"downloading", "verifying", "loading", "qualifying", "ready"}:
@@ -289,13 +313,16 @@ class LocalModels:
                                "size_bytes": s["size"], "revision": s["revision"], "source": s["source"], "note": s["note"],
                                "downloaded": path.is_file() and path.stat().st_size == s["size"],
                                "qualified": self.qualified(model=model), "loaded": self.is_loaded(model), "active": model == active,
-                               "default": model == DEFAULT_NARRATOR})
+                               "default": model == DEFAULT_NARRATOR, "think_qualified": self.think_qualified(model=model)})
             result.update(id=active, name=spec["name"], quantization=spec["quantization"], size_bytes=spec["size"],
                           revision=spec["revision"], runtime="llama.cpp " + RUNTIME_TAG + " / " + BACKENDS[self.active_backend]["label"],
                           backend=self.active_backend, loaded=self.is_loaded(), loaded_model=self.loaded_model if self.is_loaded() else None,
                           license="LFM Open License v1.0", license_note="Commercial use is limited by the $10M annual-revenue threshold.",
                           source=spec["source"], router_model="fastino/GLiNER2.5-Decide", narrators=listed,
-                          qualification=self.report_for(active), can_select=self.qualified(model=active), busy=self.busy)
+                          qualification=self.report_for(active), can_select=self.qualified(model=active), busy=self.busy,
+                          think={"budget": THINK_BUDGET, "qualified": self.think_qualified(model=active),
+                                 "loaded": self.thinker_loaded(active), "report": self.think_report(active)})
+            result.pop("think_qualifications", None)  # full reports stay on disk; the view gets the summary above
             return result
 
     def qualified(self, backend=None, model=None):
@@ -314,12 +341,42 @@ class LocalModels:
             h.update((self.repo / name).read_bytes())
         return h.hexdigest()
 
+    # -- deep think (second server, Lead answer only) ------------------------------------------------------------------
+    def think_fingerprint(self, backend=None, model=None):
+        h = hashlib.sha256(thinking_runtime_fingerprint(backend or self.active_backend, model or self.narrator_id).encode())
+        for name in ("qualify/cases.jsonl", "qualify/gates_narrator.json", "qualify/scorers.py"):
+            h.update((self.repo / name).read_bytes())
+        return h.hexdigest()
+
+    def think_qualified(self, backend=None, model=None):
+        """Deep think passed the frozen smoke gates for these exact weights, build and thinking flags. Separate from
+        qualified(): a thinking-off report never enables deep think and a thinking report never enables the narrator."""
+        model = model or self.narrator_id
+        if backend is None:
+            return any(self.think_qualified(b, model) for b in BACKENDS)
+        target = self.think_fingerprint(backend, model)
+        return any(bool(r and r.get("passed") and r.get("fingerprint") == target)
+                   for r in (self.state.get("think_qualifications") or {}).values())
+
+    def think_report(self, model):
+        current = {self.think_fingerprint(b, model) for b in BACKENDS}
+        reports = [r for r in (self.state.get("think_qualifications") or {}).values() if r and r.get("fingerprint") in current]
+        best = next((r for r in reports if r.get("passed")), reports[0] if reports else None)
+        if not best:
+            return None
+        return {k: best.get(k) for k in ("passed", "n", "gates", "backend", "evaluated_at", "budget", "error")}
+
+    def thinker_loaded(self, model=None, backend=None):
+        t = self.thinker
+        return bool(t and t["process"].poll() is None and (model is None or t["model"] == model)
+                    and (backend is None or t["backend"] == backend))
+
     def launch_task(self, action, model=None):
-        if action not in {"download", "qualify", "load", "unload", "pause"}:
+        if action not in {"download", "qualify", "qualify_thinking", "load", "unload", "pause"}:
             raise ValueError("Unknown model action.")
         if model is not None:
             narrator_spec(model)
-            if action not in {"download", "qualify"}:
+            if action not in {"download", "qualify", "qualify_thinking"}:
                 raise ValueError("Only download and qualification take a narrator; load uses the selected one.")
         if action == "pause":
             self.cancel.set()
@@ -334,6 +391,7 @@ class LocalModels:
                 try:
                     if action == "download": self.download(model)
                     elif action == "qualify": self.qualify(model)
+                    elif action == "qualify_thinking": self.qualify_thinking(model)
                     elif action == "load": self.load()
                     elif action == "unload": self.unload()
                 except Cancelled:
@@ -450,12 +508,60 @@ class LocalModels:
         self.check_cancel()
 
     def stop_process(self):
+        self.stop_thinker()  # deep think never outlives the narrator it belongs to
         self.ready = False
         self.loaded_model = None
         if self.process and self.process.poll() is None:
             self.process.terminate()
             try: self.process.wait(timeout=8)
             except subprocess.TimeoutExpired: self.process.kill(); self.process.wait(timeout=3)
+
+    def stop_thinker(self):
+        t, self.thinker = self.thinker, None
+        if t and t["process"].poll() is None:
+            t["process"].terminate()
+            try: t["process"].wait(timeout=8)
+            except subprocess.TimeoutExpired: t["process"].kill(); t["process"].wait(timeout=3)
+
+    def load_thinker(self, for_qualification=False, backend=None, model=None):
+        """Start the deep-think server next to the qualified one, on the same runtime when the narrator is loaded.
+        Refused unless deep think passed qualification for these exact weights, build and flags (or while qualifying)."""
+        model = model or self.narrator_id
+        if backend is None:
+            loaded = self.state.get("backend") if self.is_loaded(model) else None
+            backend = loaded if loaded and self.think_qualified(loaded, model) else next(
+                (b for b in self.installed_backends() if self.think_qualified(b, model)), None)
+        if backend is None or (not for_qualification and not self.think_qualified(backend, model)):
+            raise ModelError("Deep think has not passed qualification for this narrator on this runtime.")
+        if self.thinker_loaded(model, backend):
+            return
+        self.stop_thinker()
+        if not (self.is_loaded(model) and self.state.get("backend") == backend):
+            self.verify(backend, model)  # the loaded narrator's file and runtime were verified when it started
+        executables = list(self.backend_dir(backend).rglob("llama-server.exe"))
+        if len(executables) != 1: raise ModelError("Managed llama-server executable not found.")
+        with socket.socket() as sock:
+            sock.bind(("127.0.0.1", 0)); port = sock.getsockname()[1]
+        key, url = secrets.token_urlsafe(32), f"http://127.0.0.1:{port}"
+        command = server_command(executables[0], self.path_of(model), model, port, key, backend, flags=thinking_server_flags(backend))
+        env = {k:v for k,v in os.environ.items() if k.upper() in {"SYSTEMROOT","WINDIR","PATH","TEMP","TMP","USERPROFILE","LOCALAPPDATA","APPDATA","COMSPEC","PROCESSOR_ARCHITECTURE"}}
+        with (self.root / "llama-server-think.log").open("a", encoding="utf-8") as log:
+            process = subprocess.Popen(command, cwd=self.backend_dir(backend), env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+                                       creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
+        self.thinker = {"process": process, "url": url, "key": key, "model": model, "backend": backend}
+        try:
+            for _ in range(180):
+                self.check_cancel()
+                if process.poll() is not None: raise ModelError("Deep think runtime exited. See the managed runtime log.")
+                try:
+                    local_json(url + "/health", key=key, timeout=2)
+                    return
+                except (OSError, ValueError):
+                    time.sleep(.5)
+            raise ModelError("Deep think runtime did not become ready within 90 seconds.")
+        except BaseException:
+            self.stop_thinker()
+            raise
 
     def load(self, for_qualification=False, backend=None, model=None):
         """Start the fastest qualified runtime; if it cannot start (for example no GPU), fall back to the next one.
@@ -512,7 +618,9 @@ class LocalModels:
                 time.sleep(.5)
         raise ModelError("Local narrator did not become ready within 90 seconds.")
 
-    def complete(self, system, prompt, *, max_tokens=256, stop=None):
+    def complete(self, system, prompt, *, max_tokens=256, stop=None, think=False):
+        """think=True (deep think, Lead answer only) goes to the deep-think server with THINK_BUDGET more tokens; the
+        reasoning text stays in reasoning_content and is never returned, stored or shown. Same rejection rules."""
         if not self.ready or not self.process or self.process.poll() is not None:
             raise ModelError("Local narrator is not loaded.")
         self.check_cancel()
@@ -522,7 +630,14 @@ class LocalModels:
             "chat_template_kwargs": {"enable_thinking": False}}
         if stop:
             body["stop"] = list(stop)
-        response = local_json(self.url + "/v1/chat/completions", body, key=self.key)
+        url, key, timeout = self.url, self.key, 90
+        if think:
+            t = self.thinker
+            if not (self.thinker_loaded(self.loaded_model) and self.think_qualified(t["backend"], t["model"])):
+                raise ModelError("Deep think is not loaded.")
+            url, key, timeout = t["url"], t["key"], 180
+            body.update(max_tokens=body["max_tokens"] + THINK_BUDGET, chat_template_kwargs={"enable_thinking": True})
+        response = local_json(url + "/v1/chat/completions", body, key=key, timeout=timeout)
         from .usage import record_usage
         record_usage(response.get("usage"))  # include generated text even if a guard or cancellation rejects it
         self.check_cancel()
@@ -611,6 +726,56 @@ class LocalModels:
             self.update(phase="downloaded" if best else "qualification_failed",
                         stage=f"{spec['name']}: smoke gates passed; loads on the next run" if best else f"{spec['name']} remains disabled", **legacy)
 
+    def qualify_thinking(self, model=None):
+        """Smoke-qualify deep think for one narrator on every runtime where the narrator itself is qualified: the same
+        frozen cases and gates as qualify(), thinking on, answer budget raised by THINK_BUDGET. The deep-think server is
+        stopped afterwards; a chat starts it again when asked. Other narrators' reports are kept."""
+        from qualify.run import load_cases, run_cases, check_gates
+        model = model or self.narrator_id
+        spec = narrator_spec(model)
+        backends = [b for b in self.installed_backends() if self.qualified(b, model)]
+        if not backends:
+            raise ModelError("Qualify the narrator itself before deep think.")
+        cases = [c for c in load_cases(str(self.repo/"qualify/cases.jsonl")) if c["category"] in {"narration","number_faithfulness"}]
+        gates = json.loads((self.repo/"qualify/gates_narrator.json").read_text())
+        kept = {k: v for k, v in (self.state.get("think_qualifications") or {}).items() if (v or {}).get("model") != model}
+        reports = {}
+        self.update(think_qualifications=kept)
+        for backend in backends:
+            label = BACKENDS[backend]["label"]
+            self.update(stage=f"Starting deep think on {label}")
+            try:
+                self.load_thinker(for_qualification=True, backend=backend, model=model)
+            except Cancelled:
+                raise
+            except ModelError as exc:
+                reports[backend] = {"passed": False, "backend": backend, "model": model, "error": str(exc)[:250], "thinking": True,
+                                    "budget": THINK_BUDGET, "fingerprint": self.think_fingerprint(backend, model)}
+                continue
+            t, done = self.thinker, 0
+            def call(body):
+                nonlocal done
+                self.check_cancel()
+                result = local_json(t["url"]+"/v1/chat/completions", {**body, "max_tokens": int(body.get("max_tokens", 256)) + THINK_BUDGET,
+                                    "chat_template_kwargs": {"enable_thinking": True}}, key=t["key"], timeout=180)
+                done += 1
+                self.update(stage=f"Deep think on {label}: checked {done} of {len(cases)} qualification cases")
+                return result
+            try:
+                report = run_cases(cases, call, model, max_tokens=256)
+            finally:
+                self.stop_thinker()
+            report["gates"] = check_gates(report, gates)
+            report.update(fingerprint=self.think_fingerprint(backend, model), backend=backend, flags=thinking_server_flags(backend), model=model,
+                          model_sha256=spec["sha"], revision=spec["revision"], runtime=f"{RUNTIME_TAG} {label}", quantization=spec["quantization"],
+                          thinking=True, budget=THINK_BUDGET, evaluated_at=time.time(), passed=all(g["passed"] for g in report["gates"].values()))
+            reports[backend] = report
+            self.update(think_qualifications={**kept, **{f"{model}:{b}": r for b, r in reports.items()}})
+        atomic(self.root/"think_qualification.json", {**kept, **{f"{model}:{b}": r for b, r in reports.items()}})
+        passed = [BACKENDS[b]["label"] for b, r in reports.items() if r.get("passed")]
+        self.update(think_qualifications={**kept, **{f"{model}:{b}": r for b, r in reports.items()}},
+                    stage=f"{spec['name']}: deep think passed on " + ", ".join(passed) if passed else f"{spec['name']}: deep think did not pass, so it stays off")
+
     def select(self, model):
         if model not in {"facts", *narrators()}: raise ValueError("Unknown narrator choice.")
         if model != "facts" and not self.qualified(model=model): raise ModelError("Narrator qualification has not passed.")
@@ -624,6 +789,7 @@ class LocalModels:
     def unload(self, keep_choice=False):
         """Stop the narrator. A user unload also switches to tool-only; shutdown keeps the remembered choice."""
         if self.busy: raise ModelError("A research run is using the narrator.")
+        self.stop_thinker()
         self.ready = False
         if self.process and self.process.poll() is None:
             self.process.terminate()
