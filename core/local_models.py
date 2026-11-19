@@ -736,6 +736,7 @@ class LocalModels:
         backends = [b for b in self.installed_backends() if self.qualified(b, model)]
         if not backends:
             raise ModelError("Qualify the narrator itself before deep think.")
+        phase = self.state.get("phase")  # verify() marks the whole model as verifying; testing deep think must not leave it so
         cases = [c for c in load_cases(str(self.repo/"qualify/cases.jsonl")) if c["category"] in {"narration","number_faithfulness"}]
         gates = json.loads((self.repo/"qualify/gates_narrator.json").read_text())
         kept = {k: v for k, v in (self.state.get("think_qualifications") or {}).items() if (v or {}).get("model") != model}
@@ -773,7 +774,7 @@ class LocalModels:
             self.update(think_qualifications={**kept, **{f"{model}:{b}": r for b, r in reports.items()}})
         atomic(self.root/"think_qualification.json", {**kept, **{f"{model}:{b}": r for b, r in reports.items()}})
         passed = [BACKENDS[b]["label"] for b, r in reports.items() if r.get("passed")]
-        self.update(think_qualifications={**kept, **{f"{model}:{b}": r for b, r in reports.items()}},
+        self.update(think_qualifications={**kept, **{f"{model}:{b}": r for b, r in reports.items()}}, phase=phase,
                     stage=f"{spec['name']}: deep think passed on " + ", ".join(passed) if passed else f"{spec['name']}: deep think did not pass, so it stays off")
 
     def select(self, model):
@@ -807,7 +808,7 @@ class LocalModels:
 def main():
     import argparse
     ap=argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("action",choices=["download","qualify","status"])
+    ap.add_argument("action",choices=["download","qualify","qualify_thinking","status"])
     ap.add_argument("--model",choices=sorted(narrators()))
     args=ap.parse_args()
     repo=Path(__file__).resolve().parents[1]
@@ -815,6 +816,7 @@ def main():
     try:
         if args.action=="download":manager.download(args.model)
         elif args.action=="qualify":manager.qualify(args.model)
+        elif args.action=="qualify_thinking":manager.qualify_thinking(args.model)
         print(json.dumps(manager.snapshot(),indent=2))
     finally:
         if manager.process:manager.close()
