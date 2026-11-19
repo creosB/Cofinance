@@ -471,6 +471,30 @@ def news_digest(facts: Mapping[str, Sequence[Mapping[str, Any]]]) -> str:
     return " ".join(parts) if parts else NO_NEWS
 
 
+class DocumentReaderAgent:
+    """Python only: verbatim excerpts from the PDFs attached to this conversation, with page numbers. No model call.
+    Allowed numbers: the numbers inside the excerpts, the page numbers and any in the file names Python wrote."""
+
+    NAME = "Document Reader"
+
+    def run(self, question: str, documents: Sequence[Mapping[str, Any]], bus: EventBus, session_id: str) -> SpecialistReport:
+        from .documents import select_excerpts
+        excerpts = select_excerpts(documents, question)
+        if excerpts:
+            note = "" if all(e["matched"] for e in excerpts) else " No page shares words with the question, so the first pages are shown."
+            summary = ("Excerpts from the attached files, quoted by Python." + note + "\n"
+                       + "\n".join(f'From "{e["name"]}", page {e["page"]}: "{e["text"]}"' for e in excerpts))
+        else:
+            summary = "The attached files have no readable text."
+        allowed = ([n for e in excerpts for n in numbers_in(e["text"])] + [float(e["page"]) for e in excerpts]
+                   + [n for e in excerpts for n in numbers_in(str(e["name"]))])
+        validation = {"validation_reason": "python_excerpts",
+                      "excerpts": [{"name": e["name"], "page": e["page"], "matched": e["matched"], "characters": len(e["text"])}
+                                   for e in excerpts]}
+        return SpecialistReport(agent_name=self.NAME, tickers=[], raw_facts={"excerpts": excerpts}, allowed_numbers=allowed,
+                                chart_refs=[], summary=summary, faithful_numbers=True, validation=validation)
+
+
 @dataclass(frozen=True)
 class TeamRunResult:
     routed: RoutedQuery
@@ -481,6 +505,7 @@ class TeamRunResult:
     final_synthesis: str
     faithful_synthesis: bool
     events: List[A2AEvent]
+    document_report: Optional[SpecialistReport] = None
 
 
 class TeamLeadOrchestrator:
@@ -531,6 +556,7 @@ class TeamLeadOrchestrator:
         lead_llm: SmallLLMBackend,
         tools: MarketDataTools,
         bus: Optional[EventBus] = None,
+        document_agent: Optional[DocumentReaderAgent] = None,
     ) -> None:
         self.router = router
         self.data_agent = data_agent
@@ -538,6 +564,7 @@ class TeamLeadOrchestrator:
         self.lead_llm = lead_llm
         self.tools = tools
         self.bus = bus or EventBus()
+        self.document_agent = document_agent or DocumentReaderAgent()
 
     NEWS_ONLY = "python_news_answer"
 
@@ -556,9 +583,11 @@ class TeamLeadOrchestrator:
                              events=list(self.bus.history))
 
     def run(self, user_query: str, session_id: str = "default", fallback_tickers: Sequence[str] = (),
-            context: str = "") -> TeamRunResult:
+            context: str = "", documents: Optional[Sequence[Mapping[str, Any]]] = None) -> TeamRunResult:
         """`context` is the previous accepted answer in this conversation (local chat history, not a
-        memory model). It is data for the lead only; its numbers are NOT added to the allowlist."""
+        memory model). It is data for the lead only; its numbers are NOT added to the allowlist.
+        `documents` are the PDFs attached to this conversation ({id, name, pages}); with any, the Document Reader runs
+        and its excerpts are a report like the others."""
         routed = self.router.route(user_query)
         tickers = routed.tickers or list(fallback_tickers)
         risk_mode = detect_risk_mode(tickers)
@@ -617,11 +646,16 @@ class TeamLeadOrchestrator:
             )
             news_rep = self.news_agent.run(tickers, self.bus, session_id)
 
+        doc_rep: Optional[SpecialistReport] = None
+        if documents:
+            self.bus.publish(A2AEvent(session_id, "AGENT_DELEGATION", self.NAME,
+                                      {"to": DocumentReaderAgent.NAME, "documents": len(documents)}))
+            doc_rep = self.document_agent.run(user_query, documents, self.bus, session_id)
+
         allowed_numbers: List[float] = []
-        if data_rep:
-            allowed_numbers.extend(data_rep.allowed_numbers)
-        if news_rep:
-            allowed_numbers.extend(news_rep.allowed_numbers)
+        for report in (data_rep, news_rep, doc_rep):
+            if report:
+                allowed_numbers.extend(report.allowed_numbers)
 
         previous = " ".join(context.split())[:1400]
         # Closed risk list from tool facts (core/risk_cues.py): the Lead may name only these, or none.
@@ -629,7 +663,7 @@ class TeamLeadOrchestrator:
         # News-only question (Baris, 2026-11-17): the answer is the Python digest plus the listed risks, no Lead call.
         # Live, the Lead only restated the digest and twice failed the risk guard ("the reports do not name a
         # particular risk" while one was listed), so the model had nothing to add except ways to be wrong.
-        if news_rep is not None and data_rep is None:
+        if news_rep is not None and data_rep is None and doc_rep is None:
             return self._news_only(routed, risk_mode, delegated, news_rep, cues, session_id)
         synth_prompt = (
             f"User question: {' '.join(user_query.split())[:600]}\n"
@@ -638,6 +672,7 @@ class TeamLeadOrchestrator:
             + "\n"
             f"Data Analyst report:\n{data_rep.summary if data_rep else 'Not requested for this question.'}\n\n"
             f"News Researcher report:\n{news_rep.summary if news_rep else 'Not requested for this question.'}\n\n"
+            + (f"Document Reader report (files the user attached; name the page you use):\n{doc_rep.summary}\n\n" if doc_rep else "")
             + cue_block(cues)
             # Last, because small narrators follow the most recent instruction (live 2026-11-08: placed before the
             # reports, it was ignored and every follow-up restated the full fact block).
@@ -645,18 +680,18 @@ class TeamLeadOrchestrator:
                "in at most two sentences, and use at most two numbers, only ones the question asks for." if previous else "")
         )
         # Only numbers in accepted reports can be reused by the lead, not unseen tool fields.
-        allowed_numbers = [n for report in (data_rep, news_rep) if report for n in numbers_in(report.summary)
+        allowed_numbers = [n for report in (data_rep, news_rep, doc_rep) if report for n in numbers_in(report.summary)
                            if any(abs(n-a) <= max(1e-9, abs(a)*1e-9) for a in report.allowed_numbers)]
         # Accepted reports plus the Python-derived risk list (digit-free, from tool facts). Never the question or memory.
         # The agent role names are the prompt's own section headers ("News Researcher report:"), not factual claims.
         # Found live 2026-11-08: an Apple answer saying "the News Researcher reports..." fell back on "Researcher".
-        wording_evidence = "\n".join(["Data Analyst report. News Researcher report. Market Team Lead."]
-                                     + [p.summary for p in (data_rep, news_rep) if p] + [c["text"] for c in cues])
+        wording_evidence = "\n".join(["Data Analyst report. News Researcher report. Document Reader report. Market Team Lead."]
+                                     + [p.summary for p in (data_rep, news_rep, doc_rep) if p] + [c["text"] for c in cues])
         earlier = numbers_in(previous) if previous else []
 
         def narrate(prompt: str, max_tokens: int) -> str:
             try:
-                raw = self.lead_llm.complete(self.SYSTEM, prompt, max_tokens=max_tokens) if (data_rep or news_rep) else ""
+                raw = self.lead_llm.complete(self.SYSTEM, prompt, max_tokens=max_tokens) if (data_rep or news_rep or doc_rep) else ""
                 # Markdown emphasis is stripped (the UI renders plain text); a restated second block is dropped.
                 return clean_narration(final_answer(raw) or "")
             except Exception:
@@ -711,7 +746,7 @@ class TeamLeadOrchestrator:
                 clean_synth, validation = retry, retry_val
             validation["follow_up_retry"] = summary
         if not faithful:
-            parts = [p.summary for p in (data_rep, news_rep) if p]
+            parts = [p.summary for p in (data_rep, news_rep, doc_rep) if p]
             clean_synth = " ".join(parts)
 
         self.bus.publish(
@@ -732,4 +767,5 @@ class TeamLeadOrchestrator:
             final_synthesis=clean_synth,
             faithful_synthesis=faithful,
             events=list(self.bus.history),
+            document_report=doc_rep,
         )

@@ -15,13 +15,18 @@ export interface CrowdMarket {ticker:string;event:string;question:string;outcome
 export interface CrowdOdds {source:string;fetched_at:string|null;markets:CrowdMarket[];errors:string[];calibration_study?:string|null;note:string}
 export interface HeadlineAsset {ticker:string;score:number;call:string;served:number;judged:number;headlines:{title:string;label:string|null;impact:number|null}[]}
 export interface HeadlineSignal {version:string;judge?:string;call_line:number;dev_auc:number;assets:HeadlineAsset[];note:string}
-export interface Message {id:string;role:'user'|'assistant';content:string;created:number;run_id:string|null;payload:{kind?:string;mode?:string;usage?:unknown;tickers?:string[];charts?:PriceChart[];evidence?:Evidence[];citations?:unknown;snapshots?:Record<string,Snapshot>;coverage_note?:string;crowd_odds?:CrowdOdds|null;headline_signal?:HeadlineSignal|null;news_collected?:boolean;faithful_synthesis?:boolean;reports?:{data:string|null;news:string|null;news_items:number};memory?:{backend:string;used_previous:boolean;recalled:{question:string;run_id:string|null;score:number;kind?:string;found_by?:string[]}[]}}}
+export interface Message {id:string;role:'user'|'assistant';content:string;created:number;run_id:string|null;payload:{kind?:string;mode?:string;usage?:unknown;tickers?:string[];charts?:PriceChart[];evidence?:Evidence[];citations?:unknown;snapshots?:Record<string,Snapshot>;coverage_note?:string;crowd_odds?:CrowdOdds|null;headline_signal?:HeadlineSignal|null;news_collected?:boolean;faithful_synthesis?:boolean;reports?:{data:string|null;news:string|null;news_items:number;document?:string|null};document_sources?:DocumentSource[];memory?:{backend:string;used_previous:boolean;recalled:{question:string;run_id:string|null;score:number;kind?:string;found_by?:string[]}[]}}}
 export interface NewsTicker {ticker:string;digest:number;alert:number;newest_item:string|null}
 export interface NewsSource {name:string;label:string;ticker:string;host:string;timestamp_kind:string}
 export interface NewsRun {started_at:string|null;fetched:number;quarantined:number;duplicates:number;actions:Record<string,number>;source_status:Record<string,Record<string,string>>;errors:Record<string,string>}
 export interface NewsHealth {collected:boolean;last_run:NewsRun|null;sources:NewsSource[];tickers:NewsTicker[];uncovered:string[];error:string}
 export interface NewsState {phase:'idle'|'running'|'error';stage:string;run_id:string|null;error:string;started:number|null;finished:number|null;health:NewsHealth}
-export interface Conversation extends SessionMeta {messages:Message[];jobs:Job[];tickers:string[];message_count:number}
+/** A PDF attached to one conversation. The page text stays on the server; the view only lists it. */
+export interface DocumentMeta {id:string;name:string;bytes:number;page_count:number;created:number}
+export interface DocumentSource {document_id:string;name:string;page:number;matched:boolean}
+export interface Conversation extends SessionMeta {messages:Message[];jobs:Job[];tickers:string[];message_count:number;documents?:DocumentMeta[]}
+export const PDF_LIMIT_BYTES=20*1024*1024
+export const PDF_LIMIT_COUNT=5
 export interface NarratorState {id:string;name:string;publisher:string;quantization:string;size_bytes:number;revision:string;source:string;note:string;downloaded:boolean;qualified:boolean;loaded:boolean;active:boolean;default?:boolean}
 export interface ModelState {id:string;name:string;narrators?:NarratorState[];loaded_model?:string|null;size_bytes:number;phase:string;stage:string;selected:string;preferred?:string;selection_note?:string;downloaded_bytes:number;total_bytes:number;speed_bps:number;error:string;loaded:boolean;can_select:boolean;busy:boolean;quantization:string;runtime:string;revision:string;router:string;router_model:string;license:string;license_note:string;source:string;qualification:null|{passed:boolean;n:number;gates:Record<string,{passed:boolean;got:number;required:number}>;evaluated_at:number}}
 export interface WorkspaceState {csrf:string;sessions:SessionMeta[];models:ModelState;active_job:Job|null;watchlist:{ticker:string;added:number}[];news?:NewsState}
@@ -149,7 +154,29 @@ export function useChat(){
   const result=await post('/api/sessions/clear',{request_id:once('clear')},300000);delete memoryRequests.current.clear
   select('');return result
  },[post,select])
+ // PDFs: the raw file is the request body (application/pdf); the server parses it in a child process with a time limit.
+ // A blank New chat is created first, so the file always belongs to one saved conversation.
+ const attach=useCallback(async(file:File)=>{
+  if(!workspace)throw Error('Wait for the local workspace to connect.')
+  if(!/\.pdf$/i.test(file.name))throw Error('Attach a .pdf file.')
+  if(file.size>PDF_LIMIT_BYTES)throw Error('PDFs are limited to 20 MB.')
+  const sid=selectedRef.current||await create()
+  setBusy(true)
+  try{
+   const response=await fetch('/api/documents/upload?session_id='+sid+'&name='+encodeURIComponent(file.name),{method:'POST',cache:'no-store',credentials:'omit',
+    signal:AbortSignal.timeout(60000),headers:{'Content-Type':'application/pdf','X-Cofinance-CSRF':workspace.csrf},body:file})
+   const result:unknown=await response.json()
+   if(!response.ok)throw Error(text(object(result).error)||'The file could not be attached.')
+   if(alive.current){setError('');refresh()}
+   return result as DocumentMeta&{duplicate:boolean}
+  }catch(e){const message=e instanceof Error&&e.name!=='TimeoutError'&&e.name!=='AbortError'?e.message:'Reading the file timed out. Nothing was attached.';if(alive.current)setError(message);throw Error(message)}
+  finally{if(alive.current)setBusy(false)}
+ },[workspace,create,refresh])
+ const detach=useCallback(async(documentId:string)=>{
+  const sid=selectedRef.current;if(!sid)throw Error('Open a conversation first.')
+  return post('/api/documents/remove',{session_id:sid,document_id:documentId})
+ },[post])
  const startNew=()=>{pending.current=null;setHasRetry(false);select('');setDraftRevision(v=>v+1)}
- return {workspace,conversation,memory,selected,error,busy,hasRetry,select,create,startNew,draftRevision,send,post,refresh,collectNews,rememberNote,forget,removeConversation,clearConversations}
+ return {workspace,conversation,memory,selected,error,busy,hasRetry,select,create,startNew,draftRevision,send,post,refresh,collectNews,rememberNote,forget,removeConversation,clearConversations,attach,detach}
 }
 export type ChatController=ReturnType<typeof useChat>

@@ -48,6 +48,7 @@ class ChatStore:
             CREATE INDEX IF NOT EXISTS chat_messages_session ON chat_messages(session_id,created);
             CREATE TABLE IF NOT EXISTS chat_jobs(id TEXT PRIMARY KEY,request_id TEXT UNIQUE NOT NULL,session_id TEXT NOT NULL,query TEXT NOT NULL,model TEXT NOT NULL,status TEXT NOT NULL,stage TEXT NOT NULL,created REAL NOT NULL,updated REAL NOT NULL,error TEXT NOT NULL DEFAULT '');
             CREATE TABLE IF NOT EXISTS user_watchlist(ticker TEXT PRIMARY KEY,added REAL NOT NULL);
+            CREATE TABLE IF NOT EXISTS chat_documents(id TEXT PRIMARY KEY,session_id TEXT NOT NULL,name TEXT NOT NULL,sha256 TEXT NOT NULL,bytes INTEGER NOT NULL,page_count INTEGER NOT NULL,pages TEXT NOT NULL,created REAL NOT NULL,UNIQUE(session_id,sha256));
             """)
 
     @contextlib.contextmanager
@@ -88,6 +89,7 @@ class ChatStore:
             runs+=[r[0] for r in db.execute("SELECT DISTINCT run_id FROM chat_messages WHERE session_id=? AND run_id IS NOT NULL",(session_id,)) if r[0] not in runs]
             messages=db.execute("DELETE FROM chat_messages WHERE session_id=?",(session_id,)).rowcount
             db.execute("DELETE FROM chat_jobs WHERE session_id=?",(session_id,))
+            db.execute("DELETE FROM chat_documents WHERE session_id=?",(session_id,))  # attached PDFs' text goes with them
             db.execute("DELETE FROM chat_sessions WHERE id=?",(session_id,))
         with self.db() as db:
             db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
@@ -111,7 +113,42 @@ class ChatStore:
             result['messages']=messages
             result['jobs']=[dict(r) for r in db.execute("SELECT * FROM chat_jobs WHERE session_id=? ORDER BY created DESC LIMIT 20",(session_id,))]
             result['message_count']=db.execute("SELECT COUNT(*) FROM chat_messages WHERE session_id=?",(session_id,)).fetchone()[0]
+            result['documents']=[dict(r) for r in db.execute("SELECT id,name,bytes,page_count,created FROM chat_documents WHERE session_id=? ORDER BY created",(session_id,))]
             return result
+
+    # -- attached PDFs (2026-11-19). Text only: the file itself is never stored, just its page texts and sha256. ------
+    DOCUMENT_LIMIT=5
+
+    def add_document(self,session_id,name,sha256,size,pages):
+        """Attach one parsed PDF. The same file twice in one conversation is one document (returned as it is)."""
+        valid_id(session_id)
+        if not re.fullmatch(r"[0-9a-f]{64}",sha256 or ""):raise ValueError("Invalid document digest.")
+        with self.db() as db:
+            if not db.execute("SELECT 1 FROM chat_sessions WHERE id=?",(session_id,)).fetchone():raise KeyError("Conversation not found.")
+            row=db.execute("SELECT id,name,bytes,page_count,created FROM chat_documents WHERE session_id=? AND sha256=?",(session_id,sha256)).fetchone()
+            if row:return dict(row,duplicate=True)
+            if db.execute("SELECT COUNT(*) FROM chat_documents WHERE session_id=?",(session_id,)).fetchone()[0]>=self.DOCUMENT_LIMIT:
+                raise ValueError(f"A conversation can hold {self.DOCUMENT_LIMIT} PDFs. Remove one first.")
+            doc={'id':uuid.uuid4().hex,'name':name,'bytes':int(size),'page_count':len(pages),'created':time.time()}
+            db.execute("INSERT INTO chat_documents VALUES (?,?,?,?,?,?,?,?)",(doc['id'],session_id,name,sha256,doc['bytes'],doc['page_count'],json.dumps(list(pages)),doc['created']))
+            db.execute("UPDATE chat_sessions SET updated=? WHERE id=?",(doc['created'],session_id))
+        return dict(doc,duplicate=False)
+
+    def documents(self,session_id):
+        """Every attached PDF of one conversation with its page texts, read when a run starts."""
+        valid_id(session_id)
+        with self.db() as db:
+            return [dict(r,pages=json.loads(r['pages'])) for r in db.execute("SELECT id,name,page_count,pages FROM chat_documents WHERE session_id=? ORDER BY created",(session_id,))]
+
+    def remove_document(self,session_id,document_id):
+        valid_id(session_id);valid_id(document_id)
+        with self.db() as db:
+            db.execute("PRAGMA secure_delete=ON")
+            if db.execute("DELETE FROM chat_documents WHERE id=? AND session_id=?",(document_id,session_id)).rowcount!=1:
+                raise KeyError("Document not found in this conversation.")
+        with self.db() as db:
+            db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        return {'removed':document_id}
 
     def job(self,run_id):
         valid_id(run_id)

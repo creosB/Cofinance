@@ -263,7 +263,12 @@ class ChatService:
             if 'watchlist' in job['query'].lower() and not routed.tickers:
                 tickers=[r['ticker'] for r in self.store.watchlist()]
             if len(tickers)>6:raise ValueError('Limit a research run to six assets.')
-            if not tickers:
+            # Read at run time, not from the submit snapshot, so a file removed meanwhile is not used.
+            documents=self.store.documents(session['id'])
+            if documents and not tickers:
+                trace.event('Answer from attached files','decision',{'reason':'no_asset_but_documents','documents':len(documents),
+                            'note':'The question named no asset and the conversation has attached PDFs, so they are the evidence.'},actor='Python')
+            if not tickers and not documents:
                 answer='Which stock or crypto asset should I research? Name a ticker or company, such as NVDA or Nvidia.'
                 trace.event('Asset clarification required','decision',{'reason':'no_asset_in_query_or_session'},actor='Python')
                 trace.finish(summary={'answer':answer,'risk_mode':'not_resolved'})
@@ -295,7 +300,8 @@ class ChatService:
             same=lambda ts:bool(set(ts or [])&set(tickers))
             previous=research[-1]['content'] if research and same((research[-1].get('payload') or {}).get('tickers')) else ''
             hits=self.recall_memory(session,job['query'],trace,exclude_run=research[-1].get('run_id') if research else None,tickers=tickers)
-            result=run_traced_team(orch,job['query'],trace,session_id=job['session_id'],context=context_from(previous,hits))
+            result=run_traced_team(orch,job['query'],trace,session_id=job['session_id'],context=context_from(previous,hits),
+                                   documents=documents or None)
             check()
             answer=result.final_synthesis or 'No accepted evidence is available for this request.'
             if routed.intent=='watchlist_add':answer+=' Use the Add to watchlist button to confirm tracking.'
@@ -329,7 +335,11 @@ class ChatService:
                      # Accepted specialist outputs, so the UI can show structure without re-parsing the answer.
                      'reports':{'data':result.data_report.summary if result.data_report else None,
                                 'news':result.news_report.summary if result.news_report else None,
-                                'news_items':sum(len(v) for v in result.news_report.raw_facts.values()) if result.news_report else 0},
+                                'news_items':sum(len(v) for v in result.news_report.raw_facts.values()) if result.news_report else 0,
+                                'document':result.document_report.summary if result.document_report else None},
+                     # The pages the Document Reader quoted, so the answer can show where it came from.
+                     'document_sources':[{'document_id':e['document_id'],'name':e['name'],'page':e['page'],'matched':e['matched']}
+                                         for e in result.document_report.raw_facts.get('excerpts',[])] if result.document_report else [],
                      'memory':{'backend':self.memory.backend,'used_previous':bool(previous),
                                'recalled':[{'question':h.question[:160],'run_id':h.run_id,'item_id':h.item_id,'kind':h.kind,'score':h.score,**({'found_by':h.sources} if h.sources else {})} for h in hits]}}
             trace.data['summary'].update({'answer':answer[:2500],'model_choice':job['model']});trace.flush()
@@ -524,6 +534,24 @@ class ChatService:
             if same:return same  # the same note twice is one note
             if self.ledger.active_notes(session_id)>=NOTE_LIMIT:raise ValueError(f'This conversation already has {NOTE_LIMIT} notes. Forget one first.')
             return self.ledger.ensure(uuid.uuid4().hex,session_id,'note',text=text,tickers=self.note_tickers(text),request_id=request_id)
+
+    # -- attached PDFs (asked by Baris 2026-11-19). Parsed in a child process with a time limit; text only, no OCR. ----
+    def add_document(self,session_id,name,data):
+        """Parse one PDF and attach its page texts to the conversation. Refused while a run in it is active."""
+        import hashlib
+        from .documents import clean_name,extract_pages
+        valid_id(session_id)
+        name=clean_name(name)
+        self._refuse_during_run(session_id)
+        self.store.session(session_id)  # the conversation must exist before the parse cost is paid
+        pages=extract_pages(data)
+        self._refuse_during_run(session_id)  # checked again: parsing can take seconds
+        return self.store.add_document(session_id,name,hashlib.sha256(bytes(data)).hexdigest(),len(data),pages)
+
+    def remove_document(self,session_id,document_id):
+        valid_id(session_id);valid_id(document_id)
+        self._refuse_during_run(session_id)
+        return self.store.remove_document(session_id,document_id)
 
     def forget(self,session_id,item_id,request_id=None):
         """Never use one turn or note as memory again. Tombstone first, then delete every backend copy; a failed vector

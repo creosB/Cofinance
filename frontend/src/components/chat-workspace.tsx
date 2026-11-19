@@ -13,6 +13,7 @@ import { PriceChart } from './price-chart'
 import { CrowdOdds } from './crowd-odds'
 import { HeadlineSignal } from './headline-signal'
 import { TokenUsage } from './token-usage'
+import { AttachButton, AttachmentChips, DocumentSources } from './attachments'
 import { ago, evidenceUrl, statusLabel } from '@/lib/domain'
 import { canForget, contextLine, itemFor } from '@/lib/memory'
 import { refText, segments, targetId } from '@/lib/citations'
@@ -88,6 +89,7 @@ function Answer({message,inspect,chat}:{message:Message;inspect:(id:string,spanI
   {p.headline_signal&&<HeadlineSignal signal={p.headline_signal}/>}
   {p.crowd_odds&&<CrowdOdds odds={p.crowd_odds}/>}
   {!!p.evidence?.length&&<div className="sources" aria-label="Sources">{p.evidence.map((s,i)=>{const href=evidenceUrl(s.url),meta=[s.source,s.as_of==='Unknown'?'time unknown':when(s.as_of)].filter(Boolean).join(', ');return href?<a key={href+i} id={'source-'+message.id+'-'+i} href={href} target="_blank" rel="noreferrer noopener"><span className="source-name">{s.title}</span><span className="source-meta">{meta}</span><ArrowUpRight size={14} aria-hidden="true"/></a>:<p key={i} id={'source-'+message.id+'-'+i} tabIndex={-1} className="cite-target"><span className="source-name">{s.title}</span><span className="source-meta">link unavailable</span></p>})}</div>}
+  <DocumentSources sources={p.document_sources}/>
   {p.coverage_note&&<div className="coverage"><Newspaper size={14} aria-hidden="true"/><span>{p.coverage_note}</span>{news&&!news.health.collected&&news.phase!=='running'&&<Button variant="ghost" size="sm" disabled={chat.busy||!!chat.workspace?.active_job} onClick={()=>{void chat.collectNews().catch(()=>{})}}>Collect news</Button>}{news?.phase==='running'&&<span className="quiet">Collecting news now</span>}</div>}
   {memoryLine(p.memory)&&<div className="coverage" title={(p.memory?.recalled||[]).map(r=>'Recalled: '+r.question).join('\n')||undefined}><History size={14} aria-hidden="true"/><span>{memoryLine(p.memory)}</span></div>}
   {message.role==='assistant'&&p.kind==='research'&&<div className="msg-actions">{message.run_id&&<Button variant="ghost" size="sm" onClick={()=>inspect(message.run_id!)}><Activity size={14}/>Execution</Button>}{mem&&(canForget(mem)?<Button variant="ghost" size="sm" disabled={chat.busy||!!chat.workspace?.active_job} onClick={()=>{void chat.forget(message.run_id!).catch(()=>{})}}><Eraser size={14}/>Forget from memory</Button>:<Button variant="ghost" size="sm" disabled><Check size={14}/>{mem.state==='forgotten'?'Forgotten from memory':'Blocked from recall'}</Button>)}{(p.tickers||[]).map(ticker=>{const tracked=chat.workspace?.watchlist.some(w=>w.ticker===ticker);return <Button key={ticker} variant="ghost" size="sm" disabled={chat.busy||tracked} onClick={()=>{void chat.post('/api/watchlist',{ticker}).catch(()=>{})}}>{tracked?<Check size={14}/>:<Plus size={14}/>}{tracked?'Tracking '+ticker:'Track '+ticker}</Button>})}</div>}
@@ -163,7 +165,7 @@ export function ChatActions({chat,onRefresh}:{chat:ChatController;onRefresh:()=>
 export function ChatWorkspace({chat,inspect}:{chat:ChatController;inspect:(id:string,spanId?:string)=>void}){
  const [draft,setDraft]=useState(''),scroller=useRef<HTMLDivElement>(null),textarea=useRef<HTMLTextAreaElement>(null)
  const conversation=chat.conversation,ownJob=conversation?.jobs.find(j=>activeStatuses.includes(j.status)),globalJob=chat.workspace?.active_job
- const model=chat.workspace?.models,newsRunning=chat.workspace?.news?.phase==='running'
+ const model=chat.workspace?.models,newsRunning=chat.workspace?.news?.phase==='running',docs=conversation?.documents||[]
  const runningModel=!!model&&['downloading','verifying','qualifying','loading'].includes(model.phase)
  const blocked=chat.busy||!!globalJob||runningModel||newsRunning
  const lastJob=conversation?.jobs[0],failed=!ownJob&&lastJob&&['error','interrupted','cancelled'].includes(lastJob.status)?lastJob:null
@@ -181,8 +183,9 @@ export function ChatWorkspace({chat,inspect}:{chat:ChatController;inspect:(id:st
   </div></div>
   <div className="chat-dock"><div className="chat-column">
    {notice&&<p className="dock-notice" role="status">{notice}</p>}
-   <div className="composer"><Textarea ref={textarea} id="research-question" aria-label="Research question" value={draft} onChange={e=>setDraft(e.target.value)} maxLength={3000} rows={1} placeholder="Ask about a stock or crypto asset" onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();if(!blocked)void send()}}}/>
-    <div className="composer-bar"><ModelPicker chat={chat} compact/>
+   <div className="composer"><AttachmentChips chat={chat} documents={docs} disabled={chat.busy||!!ownJob}/>
+    <Textarea ref={textarea} id="research-question" aria-label="Research question" value={draft} onChange={e=>setDraft(e.target.value)} maxLength={3000} rows={1} placeholder={docs.length?'Ask about the attached PDF or an asset':'Ask about a stock or crypto asset'} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();if(!blocked)void send()}}}/>
+    <div className="composer-bar"><AttachButton chat={chat} disabled={chat.busy||!!ownJob}/><ModelPicker chat={chat} compact/>
      {ownJob&&<Button variant="ghost" size="sm" disabled={chat.busy||ownJob.status==='cancelling'} onClick={()=>{void chat.post('/api/jobs/cancel',{id:ownJob.id}).catch(()=>{})}}><Square size={13}/>Stop run</Button>}
      {chat.hasRetry&&<Button variant="ghost" size="sm" disabled={blocked} onClick={()=>void send(true)}><RotateCcw size={13}/>Retry submission</Button>}
      <span className="composer-spacer"/>

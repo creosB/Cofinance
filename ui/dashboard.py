@@ -131,6 +131,36 @@ def make_dashboard_handler(dist: Path, trace_dir: Path, corpus_dir: Path, servic
                 except OSError:
                     pass
 
+        def upload_document(self):
+            """POST /api/documents/upload?session_id=...&name=... with the raw PDF as the body (application/pdf). Same
+            origin and CSRF checks as every write (already passed); its own type and size rules, since it is not JSON."""
+            from core.documents import MAX_BYTES
+            if self.headers.get('Transfer-Encoding') or self.headers.get('Content-Type','').split(';')[0] != 'application/pdf':
+                self.discard_body()
+                self.reply(415, {'error':'Attach a PDF file.'})
+                return
+            try:
+                length = int(self.headers.get('Content-Length','-1'))
+            except ValueError:
+                length = -1
+            if not 0 < length <= MAX_BYTES:
+                self.reply(413, {'error':'PDFs are limited to 20 MB.'})
+                return
+            try:
+                query = parse_qs(urlsplit(self.path).query, keep_blank_values=True)
+                if set(query) != {'session_id','name'} or any(len(v) != 1 for v in query.values()):
+                    raise ValueError('Unexpected request fields.')
+                self.connection.settimeout(30)
+                data = self.rfile.read(length)
+                if len(data) != length:raise ValueError('The upload was incomplete.')
+                self.reply(200, service.add_document(query['session_id'][0], query['name'][0], data))
+            except ModelError as exc:
+                self.reply(409, {'error':str(exc)[:300]})
+            except (ValueError,TypeError,KeyError) as exc:
+                self.reply(400, {'error':str(exc)[:300]})
+            except Exception:
+                self.reply(500, {'error':'The file could not be attached. No automatic retry was made.'})
+
         def do_POST(self):
             if not service:
                 self.discard_body()
@@ -139,6 +169,9 @@ def make_dashboard_handler(dist: Path, trace_dir: Path, corpus_dir: Path, servic
             if not self.api_origin(write=True):
                 self.discard_body()
                 self.reply(403, {'error':'Same-origin request and valid request token required.'})
+                return
+            if urlsplit(self.path).path == '/api/documents/upload':
+                self.upload_document()
                 return
             if self.headers.get('Transfer-Encoding') or self.headers.get('Content-Type','').split(';')[0] != 'application/json':
                 self.discard_body()
@@ -157,7 +190,8 @@ def make_dashboard_handler(dist: Path, trace_dir: Path, corpus_dir: Path, servic
                           '/api/watchlist':{'ticker'}, '/api/news/collect':{'request_id'},
                           '/api/labels':{'id','material','urgent','direction','trap','event_group','notes'},
                           '/api/memory/note':{'session_id','text','request_id'}, '/api/memory/forget':{'session_id','item_id','request_id'},
-                          '/api/sessions/delete':{'session_id','request_id'}, '/api/sessions/clear':{'request_id'}}
+                          '/api/sessions/delete':{'session_id','request_id'}, '/api/sessions/clear':{'request_id'},
+                          '/api/documents/remove':{'session_id','document_id'}}
                 if self.path == '/api/labels' and set(body) == routes['/api/labels']:
                     self.reply(200, labels.save(body));return  # human labels only; no model call, no service lock
                 if self.path not in routes:
@@ -170,6 +204,8 @@ def make_dashboard_handler(dist: Path, trace_dir: Path, corpus_dir: Path, servic
                     value = (service.delete_conversation(body['session_id'], body['request_id']) if self.path == '/api/sessions/delete'
                              else service.clear_conversations(body['request_id']))
                     self.reply(200, value);return
+                if self.path == '/api/documents/remove':
+                    self.reply(200, service.remove_document(body['session_id'], body['document_id']));return
                 if self.path.startswith('/api/memory/'):
                     # Explicit memory actions. Not under the service-wide lock: the first note can start the local embedder.
                     if self.path == '/api/memory/note':

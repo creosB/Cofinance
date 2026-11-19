@@ -14,3 +14,6 @@ sentence-transformers==5.1.2
 pytest==7.4.2
 # Cofinance v2 core (System-1 router/judge). core/ itself is stdlib-only; this is needed for the live model.
 gliner2[local]==2.1.0
+# PDF upload in chat (Baris, 2026-11-19). 6.21.2 or later carries the 2026 denial-of-service fixes; parsing also runs
+# in a separate, time-limited process (core/pdf_worker.py).
+pypdf==6.21.4

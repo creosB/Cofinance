@@ -328,10 +328,11 @@ def run_traced_clock1(tickers, fetch, classifier, trace: TraceRecorder, *, cfg=N
             store.close()
 
 
-def run_traced_team(orchestrator, query: str, trace: TraceRecorder, *, session_id: str = "trace", fallback_tickers=(), context: str = ""):
+def run_traced_team(orchestrator, query: str, trace: TraceRecorder, *, session_id: str = "trace", fallback_tickers=(), context: str = "",
+                    documents=None):
     """Instrument every called backend. Preserves existing tool side effects, so this is not a dry run."""
     from .gliner_decide import GlinerQueryRouter
-    from .orchestrator import DataAnalystAgent, EventBus, NewsResearcherAgent, TeamLeadOrchestrator
+    from .orchestrator import DataAnalystAgent, DocumentReaderAgent, EventBus, NewsResearcherAgent, TeamLeadOrchestrator
     original = orchestrator
     class AgentTrace:
         def __init__(self, agent, name):
@@ -366,11 +367,12 @@ def run_traced_team(orchestrator, query: str, trace: TraceRecorder, *, session_i
         AgentTrace(DataAnalystAgent(TracedLLM(original.data_agent.llm, trace, "Data Analyst"), TracedTools(original.data_agent.tools, trace),
                                     stop=getattr(original.data_agent, "stop", None)), "Data Analyst"),
         AgentTrace(NewsResearcherAgent(TracedLLM(original.news_agent.llm, trace, "News Researcher"), TracedStore(original.news_agent.store, trace)), "News Researcher"),
-        TracedLLM(original.lead_llm, trace, "Market Team Lead"), tools, bus)
+        TracedLLM(original.lead_llm, trace, "Market Team Lead"), tools, bus,
+        document_agent=AgentTrace(getattr(original, "document_agent", None) or DocumentReaderAgent(), "Document Reader"))
     try:
         with trace.span("Interactive research", "run", inputs={"query": query, "tool_side_effects": "same as original orchestrator",
                                                                 "conversation_context": "previous accepted answer" if context else "none"}) as span:
-            result = clone.run(query, session_id, fallback_tickers, context=context)
+            result = clone.run(query, session_id, fallback_tickers, context=context, documents=documents)
             span.update(output={"answer": result.final_synthesis, "agents": result.delegated_agents}, fallback=not result.faithful_synthesis)
         trace.finish(summary={"answer": result.final_synthesis, "risk_mode": result.risk_mode})
         return result
