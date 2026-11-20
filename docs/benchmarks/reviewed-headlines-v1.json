@@ -1,0 +1,1281 @@
+{
+  "assertion_scope_before": {
+    "cases": [
+      {
+        "condition": "clean",
+        "correct": true,
+        "expected": "UP",
+        "predicted": "UP",
+        "reason": "verified_difference",
+        "title": "Northline Q2 operating margin was reported at 15%; analysts expected Q2 operating margin of 12% for Northline."
+      },
+      {
+        "condition": "order",
+        "correct": true,
+        "expected": "UP",
+        "predicted": "UP",
+        "reason": "verified_difference",
+        "title": "analysts expected Q2 operating margin of 12% for Northline; Northline Q2 operating margin was reported at 15%."
+      },
+      {
+        "condition": "equivalent_bps",
+        "correct": true,
+        "expected": "UP",
+        "predicted": "UP",
+        "reason": "verified_difference",
+        "title": "Northline Q2 operating margin was reported at 1500 basis points; analysts expected Q2 operating margin of 12% for Northline."
+      },
+      {
+        "condition": "foreign_company",
+        "correct": false,
+        "expected": "ABSTAIN",
+        "predicted": "UP",
+        "reason": "verified_difference",
+        "title": "Northline Q2 operating margin was reported at 15%; analysts expected Q2 operating margin of 12% for Southport."
+      },
+      {
+        "condition": "denial",
+        "correct": false,
+        "expected": "ABSTAIN",
+        "predicted": "UP",
+        "reason": "verified_difference",
+        "title": "Northline Q2 operating margin was not reported at 15%; analysts expected Q2 operating margin of 12% for Northline."
+      },
+      {
+        "condition": "conditional",
+        "correct": false,
+        "expected": "ABSTAIN",
+        "predicted": "UP",
+        "reason": "verified_difference",
+        "title": "If Northline Q2 operating margin were reported at 15%; analysts expected Q2 operating margin of 12% for Northline."
+      },
+      {
+        "condition": "retracted",
+        "correct": false,
+        "expected": "ABSTAIN",
+        "predicted": "UP",
+        "reason": "verified_difference",
+        "title": "Northline Q2 operating margin was reported at 15%; analysts expected Q2 operating margin of 12% for Northline. The issuer retracted the reported figure."
+      },
+      {
+        "condition": "basis",
+        "correct": false,
+        "expected": "ABSTAIN",
+        "predicted": "UP",
+        "reason": "verified_difference",
+        "title": "Northline Q2 adjusted operating margin was reported at 15%; analysts expected Q2 unadjusted operating margin of 12% for Northline."
+      },
+      {
+        "condition": "wrong_period",
+        "correct": true,
+        "expected": "ABSTAIN",
+        "predicted": "ABSTAIN",
+        "reason": "incomparable",
+        "title": "Northline Q2 operating margin was reported at 15%; analysts expected Q3 operating margin of 12% for Northline."
+      },
+      {
+        "condition": "no_consensus",
+        "correct": true,
+        "expected": "ABSTAIN",
+        "predicted": "ABSTAIN",
+        "reason": "nonunique_or_missing",
+        "title": "Northline Q2 operating margin was reported at 15%. No analyst estimate was given."
+      },
+      {
+        "condition": "historical",
+        "correct": true,
+        "expected": "ABSTAIN",
+        "predicted": "ABSTAIN",
+        "reason": "nonunique_or_missing",
+        "title": "Northline Q2 operating margin was reported at 15%; last year Q2 operating margin was 12%."
+      },
+      {
+        "condition": "clean",
+        "correct": true,
+        "expected": "DOWN",
+        "predicted": "DOWN",
+        "reason": "verified_difference",
+        "title": "Northline Q2 operating margin was reported at 9%; analysts expected Q2 operating margin of 12% for Northline."
+      },
+      {
+        "condition": "order",
+        "correct": true,
+        "expected": "DOWN",
+        "predicted": "DOWN",
+        "reason": "verified_difference",
+        "title": "analysts expected Q2 operating margin of 12% for Northline; Northline Q2 operating margin was reported at 9%."
+      },
+      {
+        "condition": "equivalent_bps",
+        "correct": true,
+        "expected": "DOWN",
+        "predicted": "DOWN",
+        "reason": "verified_difference",
+        "title": "Northline Q2 operating margin was reported at 900 basis points; analysts expected Q2 operating margin of 12% for Northline."
+      },
+      {
+        "condition": "foreign_company",
+        "correct": false,
+        "expected": "ABSTAIN",
+        "predicted": "DOWN",
+        "reason": "verified_difference",
+        "title": "Northline Q2 operating margin was reported at 9%; analysts expected Q2 operating margin of 12% for Southport."
+      },
+      {
+        "condition": "denial",
+        "correct": false,
+        "expected": "ABSTAIN",
+        "predicted": "DOWN",
+        "reason": "verified_difference",
+        "title": "Northline Q2 operating margin was not reported at 9%; analysts expected Q2 operating margin of 12% for Northline."
+      },
+      {
+        "condition": "conditional",
+        "correct": false,
+        "expected": "ABSTAIN",
+        "predicted": "DOWN",
+        "reason": "verified_difference",
+        "title": "If Northline Q2 operating margin were reported at 9%; analysts expected Q2 operating margin of 12% for Northline."
+      },
+      {
+        "condition": "retracted",
+        "correct": false,
+        "expected": "ABSTAIN",
+        "predicted": "DOWN",
+        "reason": "verified_difference",
+        "title": "Northline Q2 operating margin was reported at 9%; analysts expected Q2 operating margin of 12% for Northline. The issuer retracted the reported figure."
+      },
+      {
+        "condition": "basis",
+        "correct": false,
+        "expected": "ABSTAIN",
+        "predicted": "DOWN",
+        "reason": "verified_difference",
+        "title": "Northline Q2 adjusted operating margin was reported at 9%; analysts expected Q2 unadjusted operating margin of 12% for Northline."
+      },
+      {
+        "condition": "wrong_period",
+        "correct": true,
+        "expected": "ABSTAIN",
+        "predicted": "ABSTAIN",
+        "reason": "incomparable",
+        "title": "Northline Q2 operating margin was reported at 9%; analysts expected Q3 operating margin of 12% for Northline."
+      },
+      {
+        "condition": "no_consensus",
+        "correct": true,
+        "expected": "ABSTAIN",
+        "predicted": "ABSTAIN",
+        "reason": "nonunique_or_missing",
+        "title": "Northline Q2 operating margin was reported at 9%. No analyst estimate was given."
+      },
+      {
+        "condition": "historical",
+        "correct": true,
+        "expected": "ABSTAIN",
+        "predicted": "ABSTAIN",
+        "reason": "nonunique_or_missing",
+        "title": "Northline Q2 operating margin was reported at 9%; last year Q2 operating margin was 12%."
+      }
+    ],
+    "direction_controls": 6,
+    "direction_controls_correct": 6,
+    "false_direction_conditions": [
+      "basis",
+      "conditional",
+      "denial",
+      "foreign_company",
+      "retracted"
+    ],
+    "n": 22,
+    "protocol_sha256": "18a7b8ada2a68793ad426ae82e7b5d9e7a1b18c177639f3f5207523ed7c21a42",
+    "unsupported": 16,
+    "unsupported_correctly_declined": 6
+  },
+  "assertion_scope_repair": {
+    "reused_for_repair": true,
+    "rows": [
+      {
+        "after": "UP",
+        "condition": "clean",
+        "correct": true,
+        "expected": "UP",
+        "predicted": "UP",
+        "reason": "verified_difference",
+        "title": "Northline Q2 operating margin was reported at 15%; analysts expected Q2 operating margin of 12% for Northline."
+      },
+      {
+        "after": "UP",
+        "condition": "order",
+        "correct": true,
+        "expected": "UP",
+        "predicted": "UP",
+        "reason": "verified_difference",
+        "title": "analysts expected Q2 operating margin of 12% for Northline; Northline Q2 operating margin was reported at 15%."
+      },
+      {
+        "after": "UP",
+        "condition": "equivalent_bps",
+        "correct": true,
+        "expected": "UP",
+        "predicted": "UP",
+        "reason": "verified_difference",
+        "title": "Northline Q2 operating margin was reported at 1500 basis points; analysts expected Q2 operating margin of 12% for Northline."
+      },
+      {
+        "after": "ABSTAIN",
+        "condition": "foreign_company",
+        "correct": false,
+        "expected": "ABSTAIN",
+        "predicted": "UP",
+        "reason": "verified_difference",
+        "title": "Northline Q2 operating margin was reported at 15%; analysts expected Q2 operating margin of 12% for Southport."
+      },
+      {
+        "after": "ABSTAIN",
+        "condition": "denial",
+        "correct": false,
+        "expected": "ABSTAIN",
+        "predicted": "UP",
+        "reason": "verified_difference",
+        "title": "Northline Q2 operating margin was not reported at 15%; analysts expected Q2 operating margin of 12% for Northline."
+      },
+      {
+        "after": "ABSTAIN",
+        "condition": "conditional",
+        "correct": false,
+        "expected": "ABSTAIN",
+        "predicted": "UP",
+        "reason": "verified_difference",
+        "title": "If Northline Q2 operating margin were reported at 15%; analysts expected Q2 operating margin of 12% for Northline."
+      },
+      {
+        "after": "ABSTAIN",
+        "condition": "retracted",
+        "correct": false,
+        "expected": "ABSTAIN",
+        "predicted": "UP",
+        "reason": "verified_difference",
+        "title": "Northline Q2 operating margin was reported at 15%; analysts expected Q2 operating margin of 12% for Northline. The issuer retracted the reported figure."
+      },
+      {
+        "after": "ABSTAIN",
+        "condition": "basis",
+        "correct": false,
+        "expected": "ABSTAIN",
+        "predicted": "UP",
+        "reason": "verified_difference",
+        "title": "Northline Q2 adjusted operating margin was reported at 15%; analysts expected Q2 unadjusted operating margin of 12% for Northline."
+      },
+      {
+        "after": "ABSTAIN",
+        "condition": "wrong_period",
+        "correct": true,
+        "expected": "ABSTAIN",
+        "predicted": "ABSTAIN",
+        "reason": "incomparable",
+        "title": "Northline Q2 operating margin was reported at 15%; analysts expected Q3 operating margin of 12% for Northline."
+      },
+      {
+        "after": "ABSTAIN",
+        "condition": "no_consensus",
+        "correct": true,
+        "expected": "ABSTAIN",
+        "predicted": "ABSTAIN",
+        "reason": "nonunique_or_missing",
+        "title": "Northline Q2 operating margin was reported at 15%. No analyst estimate was given."
+      },
+      {
+        "after": "ABSTAIN",
+        "condition": "historical",
+        "correct": true,
+        "expected": "ABSTAIN",
+        "predicted": "ABSTAIN",
+        "reason": "nonunique_or_missing",
+        "title": "Northline Q2 operating margin was reported at 15%; last year Q2 operating margin was 12%."
+      },
+      {
+        "after": "DOWN",
+        "condition": "clean",
+        "correct": true,
+        "expected": "DOWN",
+        "predicted": "DOWN",
+        "reason": "verified_difference",
+        "title": "Northline Q2 operating margin was reported at 9%; analysts expected Q2 operating margin of 12% for Northline."
+      },
+      {
+        "after": "DOWN",
+        "condition": "order",
+        "correct": true,
+        "expected": "DOWN",
+        "predicted": "DOWN",
+        "reason": "verified_difference",
+        "title": "analysts expected Q2 operating margin of 12% for Northline; Northline Q2 operating margin was reported at 9%."
+      },
+      {
+        "after": "DOWN",
+        "condition": "equivalent_bps",
+        "correct": true,
+        "expected": "DOWN",
+        "predicted": "DOWN",
+        "reason": "verified_difference",
+        "title": "Northline Q2 operating margin was reported at 900 basis points; analysts expected Q2 operating margin of 12% for Northline."
+      },
+      {
+        "after": "ABSTAIN",
+        "condition": "foreign_company",
+        "correct": false,
+        "expected": "ABSTAIN",
+        "predicted": "DOWN",
+        "reason": "verified_difference",
+        "title": "Northline Q2 operating margin was reported at 9%; analysts expected Q2 operating margin of 12% for Southport."
+      },
+      {
+        "after": "ABSTAIN",
+        "condition": "denial",
+        "correct": false,
+        "expected": "ABSTAIN",
+        "predicted": "DOWN",
+        "reason": "verified_difference",
+        "title": "Northline Q2 operating margin was not reported at 9%; analysts expected Q2 operating margin of 12% for Northline."
+      },
+      {
+        "after": "ABSTAIN",
+        "condition": "conditional",
+        "correct": false,
+        "expected": "ABSTAIN",
+        "predicted": "DOWN",
+        "reason": "verified_difference",
+        "title": "If Northline Q2 operating margin were reported at 9%; analysts expected Q2 operating margin of 12% for Northline."
+      },
+      {
+        "after": "ABSTAIN",
+        "condition": "retracted",
+        "correct": false,
+        "expected": "ABSTAIN",
+        "predicted": "DOWN",
+        "reason": "verified_difference",
+        "title": "Northline Q2 operating margin was reported at 9%; analysts expected Q2 operating margin of 12% for Northline. The issuer retracted the reported figure."
+      },
+      {
+        "after": "ABSTAIN",
+        "condition": "basis",
+        "correct": false,
+        "expected": "ABSTAIN",
+        "predicted": "DOWN",
+        "reason": "verified_difference",
+        "title": "Northline Q2 adjusted operating margin was reported at 9%; analysts expected Q2 unadjusted operating margin of 12% for Northline."
+      },
+      {
+        "after": "ABSTAIN",
+        "condition": "wrong_period",
+        "correct": true,
+        "expected": "ABSTAIN",
+        "predicted": "ABSTAIN",
+        "reason": "incomparable",
+        "title": "Northline Q2 operating margin was reported at 9%; analysts expected Q3 operating margin of 12% for Northline."
+      },
+      {
+        "after": "ABSTAIN",
+        "condition": "no_consensus",
+        "correct": true,
+        "expected": "ABSTAIN",
+        "predicted": "ABSTAIN",
+        "reason": "nonunique_or_missing",
+        "title": "Northline Q2 operating margin was reported at 9%. No analyst estimate was given."
+      },
+      {
+        "after": "ABSTAIN",
+        "condition": "historical",
+        "correct": true,
+        "expected": "ABSTAIN",
+        "predicted": "ABSTAIN",
+        "reason": "nonunique_or_missing",
+        "title": "Northline Q2 operating margin was reported at 9%; last year Q2 operating margin was 12%."
+      }
+    ],
+    "summary": {
+      "direction_controls": {
+        "matched": 6,
+        "n": 6
+      },
+      "invalid_controls": {
+        "matched": 16,
+        "n": 16
+      }
+    }
+  },
+  "materiality": {
+    "eligible": {
+      "errors": 0,
+      "n": 52,
+      "raw_positive": 13,
+      "reasons": {
+        "accepted": 13,
+        "none": 39
+      },
+      "verified_positive": 13
+    },
+    "experimental": true,
+    "judge_failures": 0,
+    "live_change": false,
+    "live_thresholds": {
+      "literal": {
+        "abstain": 34,
+        "all_case_ba": 0.4351288056206089,
+        "coverage": 0.6458333333333334,
+        "down": 20,
+        "up": 42
+      },
+      "old": {
+        "abstain": 34,
+        "all_case_ba": 0.4351288056206089,
+        "coverage": 0.6458333333333334,
+        "down": 20,
+        "up": 42
+      },
+      "review": {
+        "abstain": 46,
+        "all_case_ba": 0.36370023419203745,
+        "coverage": 0.5208333333333334,
+        "down": 20,
+        "up": 30
+      },
+      "uniform": {
+        "abstain": 37,
+        "all_case_ba": 0.4126463700234192,
+        "coverage": 0.6145833333333334,
+        "down": 19,
+        "up": 40
+      }
+    },
+    "matched": {
+      "called_accuracy_delta": -0.016129032258064516,
+      "calls_each": 62,
+      "correct_current": 36,
+      "correct_review": 35,
+      "interval": {
+        "draws": 1000,
+        "high": 0.0,
+        "low": -0.05263157894736842,
+        "median": -0.016129032258064516
+      }
+    },
+    "metrics": {
+      "literal": {
+        "auc": 0.6451990632318502,
+        "ba": 0.5906323185011709
+      },
+      "old": {
+        "auc": 0.6451990632318502,
+        "ba": 0.5906323185011709
+      },
+      "review": {
+        "auc": 0.6508196721311476,
+        "ba": 0.5906323185011709
+      },
+      "uniform": {
+        "auc": 0.6451990632318502,
+        "ba": 0.5906323185011709
+      }
+    },
+    "missing_impacts": 0,
+    "n": 96,
+    "news_cases": 74,
+    "origins": 12,
+    "paired": {
+      "literal": {
+        "hi": {
+          "auc": 0.04347826086956519,
+          "ba": 0.0
+        },
+        "lo": {
+          "auc": -0.016687309958935435,
+          "ba": 0.0
+        },
+        "point": {
+          "auc": 0.005620608899297386,
+          "ba": 0.0
+        },
+        "valid_draws": 1000
+      },
+      "old": {
+        "hi": {
+          "auc": 0.04347826086956519,
+          "ba": 0.0
+        },
+        "lo": {
+          "auc": -0.016687309958935435,
+          "ba": 0.0
+        },
+        "point": {
+          "auc": 0.005620608899297386,
+          "ba": 0.0
+        },
+        "valid_draws": 1000
+      },
+      "uniform": {
+        "hi": {
+          "auc": 0.04347826086956519,
+          "ba": 0.0
+        },
+        "lo": {
+          "auc": -0.016687309958935435,
+          "ba": 0.0
+        },
+        "point": {
+          "auc": 0.005620608899297386,
+          "ba": 0.0
+        },
+        "valid_draws": 1000
+      }
+    },
+    "parts": {
+      "dev": {
+        "literal": {
+          "auc": 0.6247049567269867,
+          "ba": 0.5639260424862313
+        },
+        "old": {
+          "auc": 0.6247049567269867,
+          "ba": 0.5639260424862313
+        },
+        "review": {
+          "auc": 0.6380802517702596,
+          "ba": 0.5639260424862313
+        },
+        "uniform": {
+          "auc": 0.6247049567269867,
+          "ba": 0.5639260424862313
+        }
+      },
+      "reused_window": {
+        "literal": {
+          "auc": 0.68125,
+          "ba": 0.6375
+        },
+        "old": {
+          "auc": 0.68125,
+          "ba": 0.6375
+        },
+        "review": {
+          "auc": 0.63125,
+          "ba": 0.6375
+        },
+        "uniform": {
+          "auc": 0.68125,
+          "ba": 0.6375
+        }
+      }
+    },
+    "protocol_sha256": "33c20fe671f7af364c03be46e6c55f7ff356933713004241cb0fb9d16a449bb7",
+    "review_calls": 104,
+    "screen_passed": false,
+    "swaps": {
+      "errors": 0,
+      "n": 52,
+      "raw_positive": 2,
+      "reasons": {
+        "no_explicit_asset": 2,
+        "none": 50
+      },
+      "verified_positive": 0
+    },
+    "within_asset_shuffles_ge": 0.719
+  },
+  "snippet_coverage": {
+    "distinct_snippet": 101,
+    "title_grounded": 0,
+    "title_literal_clue": 0,
+    "title_plus_snippet_grounded": 0,
+    "title_plus_snippet_literal_clue": 0,
+    "unique": 213
+  },
+  "surprise": {
+    "by_condition_correct": {
+      "challenge": {
+        "beat": {
+          "evidence": 0,
+          "evidence_router": 3,
+          "live": 2,
+          "n": 8,
+          "rules": 0,
+          "rules_router": 3,
+          "semantic": 3
+        },
+        "miss": {
+          "evidence": 0,
+          "evidence_router": 2,
+          "live": 3,
+          "n": 8,
+          "rules": 0,
+          "rules_router": 2,
+          "semantic": 2
+        },
+        "neutral": {
+          "evidence": 8,
+          "evidence_router": 6,
+          "live": 3,
+          "n": 8,
+          "rules": 8,
+          "rules_router": 6,
+          "semantic": 6
+        }
+      },
+      "controlled": {
+        "beat": {
+          "evidence": 6,
+          "evidence_router": 12,
+          "live": 7,
+          "n": 16,
+          "rules": 16,
+          "rules_router": 16,
+          "semantic": 11
+        },
+        "conflicting": {
+          "evidence": 16,
+          "evidence_router": 8,
+          "live": 10,
+          "n": 16,
+          "rules": 16,
+          "rules_router": 8,
+          "semantic": 8
+        },
+        "equal": {
+          "evidence": 16,
+          "evidence_router": 16,
+          "live": 16,
+          "n": 16,
+          "rules": 16,
+          "rules_router": 16,
+          "semantic": 16
+        },
+        "historical_only": {
+          "evidence": 16,
+          "evidence_router": 8,
+          "live": 9,
+          "n": 16,
+          "rules": 16,
+          "rules_router": 8,
+          "semantic": 8
+        },
+        "miss": {
+          "evidence": 7,
+          "evidence_router": 10,
+          "live": 3,
+          "n": 16,
+          "rules": 16,
+          "rules_router": 16,
+          "semantic": 6
+        },
+        "no_consensus": {
+          "evidence": 16,
+          "evidence_router": 16,
+          "live": 16,
+          "n": 16,
+          "rules": 16,
+          "rules_router": 16,
+          "semantic": 16
+        },
+        "wrong_measure": {
+          "evidence": 16,
+          "evidence_router": 15,
+          "live": 14,
+          "n": 16,
+          "rules": 16,
+          "rules_router": 15,
+          "semantic": 15
+        },
+        "wrong_period": {
+          "evidence": 16,
+          "evidence_router": 15,
+          "live": 15,
+          "n": 16,
+          "rules": 16,
+          "rules_router": 15,
+          "semantic": 15
+        }
+      }
+    },
+    "cache_coverage": {
+      "from_both": 52,
+      "gated_cache": {
+        "asset_titles": 213,
+        "contains_estimate_marker": 0,
+        "fully_verified": 0,
+        "reasons": {
+          "nonunique_or_missing": 213
+        }
+      },
+      "originally_scored": {
+        "asset_titles": 52,
+        "contains_estimate_marker": 0,
+        "fully_verified": 0,
+        "reasons": {
+          "nonunique_or_missing": 52
+        }
+      }
+    },
+    "call_errors": {},
+    "calls": 456,
+    "experimental": true,
+    "extra_reviewer_gate": false,
+    "families": 8,
+    "live_change": false,
+    "market_accuracy_tested": false,
+    "median_seconds_per_call": {
+      "live": 1.6230000000000002,
+      "select": 1.701,
+      "semantic": 1.312
+    },
+    "metrics": {
+      "challenge": {
+        "evidence": {
+          "accuracy": 0.3333333333333333,
+          "confusion": {
+            "ABSTAIN": {
+              "ABSTAIN": 8,
+              "DOWN": 0,
+              "ERROR": 0,
+              "UP": 0
+            },
+            "DOWN": {
+              "ABSTAIN": 8,
+              "DOWN": 0,
+              "ERROR": 0,
+              "UP": 0
+            },
+            "UP": {
+              "ABSTAIN": 8,
+              "DOWN": 0,
+              "ERROR": 0,
+              "UP": 0
+            }
+          },
+          "correct": 8,
+          "correct_pairs": 0,
+          "macro_recall": 0.3333333333333333,
+          "n": 24,
+          "pair_rate": 0.0,
+          "pairs": 8,
+          "predicted": {
+            "ABSTAIN": 24
+          },
+          "recall": {
+            "ABSTAIN": 1.0,
+            "DOWN": 0.0,
+            "UP": 0.0
+          }
+        },
+        "evidence_router": {
+          "accuracy": 0.4583333333333333,
+          "confusion": {
+            "ABSTAIN": {
+              "ABSTAIN": 6,
+              "DOWN": 1,
+              "ERROR": 0,
+              "UP": 1
+            },
+            "DOWN": {
+              "ABSTAIN": 4,
+              "DOWN": 2,
+              "ERROR": 0,
+              "UP": 2
+            },
+            "UP": {
+              "ABSTAIN": 4,
+              "DOWN": 1,
+              "ERROR": 0,
+              "UP": 3
+            }
+          },
+          "correct": 11,
+          "correct_pairs": 0,
+          "macro_recall": 0.4583333333333333,
+          "n": 24,
+          "pair_rate": 0.0,
+          "pairs": 8,
+          "predicted": {
+            "ABSTAIN": 14,
+            "DOWN": 4,
+            "UP": 6
+          },
+          "recall": {
+            "ABSTAIN": 0.75,
+            "DOWN": 0.25,
+            "UP": 0.375
+          }
+        },
+        "live": {
+          "accuracy": 0.3333333333333333,
+          "confusion": {
+            "ABSTAIN": {
+              "ABSTAIN": 3,
+              "DOWN": 3,
+              "ERROR": 0,
+              "UP": 2
+            },
+            "DOWN": {
+              "ABSTAIN": 4,
+              "DOWN": 3,
+              "ERROR": 0,
+              "UP": 1
+            },
+            "UP": {
+              "ABSTAIN": 4,
+              "DOWN": 2,
+              "ERROR": 0,
+              "UP": 2
+            }
+          },
+          "correct": 8,
+          "correct_pairs": 0,
+          "macro_recall": 0.3333333333333333,
+          "n": 24,
+          "pair_rate": 0.0,
+          "pairs": 8,
+          "predicted": {
+            "ABSTAIN": 11,
+            "DOWN": 8,
+            "UP": 5
+          },
+          "recall": {
+            "ABSTAIN": 0.375,
+            "DOWN": 0.375,
+            "UP": 0.25
+          }
+        },
+        "rules": {
+          "accuracy": 0.3333333333333333,
+          "confusion": {
+            "ABSTAIN": {
+              "ABSTAIN": 8,
+              "DOWN": 0,
+              "ERROR": 0,
+              "UP": 0
+            },
+            "DOWN": {
+              "ABSTAIN": 8,
+              "DOWN": 0,
+              "ERROR": 0,
+              "UP": 0
+            },
+            "UP": {
+              "ABSTAIN": 8,
+              "DOWN": 0,
+              "ERROR": 0,
+              "UP": 0
+            }
+          },
+          "correct": 8,
+          "correct_pairs": 0,
+          "macro_recall": 0.3333333333333333,
+          "n": 24,
+          "pair_rate": 0.0,
+          "pairs": 8,
+          "predicted": {
+            "ABSTAIN": 24
+          },
+          "recall": {
+            "ABSTAIN": 1.0,
+            "DOWN": 0.0,
+            "UP": 0.0
+          }
+        },
+        "rules_router": {
+          "accuracy": 0.4583333333333333,
+          "confusion": {
+            "ABSTAIN": {
+              "ABSTAIN": 6,
+              "DOWN": 1,
+              "ERROR": 0,
+              "UP": 1
+            },
+            "DOWN": {
+              "ABSTAIN": 4,
+              "DOWN": 2,
+              "ERROR": 0,
+              "UP": 2
+            },
+            "UP": {
+              "ABSTAIN": 4,
+              "DOWN": 1,
+              "ERROR": 0,
+              "UP": 3
+            }
+          },
+          "correct": 11,
+          "correct_pairs": 0,
+          "macro_recall": 0.4583333333333333,
+          "n": 24,
+          "pair_rate": 0.0,
+          "pairs": 8,
+          "predicted": {
+            "ABSTAIN": 14,
+            "DOWN": 4,
+            "UP": 6
+          },
+          "recall": {
+            "ABSTAIN": 0.75,
+            "DOWN": 0.25,
+            "UP": 0.375
+          }
+        },
+        "semantic": {
+          "accuracy": 0.4583333333333333,
+          "confusion": {
+            "ABSTAIN": {
+              "ABSTAIN": 6,
+              "DOWN": 1,
+              "ERROR": 0,
+              "UP": 1
+            },
+            "DOWN": {
+              "ABSTAIN": 4,
+              "DOWN": 2,
+              "ERROR": 0,
+              "UP": 2
+            },
+            "UP": {
+              "ABSTAIN": 4,
+              "DOWN": 1,
+              "ERROR": 0,
+              "UP": 3
+            }
+          },
+          "correct": 11,
+          "correct_pairs": 0,
+          "macro_recall": 0.4583333333333333,
+          "n": 24,
+          "pair_rate": 0.0,
+          "pairs": 8,
+          "predicted": {
+            "ABSTAIN": 14,
+            "DOWN": 4,
+            "UP": 6
+          },
+          "recall": {
+            "ABSTAIN": 0.75,
+            "DOWN": 0.25,
+            "UP": 0.375
+          }
+        }
+      },
+      "controlled": {
+        "evidence": {
+          "accuracy": 0.8515625,
+          "confusion": {
+            "ABSTAIN": {
+              "ABSTAIN": 96,
+              "DOWN": 0,
+              "ERROR": 0,
+              "UP": 0
+            },
+            "DOWN": {
+              "ABSTAIN": 9,
+              "DOWN": 7,
+              "ERROR": 0,
+              "UP": 0
+            },
+            "UP": {
+              "ABSTAIN": 10,
+              "DOWN": 0,
+              "ERROR": 0,
+              "UP": 6
+            }
+          },
+          "correct": 109,
+          "correct_pairs": 6,
+          "macro_recall": 0.6041666666666666,
+          "n": 128,
+          "pair_rate": 0.375,
+          "pairs": 16,
+          "predicted": {
+            "ABSTAIN": 115,
+            "DOWN": 7,
+            "UP": 6
+          },
+          "recall": {
+            "ABSTAIN": 1.0,
+            "DOWN": 0.4375,
+            "UP": 0.375
+          }
+        },
+        "evidence_router": {
+          "accuracy": 0.78125,
+          "confusion": {
+            "ABSTAIN": {
+              "ABSTAIN": 78,
+              "DOWN": 9,
+              "ERROR": 0,
+              "UP": 9
+            },
+            "DOWN": {
+              "ABSTAIN": 2,
+              "DOWN": 10,
+              "ERROR": 0,
+              "UP": 4
+            },
+            "UP": {
+              "ABSTAIN": 1,
+              "DOWN": 3,
+              "ERROR": 0,
+              "UP": 12
+            }
+          },
+          "correct": 100,
+          "correct_pairs": 9,
+          "macro_recall": 0.7291666666666666,
+          "n": 128,
+          "pair_rate": 0.5625,
+          "pairs": 16,
+          "predicted": {
+            "ABSTAIN": 81,
+            "DOWN": 22,
+            "UP": 25
+          },
+          "recall": {
+            "ABSTAIN": 0.8125,
+            "DOWN": 0.625,
+            "UP": 0.75
+          }
+        },
+        "live": {
+          "accuracy": 0.703125,
+          "confusion": {
+            "ABSTAIN": {
+              "ABSTAIN": 80,
+              "DOWN": 7,
+              "ERROR": 0,
+              "UP": 9
+            },
+            "DOWN": {
+              "ABSTAIN": 9,
+              "DOWN": 3,
+              "ERROR": 0,
+              "UP": 4
+            },
+            "UP": {
+              "ABSTAIN": 9,
+              "DOWN": 0,
+              "ERROR": 0,
+              "UP": 7
+            }
+          },
+          "correct": 90,
+          "correct_pairs": 1,
+          "macro_recall": 0.48611111111111116,
+          "n": 128,
+          "pair_rate": 0.0625,
+          "pairs": 16,
+          "predicted": {
+            "ABSTAIN": 98,
+            "DOWN": 10,
+            "UP": 20
+          },
+          "recall": {
+            "ABSTAIN": 0.8333333333333334,
+            "DOWN": 0.1875,
+            "UP": 0.4375
+          }
+        },
+        "rules": {
+          "accuracy": 1.0,
+          "confusion": {
+            "ABSTAIN": {
+              "ABSTAIN": 96,
+              "DOWN": 0,
+              "ERROR": 0,
+              "UP": 0
+            },
+            "DOWN": {
+              "ABSTAIN": 0,
+              "DOWN": 16,
+              "ERROR": 0,
+              "UP": 0
+            },
+            "UP": {
+              "ABSTAIN": 0,
+              "DOWN": 0,
+              "ERROR": 0,
+              "UP": 16
+            }
+          },
+          "correct": 128,
+          "correct_pairs": 16,
+          "macro_recall": 1.0,
+          "n": 128,
+          "pair_rate": 1.0,
+          "pairs": 16,
+          "predicted": {
+            "ABSTAIN": 96,
+            "DOWN": 16,
+            "UP": 16
+          },
+          "recall": {
+            "ABSTAIN": 1.0,
+            "DOWN": 1.0,
+            "UP": 1.0
+          }
+        },
+        "rules_router": {
+          "accuracy": 0.859375,
+          "confusion": {
+            "ABSTAIN": {
+              "ABSTAIN": 78,
+              "DOWN": 9,
+              "ERROR": 0,
+              "UP": 9
+            },
+            "DOWN": {
+              "ABSTAIN": 0,
+              "DOWN": 16,
+              "ERROR": 0,
+              "UP": 0
+            },
+            "UP": {
+              "ABSTAIN": 0,
+              "DOWN": 0,
+              "ERROR": 0,
+              "UP": 16
+            }
+          },
+          "correct": 110,
+          "correct_pairs": 16,
+          "macro_recall": 0.9375,
+          "n": 128,
+          "pair_rate": 1.0,
+          "pairs": 16,
+          "predicted": {
+            "ABSTAIN": 78,
+            "DOWN": 25,
+            "UP": 25
+          },
+          "recall": {
+            "ABSTAIN": 0.8125,
+            "DOWN": 1.0,
+            "UP": 1.0
+          }
+        },
+        "semantic": {
+          "accuracy": 0.7421875,
+          "confusion": {
+            "ABSTAIN": {
+              "ABSTAIN": 78,
+              "DOWN": 9,
+              "ERROR": 0,
+              "UP": 9
+            },
+            "DOWN": {
+              "ABSTAIN": 5,
+              "DOWN": 6,
+              "ERROR": 0,
+              "UP": 5
+            },
+            "UP": {
+              "ABSTAIN": 1,
+              "DOWN": 4,
+              "ERROR": 0,
+              "UP": 11
+            }
+          },
+          "correct": 95,
+          "correct_pairs": 5,
+          "macro_recall": 0.625,
+          "n": 128,
+          "pair_rate": 0.3125,
+          "pairs": 16,
+          "predicted": {
+            "ABSTAIN": 84,
+            "DOWN": 19,
+            "UP": 25
+          },
+          "recall": {
+            "ABSTAIN": 0.8125,
+            "DOWN": 0.375,
+            "UP": 0.6875
+          }
+        }
+      }
+    },
+    "n": 152,
+    "paired_vs_router": {
+      "challenge": {
+        "rules_router": {
+          "delta": 0.0,
+          "interval": {
+            "draws": 2000,
+            "high": 0.0,
+            "low": 0.0,
+            "median": 0.0
+          }
+        },
+        "semantic": {
+          "delta": 0.0,
+          "interval": {
+            "draws": 2000,
+            "high": 0.0,
+            "low": 0.0,
+            "median": 0.0
+          }
+        }
+      },
+      "controlled": {
+        "rules_router": {
+          "delta": -0.20833333333333337,
+          "interval": {
+            "draws": 2000,
+            "high": -0.0625,
+            "low": -0.375,
+            "median": -0.20833333333333326
+          }
+        },
+        "semantic": {
+          "delta": 0.10416666666666663,
+          "interval": {
+            "draws": 2000,
+            "high": 0.1875,
+            "low": 0.04166666666666663,
+            "median": 0.10416666666666663
+          }
+        }
+      }
+    },
+    "protocol_sha256": "f4dd80ce4de01e907fd934a5a78a193153311f8801a07ac0b6fe7097e3cb2eeb",
+    "route_by_split": {
+      "challenge": {
+        "semantic_fallback": 24
+      },
+      "controlled": {
+        "semantic_fallback": 113,
+        "verified": 15
+      }
+    },
+    "runtime": {
+      "backend": "vulkan",
+      "cpu_only": false,
+      "flags": [
+        "--ctx-size",
+        "4096",
+        "--parallel",
+        "1",
+        "--reasoning",
+        "off",
+        "--jinja",
+        "--device",
+        "Vulkan0",
+        "--n-gpu-layers",
+        "99",
+        "--flash-attn",
+        "on",
+        "--threads",
+        "6"
+      ],
+      "id": "lfm3-1.7b-atomic-ad-q4km",
+      "model_sha256": "b22df65673b54ed326f18f74826d76f3b65dadc237ffd6306cd52be04544827d",
+      "revision": "3ad712542eb9de349dbd28f2739b69c925cdec7d",
+      "runtime": "b12110"
+    },
+    "semantic_router_gate": false
+  }
+}
