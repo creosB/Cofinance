@@ -1,0 +1,126 @@
+{
+  "audit": {
+    "archived_urls": 15,
+    "exact_spans": 28,
+    "invalid_responses": 0,
+    "overlap_previous_gate_urls": 8,
+    "permutations": 144,
+    "scored_rows": 48
+  },
+  "frozen": {
+    "decision": "INDEPENDENT_RETEST",
+    "experimental": true,
+    "limits": "12 archived questions (some source reuse) and 12 authored contrasts. The exact evidence for each verdict is keyed before generation. One model, narrow English rules, not population accuracy. No live changes.",
+    "paired": {
+      "cluster_count": 6,
+      "descriptive_cluster_interval": [
+        0.615,
+        0.87
+      ],
+      "losses": 0,
+      "ties": 6,
+      "wins": 18
+    },
+    "protocol_sha": "b0595650b0f9ff7d5a4af59c37a25666a849096c0a6a0a7b0616570098cb92a5",
+    "results": {
+      "all": {
+        "code": {
+          "false_live": 0,
+          "input_tokens": 0,
+          "joint": 24,
+          "median_s": 0.0,
+          "miss": 0,
+          "n": 24,
+          "output_tokens": 0,
+          "refs": 24,
+          "valid": 24,
+          "verdict": 24,
+          "withheld": 11,
+          "wrong_definite": 0
+        },
+        "direct": {
+          "false_live": 1,
+          "input_tokens": 7581,
+          "joint": 6,
+          "median_s": 3.789,
+          "miss": 6,
+          "n": 24,
+          "output_tokens": 764,
+          "refs": 9,
+          "valid": 24,
+          "verdict": 17,
+          "withheld": 16,
+          "wrong_definite": 1
+        }
+      },
+      "archive": {
+        "code": {
+          "false_live": 0,
+          "input_tokens": 0,
+          "joint": 12,
+          "median_s": 0.0,
+          "miss": 0,
+          "n": 12,
+          "output_tokens": 0,
+          "refs": 12,
+          "valid": 12,
+          "verdict": 12,
+          "withheld": 6,
+          "wrong_definite": 0
+        },
+        "direct": {
+          "false_live": 0,
+          "input_tokens": 4654,
+          "joint": 4,
+          "median_s": 3.7735,
+          "miss": 2,
+          "n": 12,
+          "output_tokens": 348,
+          "refs": 5,
+          "valid": 12,
+          "verdict": 10,
+          "withheld": 8,
+          "wrong_definite": 0
+        }
+      },
+      "contrast": {
+        "code": {
+          "false_live": 0,
+          "input_tokens": 0,
+          "joint": 12,
+          "median_s": 0.0,
+          "miss": 0,
+          "n": 12,
+          "output_tokens": 0,
+          "refs": 12,
+          "valid": 12,
+          "verdict": 12,
+          "withheld": 5,
+          "wrong_definite": 0
+        },
+        "direct": {
+          "false_live": 1,
+          "input_tokens": 2927,
+          "joint": 2,
+          "median_s": 3.789,
+          "miss": 4,
+          "n": 12,
+          "output_tokens": 416,
+          "refs": 4,
+          "valid": 12,
+          "verdict": 7,
+          "withheld": 8,
+          "wrong_definite": 1
+        }
+      }
+    }
+  },
+  "label_sha": "28c40ed3f8f43a8eaf5e5f35708e568299bf84cf15065be447073fa580b1d30e",
+  "runtime": {
+    "backend": "vulkan",
+    "id": "lfm3-1.7b-atomic-ad-q4km",
+    "model_sha256": "b22df65673b54ed326f18f74826d76f3b65dadc237ffd6306cd52be04544827d",
+    "revision": "3ad712542eb9de349dbd28f2739b69c925cdec7d",
+    "runtime": "b12110"
+  }
+}

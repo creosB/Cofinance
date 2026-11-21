@@ -9,6 +9,7 @@
 
 | What we tested | What happened | Interpretation |
 | --- | --- | --- |
+| [Announced vs actually rolled out](benchmarks/ROLLOUT_STAGE.md) | On a 24-question development screen, the narrow rules gave the right verdict and decisive sources on 24 versus 6 for direct Q&A (verdict alone: 24 vs 17). | Qualifies only to test on independently worded cases. Not deployed. |
 | [Packet coverage](benchmarks/PACKET_COVERAGE.md) | On 12 authored four-page packets, treating the top three hits as complete yielded 6 unsupported verified verdicts. Checking the full supplied packet got 12/12 expected states with required sources, including 4 withheld judgments. | Verify the stated evidence scope; this was not an end-to-end product or model-accuracy test. |
 | [Evidence receipts and blockers](benchmarks/EVIDENCE_RECEIPTS.md) | All four status types matched on 36 variants of 12 reused packets; 35/36 also returned the keyed receipts. New PDF uploads now retain bounded extracted text before normalization; old attachments remain search-only unless original evidence exists. | Better source provenance, not proof that arbitrary tables or diagrams are understood. |
 | [Source scope and checked decisions](benchmarks/SOURCE_SCOPE.md) | On 12 authored packets a checked card raised model verdicts from 4 to 8 correct, but neither model arm selected exactly the decisive sources with the correct verdict. Code alone did so on 7. | Separate evidence extraction, decision correctness and citation selection. Not a live model change. |
