@@ -13,6 +13,8 @@ class ScopeCheck(unittest.TestCase):
         for edited in (self.obs['text'].replace('unrestricted cash','total cash'),self.obs['text'].replace('unrestricted cash','restricted cash'),self.obs['text'].replace('Arrow','Elsewhere'),self.obs['text'].replace('dollars','euros'),self.obs['text'].replace('quarter-end','prior-quarter'),self.obs['text'].replace('signed','forecast')):
             self.assertIsNone(E.analyze(self.q,[self.rule,dict(self.obs,text=edited),self.flash])['card'])
         self.assertIsNone(E.analyze(self.q,[self.rule,dict(self.flash,text=self.flash['text'].replace('total cash','unrestricted cash'))])['card'])
+        # No conflicting preliminary amount can mask a wrong-measure acceptance.
+        self.assertIsNone(E.analyze(self.q,[self.rule,dict(self.obs,text=self.obs['text'].replace('unrestricted cash','total cash'))])['card'])
     def test_week_and_month_are_not_exchangeable(self):
         q='Did Kite meet its full-month uptime commitment?';policy=doc('Policy','Kite requires at least 96 percent uptime for the entire month.');week=doc('Dash','The dashboard for Kite showed 98 percent uptime for the first week only.');self.assertIsNone(E.analyze(q,[policy,week])['card']);act=doc('Obs','The signed full-month uptime ledger for Kite shows 95.9 percent.');r=E.analyze(q,[policy,week,act]);self.assertEqual((r['card']['verdict'],r['card']['actual']),('missed','95.9'));self.assertIsNone(E.analyze(q,[policy,dict(act,text=act['text'].replace('95.9','105'))])['card']);self.assertIsNone(E.analyze(q,[policy,dict(act,text=act['text'].replace('Kite','Birch'))])['card'])
     def test_signed_conflicts_and_explicit_supersession(self):
@@ -25,6 +27,8 @@ class ScopeCheck(unittest.TestCase):
     def test_whole_excerpt_not_substring(self):
         for t in (self.obs['text']+' This is conditional.', 'If confirmed, '+self.obs['text'],self.obs['text']+'...',self.obs['text']+' '*900,self.obs['text'].replace('22','-22'),self.obs['text'].replace('22','22,000'),self.obs['text'].replace('22','22 billion')):self.assertIsNone(E.analyze(self.q,[self.rule,dict(self.obs,text=t)])['card'])
         self.assertIsNone(E.analyze(self.q,self.ds+[dict(self.obs,name='LEDGER.PDF')])['card']);self.assertIsNone(E.analyze('What is tomorrow’s price?',self.ds)['card'])
+        # Other excerpts alone would permit a verdict. Silently skipping this page must not succeed.
+        self.assertIsNone(E.analyze(self.q,[self.rule,self.obs,doc('Notice','The signed quarter-end ledger was withdrawn.')])['card'])
     def test_witness_and_tamper_checks(self):
         ds=[self.rule,dict(self.obs,text='  '+self.obs['text']+' '),self.flash];r=E.analyze(self.q,ds);self.assertTrue(L.evidence_ok(r,ds));self.assertEqual(r['sources'][1]['witness']['start'],2);self.assertEqual(L.classify(r,r['card'].copy(),ds),'exact');self.assertEqual(L.classify(r,None,ds),'unsafe')
         for k,v in [('quote','altered'),('end',1),('start',0),('excerpt_sha256','x')]:
