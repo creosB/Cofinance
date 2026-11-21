@@ -1,0 +1,295 @@
+{
+  "frozen_matrix": {
+    "baseline_parents": [
+      {
+        "id": "Opal",
+        "old_resolved": true,
+        "status": "VERIFIED",
+        "value": "63"
+      },
+      {
+        "id": "Topaz",
+        "old_resolved": true,
+        "status": "VERIFIED",
+        "value": "27"
+      },
+      {
+        "id": "Rowan",
+        "old_resolved": true,
+        "status": "VERIFIED",
+        "value": "44"
+      },
+      {
+        "id": "Bay",
+        "old_resolved": true,
+        "status": "VERIFIED",
+        "value": "99.6"
+      },
+      {
+        "id": "Aster",
+        "old_resolved": true,
+        "status": "VERIFIED",
+        "value": "98.95"
+      },
+      {
+        "id": "Sumac",
+        "old_resolved": true,
+        "status": "VERIFIED",
+        "value": "97.7"
+      },
+      {
+        "id": "revised",
+        "old_resolved": true,
+        "status": "VERIFIED",
+        "value": "66"
+      },
+      {
+        "id": "unreconciled",
+        "old_resolved": false,
+        "status": "CONFLICT",
+        "value": null
+      },
+      {
+        "id": "no-month",
+        "old_resolved": false,
+        "status": "UNINTERPRETED",
+        "value": null
+      },
+      {
+        "id": "withdrawn",
+        "old_resolved": false,
+        "status": "WITHDRAWN",
+        "value": null
+      },
+      {
+        "id": "cash-language",
+        "old_resolved": false,
+        "status": "UNINTERPRETED",
+        "value": null
+      },
+      {
+        "id": "uptime-language",
+        "old_resolved": false,
+        "status": "UNINTERPRETED",
+        "value": null
+      }
+    ],
+    "correction_false_verified": 0,
+    "exact": 35,
+    "exact_by_type": {
+      "correction": 12,
+      "scope": 12,
+      "wording": 11
+    },
+    "experimental": true,
+    "false_world": 0,
+    "injected_contract_downgrades": 108,
+    "mismatches": [
+      {
+        "blocker_ok": true,
+        "expected": "UNINTERPRETED",
+        "id": "no-month/wording",
+        "ids": [
+          "Dashboard"
+        ],
+        "observed": "UNINTERPRETED",
+        "reason": "NO_MATCHING_OBSERVATION",
+        "refs_ok": false,
+        "value_ok": true
+      }
+    ],
+    "observed": {
+      "CONFLICT": 4,
+      "UNINTERPRETED": 21,
+      "VERIFIED": 7,
+      "WITHDRAWN": 4
+    },
+    "order_checks": 216,
+    "parents": 12,
+    "passes_lab_gate": true,
+    "protocol_sha256": "566734b316b9dd799814dd211dff19b0547d3b2a8dfce67e958a469a7d54eb43",
+    "saved_withdrawal": {
+      "new": {
+        "contract_failures": [],
+        "rendered": {
+          "citations": [
+            {
+              "doc_id": "2",
+              "document": "Dashboard.pdf",
+              "end": 80,
+              "kind": "paragraph",
+              "page": 1,
+              "page_sha256": "f9bac307a2d986794f097d28f9c48f8cdd352515eca06986e74bab03a2d9485b",
+              "quote": "The signed full-month uptime ledger for Flint was withdrawn without replacement.",
+              "start": 0
+            },
+            {
+              "doc_id": "1",
+              "document": "Ledger.pdf",
+              "end": 65,
+              "kind": "paragraph",
+              "page": 1,
+              "page_sha256": "d86db92613ee3fb43ba1180391536fca0dd5afcbb67ad0af40acf9df7dfb1faa",
+              "quote": "The signed full-month uptime ledger for Flint shows 99.2 percent.",
+              "start": 0
+            }
+          ],
+          "message": "This notice withdraws the identified record without replacement."
+        },
+        "result": {
+          "status": "WITHDRAWN",
+          "target_span": {
+            "doc_id": "1",
+            "document": "Ledger.pdf",
+            "end": 65,
+            "kind": "paragraph",
+            "page": 1,
+            "page_sha256": "d86db92613ee3fb43ba1180391536fca0dd5afcbb67ad0af40acf9df7dfb1faa",
+            "quote": "The signed full-month uptime ledger for Flint shows 99.2 percent.",
+            "start": 0
+          },
+          "withdrawal_span": {
+            "doc_id": "2",
+            "document": "Dashboard.pdf",
+            "end": 80,
+            "kind": "paragraph",
+            "page": 1,
+            "page_sha256": "f9bac307a2d986794f097d28f9c48f8cdd352515eca06986e74bab03a2d9485b",
+            "quote": "The signed full-month uptime ledger for Flint was withdrawn without replacement.",
+            "start": 0
+          }
+        }
+      },
+      "old": "uninterpreted_source",
+      "old_docs": [
+        "Policy.pdf",
+        "Ledger.pdf"
+      ],
+      "without_target": {
+        "contract_failures": [
+          {
+            "blocker": [
+              "2",
+              1,
+              0,
+              80
+            ],
+            "code": "CONTRACT_REJECTED",
+            "proposed_tag": "WITHDRAWN"
+          }
+        ],
+        "rendered": {
+          "citations": [
+            {
+              "doc_id": "2",
+              "document": "Dashboard.pdf",
+              "end": 80,
+              "kind": "paragraph",
+              "page": 1,
+              "page_sha256": "f9bac307a2d986794f097d28f9c48f8cdd352515eca06986e74bab03a2d9485b",
+              "quote": "The signed full-month uptime ledger for Flint was withdrawn without replacement.",
+              "start": 0
+            }
+          ],
+          "message": "I could not verify a conclusion from this passage."
+        },
+        "result": {
+          "blocker_span": {
+            "doc_id": "2",
+            "document": "Dashboard.pdf",
+            "end": 80,
+            "kind": "paragraph",
+            "page": 1,
+            "page_sha256": "f9bac307a2d986794f097d28f9c48f8cdd352515eca06986e74bab03a2d9485b",
+            "quote": "The signed full-month uptime ledger for Flint was withdrawn without replacement.",
+            "start": 0
+          },
+          "reason_code": "CONTRACT_REJECTED",
+          "status": "UNINTERPRETED"
+        }
+      }
+    },
+    "scope_abstained": 12,
+    "valid_spans": 52,
+    "variants": 36,
+    "wording_verified_preserved": 7
+  },
+  "pdf_smoke": {
+    "current_import": {
+      "blocks": [
+        [
+          "Ledger",
+          "paragraph",
+          0,
+          130,
+          "The signed full-month uptime ledger for Amber shows 97 percent. [1] Notice: Ledger.pdf is withdrawn without replacement for Amber."
+        ],
+        [
+          "Policy",
+          "paragraph",
+          0,
+          69,
+          "Amber requires strictly above 97 percent uptime for the entire month."
+        ]
+      ],
+      "citations": [
+        [
+          "Ledger",
+          0,
+          130
+        ]
+      ],
+      "reason": "UNPARSED_BLOCK",
+      "status": "UNINTERPRETED"
+    },
+    "pre_normalization": {
+      "blocks": [
+        [
+          "Ledger",
+          "paragraph",
+          0,
+          63,
+          "The signed full-month uptime ledger for Amber shows 97 percent."
+        ],
+        [
+          "Ledger",
+          "footnote",
+          64,
+          130,
+          "[1] Notice: Ledger.pdf is withdrawn without replacement for Amber."
+        ],
+        [
+          "Policy",
+          "paragraph",
+          0,
+          69,
+          "Amber requires strictly above 97 percent uptime for the entire month."
+        ]
+      ],
+      "citations": [
+        [
+          "Ledger",
+          64,
+          130
+        ],
+        [
+          "Ledger",
+          0,
+          63
+        ]
+      ],
+      "reason": null,
+      "status": "WITHDRAWN"
+    }
+  },
+  "post_repair": {
+    "commit": "f0a3a95",
+    "matrix_payloads_unchanged": 36,
+    "three_new_stale_proposal_controls": "passed after red tests"
+  },
+  "pre_repair_stale_internal_proposal": {
+    "injected_proposer_bug": "VERIFIED",
+    "normal_external": "UNINTERPRETED"
+  },
+  "production_change": false
+}
