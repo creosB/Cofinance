@@ -24,6 +24,23 @@ Paired joint wins/ties/losses 18/6/0; descriptive interval on the code-minus-dir
 
 **Decision:** the frozen threshold advanced the method only to an independent retest; live behavior unchanged. Do not train on this score or treat announcement/time/scope wording outside the grammar as established. The direct baseline remains necessary when the rules cannot interpret the source.
 
+## Fresh wording transfer: no integration
+
+The [transfer runner](../../qualify/rollout_transfer.py), commit `0ffdef3`, froze the unchanged verifier and direct prompt, the base-model author instructions and selection criteria before generating prose (protocol `edd62ff3`). A separate installed base narrator produced 12 fictional, three-notice packets without seeing the rules or first-screen outputs. A reviewer read the actual text before predicting or unmasking either arm; 10 packets were usable (3 live, 3 explicitly not live, 4 insufficient). Two were excluded up front: two equally sufficient decisive negative citations were possible, or a direct-purchase link was ambiguous about actual access. No re-generation, grammar patch, or selection based on model output. The synthetic writer shares the generator model family; reviewer was also involved in design. This is a limited transfer test, not independent customer validation.
+
+| Frozen transfer metric (10 usable) | Rules | Direct AtomicChat |
+| --- | ---: | ---: |
+| Correct verdict + decisive citations | 0 | 1 |
+| Correct verdict alone | 4 | 6 |
+| Exact references alone | 6 | 1 |
+| False rollout confirmations | 0 | 0 |
+| Missed answerable questions | 6 | 4 |
+| Withheld a definite answer | 10 | 8 |
+
+All six answerable cases had the right source IDs selected by the rules, yet all six were labeled insufficient. For example, the notice that users could download and use the desktop app that day was present and cited, but did not match a supported release construction. This is a parser limitation, not evidence against public access. On unresolved packets, redundant or missing context also cost exact-citation credit. Joint paired wins/ties/losses 0/9/1; descriptive paired interval -0.30 to 0.00. No false positive from a rule that never confirms anything is not a safety win. Twenty item scores, costs, 11 exact source spans, and 60 order permutations cross-checked. Nine transfer-gate faults caught, restored clean. Full backend: 830 tests run, 21 skipped, OK.
+
+**Disposition: do not integrate these rules as an open-prose verdict engine.** Keep their ability to suggest source spans as a separately testable component. In any future proposal distinguish unsupported wording from evidence of nonrelease. Do not tune the grammar on this transfer set and present the result as a fresh win.
+
 ## Reproduction
 
 Protocol `b0595650`, archived label hash `28c40ed3`, commit `5408c0c`. With the original local cache and pinned weights installed, seal a fresh root using `qualify.rollout_packets.freeze_labels(root)`, then `python -B -m qualify.rollout_screen freeze <root>` and `run <root>`. The original receipts are write-once. The public repo does not contain the private cache or local model.

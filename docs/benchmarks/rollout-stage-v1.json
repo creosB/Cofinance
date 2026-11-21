@@ -122,5 +122,65 @@
     "model_sha256": "b22df65673b54ed326f18f74826d76f3b65dadc237ffd6306cd52be04544827d",
     "revision": "3ad712542eb9de349dbd28f2739b69c925cdec7d",
     "runtime": "b12110"
+  },
+  "wording_transfer": {
+    "audit": {
+      "code_order_checks": 60,
+      "exclusions": {
+        "r08": "Two independent excerpts each explicitly and sufficiently deny current Greek public availability. A single exact minimal key would arbitrarily penalize another equally valid citation.",
+        "r09": "The catalog offers direct purchase links, but the wording does not resolve whether those links let customers obtain or use the product now versus reserve it. Ambiguous rollout boundary."
+      },
+      "joint_wins_ties_losses": [
+        0,
+        9,
+        1
+      ],
+      "key_sha": "847460f06fee3e657a3d80550fc5b29ee46d39eb9545aa0dc523dabefa98abe7",
+      "paired_descriptive_interval": [
+        -0.3,
+        0.0
+      ],
+      "source_spans_checked": 11,
+      "usable": 10
+    },
+    "author_model": "lfm3-1.7b-q4km",
+    "direct_model": "lfm3-1.7b-atomic-ad-q4km",
+    "frozen_result": {
+      "attempted": 12,
+      "counts": {
+        "code": {
+          "false_live": 0,
+          "input_tokens": 0,
+          "joint": 0,
+          "miss": 6,
+          "n": 10,
+          "output_tokens": 0,
+          "refs": 6,
+          "valid": 10,
+          "verdict": 4,
+          "withheld": 10,
+          "wrong_definite": 0
+        },
+        "direct": {
+          "false_live": 0,
+          "input_tokens": 2745,
+          "joint": 1,
+          "miss": 4,
+          "n": 10,
+          "output_tokens": 356,
+          "refs": 1,
+          "valid": 10,
+          "verdict": 6,
+          "withheld": 8,
+          "wrong_definite": 0
+        }
+      },
+      "decision": "NO_INTEGRATION",
+      "experimental": true,
+      "protocol_sha": "edd62ff37d929f6fed3433982c5152e35d67a5f2d273973dc0405d7374215508",
+      "reviewed_usable": 10
+    },
+    "post_hoc_correct_refs_on_determinate": 6,
+    "raw_receipts_local": true
   }
 }
