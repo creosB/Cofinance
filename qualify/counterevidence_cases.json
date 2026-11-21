@@ -1,0 +1,671 @@
+[
+  {
+    "id": "packet-03bd1ef28",
+    "kind": "empty",
+    "family": "unrelated coverage",
+    "subject": "Oriel Service",
+    "scope": "Sunday deliveries",
+    "question": "Is there any evidence about Oriel Service delivering parcels on Sundays?",
+    "documents": [
+      {
+        "id": "A",
+        "title": "Art desk",
+        "body": "Oriel Service designed a new logo."
+      },
+      {
+        "id": "B",
+        "title": "Footwear desk",
+        "body": "Couriers can collect boots on Wednesday."
+      },
+      {
+        "id": "C",
+        "title": "Corrections",
+        "body": "A report about Sunday bus routes was withdrawn."
+      }
+    ],
+    "facets": [],
+    "counter_facets": []
+  },
+  {
+    "id": "packet-a02a2efdd",
+    "kind": "retraction",
+    "family": "room booking",
+    "subject": "Quartz Room",
+    "scope": "Saturday bookings",
+    "question": "What did the bookings desk say about reserving the Quartz Room on Saturdays, and is that notice current?",
+    "documents": [
+      {
+        "id": "A",
+        "title": "Noticeboard",
+        "body": "The Thursday rota is on a separate sheet."
+      },
+      {
+        "id": "B",
+        "title": "Cleaning",
+        "body": "Cleaning takes place after the final booking."
+      },
+      {
+        "id": "C",
+        "title": "Bookings circular",
+        "body": "The Quartz Room accepts Saturday reservations starting this week. Please disregard the Saturday reservation notice above; it was printed from a superseded schedule."
+      }
+    ],
+    "facets": [
+      [
+        "CS1"
+      ],
+      [
+        "CS2"
+      ]
+    ],
+    "counter_facets": [
+      1
+    ]
+  },
+  {
+    "id": "packet-75dbf49da",
+    "kind": "retraction",
+    "family": "room booking",
+    "subject": "Quartz Room",
+    "scope": "Saturday bookings",
+    "question": "What did the bookings desk say about reserving the Quartz Room on Saturdays, and is that notice current?",
+    "documents": [
+      {
+        "id": "A",
+        "title": "Bookings circular",
+        "body": "The Quartz Room accepts Saturday reservations starting this week. Please disregard the Sunday catering notice; it was printed from a superseded schedule."
+      },
+      {
+        "id": "B",
+        "title": "Noticeboard",
+        "body": "The Thursday rota is on a separate sheet."
+      },
+      {
+        "id": "C",
+        "title": "Cleaning",
+        "body": "Cleaning takes place after the final booking."
+      }
+    ],
+    "facets": [
+      [
+        "AS1"
+      ]
+    ],
+    "counter_facets": []
+  },
+  {
+    "id": "packet-bfc021f39",
+    "kind": "restriction",
+    "family": "refill",
+    "subject": "Kite Refill",
+    "scope": "walk-in customers",
+    "question": "Can a walk-in customer rely on the advertised Kite Refill offer at the city stores?",
+    "documents": [
+      {
+        "id": "A",
+        "title": "Window card",
+        "body": "City stores offer walk-in customers a free Kite Refill. The free Kite Refill is dispensed only when the original cartridge comes back with the customer."
+      },
+      {
+        "id": "B",
+        "title": "Survey",
+        "body": "Only volunteers at the bus depot received survey forms."
+      },
+      {
+        "id": "C",
+        "title": "Wall chart",
+        "body": "Staff rotations change on Friday."
+      }
+    ],
+    "facets": [
+      [
+        "AS1"
+      ],
+      [
+        "AS2"
+      ]
+    ],
+    "counter_facets": [
+      1
+    ]
+  },
+  {
+    "id": "packet-1225e713a",
+    "kind": "conflict",
+    "family": "refurbishment",
+    "subject": "Junco Lamps",
+    "scope": "Marsh ward",
+    "question": "Do the records agree that Junco Lamps are working again in Marsh ward?",
+    "documents": [
+      {
+        "id": "A",
+        "title": "Streets desk",
+        "body": "Footpath sweeping was completed this morning."
+      },
+      {
+        "id": "B",
+        "title": "Night inspection",
+        "body": "The inspection team used the community van. In Marsh ward the replacement lights were still dark when the inspector visited that night."
+      },
+      {
+        "id": "C",
+        "title": "Repair sheet",
+        "body": "Junco Lamps are back in operation throughout Marsh ward."
+      }
+    ],
+    "facets": [
+      [
+        "CS1"
+      ],
+      [
+        "BS2"
+      ]
+    ],
+    "counter_facets": [
+      1
+    ]
+  },
+  {
+    "id": "packet-a03731452",
+    "kind": "restriction",
+    "family": "transfer fee",
+    "subject": "Linden Transfer",
+    "scope": "household plan",
+    "question": "What fee relief does the Linden Transfer household plan actually offer?",
+    "documents": [
+      {
+        "id": "A",
+        "title": "Rate card",
+        "body": "Linden Transfer waives the service charge for household transfers."
+      },
+      {
+        "id": "B",
+        "title": "Help desk",
+        "body": "The packaging waiver covers the first order of each calendar month; subsequent parcels carry the ordinary charge."
+      },
+      {
+        "id": "C",
+        "title": "Business desk",
+        "body": "The business tariff is reviewed in May."
+      }
+    ],
+    "facets": [
+      [
+        "AS1"
+      ]
+    ],
+    "counter_facets": []
+  },
+  {
+    "id": "packet-9308d8a50",
+    "kind": "restriction",
+    "family": "district passes",
+    "subject": "Marble Pass",
+    "scope": "Dorset",
+    "question": "What can the desk tell Dorset residents about getting a Marble Pass this month?",
+    "documents": [
+      {
+        "id": "A",
+        "title": "Mailroom",
+        "body": "A separate library survey is available to people unable to visit a branch."
+      },
+      {
+        "id": "B",
+        "title": "Branch circular",
+        "body": "A delivery of envelopes reached the depot. At coastal branches the counter accepts applications for boat permits solely from people on the appointment list."
+      },
+      {
+        "id": "C",
+        "title": "County desk",
+        "body": "Dorset residents can collect a Marble Pass at any branch this month. The circular was typeset in the district office."
+      }
+    ],
+    "facets": [
+      [
+        "CS1"
+      ]
+    ],
+    "counter_facets": []
+  },
+  {
+    "id": "packet-c1c5e3d86",
+    "kind": "empty",
+    "family": "unrelated repairs",
+    "subject": "Palmer Card",
+    "scope": "replacement charges",
+    "question": "Do any of these notices address the fee for replacing a Palmer Card?",
+    "documents": [
+      {
+        "id": "A",
+        "title": "Press note",
+        "body": "The library replaced a window."
+      },
+      {
+        "id": "B",
+        "title": "Repair counter",
+        "body": "Palmer Card machines were repainted."
+      },
+      {
+        "id": "C",
+        "title": "Cash desk",
+        "body": "Only the bicycle storage fee has been withdrawn."
+      }
+    ],
+    "facets": [],
+    "counter_facets": []
+  },
+  {
+    "id": "packet-401e8e90a",
+    "kind": "restriction",
+    "family": "transfer fee",
+    "subject": "Linden Transfer",
+    "scope": "household plan",
+    "question": "What fee relief does the Linden Transfer household plan actually offer?",
+    "documents": [
+      {
+        "id": "A",
+        "title": "Help desk",
+        "body": "The waiver covers the first transfer of each calendar month; subsequent transfers carry the ordinary charge."
+      },
+      {
+        "id": "B",
+        "title": "Rate card",
+        "body": "Linden Transfer waives the service charge for household transfers."
+      },
+      {
+        "id": "C",
+        "title": "Business desk",
+        "body": "The business tariff is reviewed in May."
+      }
+    ],
+    "facets": [
+      [
+        "BS1"
+      ],
+      [
+        "AS1"
+      ]
+    ],
+    "counter_facets": [
+      1
+    ]
+  },
+  {
+    "id": "packet-7a397ddf5",
+    "kind": "conflict",
+    "family": "scanner acceptance",
+    "subject": "Vale Ticket",
+    "scope": "North Pier evening trips",
+    "question": "Can passengers depend on using a Vale Ticket at North Pier on evening trips?",
+    "documents": [
+      {
+        "id": "A",
+        "title": "Duty office",
+        "body": "The North Pier duty manager says evening entry still requires a paper boarding slip instead."
+      },
+      {
+        "id": "B",
+        "title": "Gate shift report",
+        "body": "During the North Pier evening shift our reader refused every passenger carrying that ticket."
+      },
+      {
+        "id": "C",
+        "title": "Operator notice",
+        "body": "A Vale Ticket will open the North Pier gates for every evening trip."
+      }
+    ],
+    "facets": [
+      [
+        "CS1"
+      ],
+      [
+        "BS1"
+      ],
+      [
+        "AS1"
+      ]
+    ],
+    "counter_facets": [
+      1,
+      2
+    ]
+  },
+  {
+    "id": "packet-db0eaa956",
+    "kind": "restriction",
+    "family": "refill",
+    "subject": "Kite Refill",
+    "scope": "walk-in customers",
+    "question": "Can a walk-in customer rely on the advertised Kite Refill offer at the city stores?",
+    "documents": [
+      {
+        "id": "A",
+        "title": "Wall chart",
+        "body": "Staff rotations change on Friday."
+      },
+      {
+        "id": "B",
+        "title": "Survey",
+        "body": "Only volunteers at the bus depot received survey forms."
+      },
+      {
+        "id": "C",
+        "title": "Window card",
+        "body": "City stores offer walk-in customers a free Kite Refill. The free Lantern Refill is dispensed only when the original cartridge comes back with the customer."
+      }
+    ],
+    "facets": [
+      [
+        "CS1"
+      ]
+    ],
+    "counter_facets": []
+  },
+  {
+    "id": "packet-f32aaa3a5",
+    "kind": "restriction",
+    "family": "district passes",
+    "subject": "Marble Pass",
+    "scope": "Dorset",
+    "question": "What can the desk tell Dorset residents about getting a Marble Pass this month?",
+    "documents": [
+      {
+        "id": "A",
+        "title": "Mailroom",
+        "body": "Home delivery is not an alternative for those unable to visit a branch."
+      },
+      {
+        "id": "B",
+        "title": "Branch circular",
+        "body": "A delivery of envelopes reached the depot. At coastal branches the counter accepts applications solely from people on the appointment list."
+      },
+      {
+        "id": "C",
+        "title": "County desk",
+        "body": "Dorset residents can collect a Marble Pass at any branch this month. The circular was typeset in the district office."
+      }
+    ],
+    "facets": [
+      [
+        "CS1"
+      ],
+      [
+        "BS2"
+      ],
+      [
+        "AS1"
+      ]
+    ],
+    "counter_facets": [
+      1,
+      2
+    ]
+  },
+  {
+    "id": "packet-7ebd8395a",
+    "kind": "conflict",
+    "family": "scanner acceptance",
+    "subject": "Vale Ticket",
+    "scope": "North Pier evening trips",
+    "question": "Can passengers depend on using a Vale Ticket at North Pier on evening trips?",
+    "documents": [
+      {
+        "id": "A",
+        "title": "Operator notice",
+        "body": "A Vale Ticket will open the North Pier gates for every evening trip."
+      },
+      {
+        "id": "B",
+        "title": "Duty office",
+        "body": "The East Pier duty manager says evening entry still requires a paper boarding slip instead."
+      },
+      {
+        "id": "C",
+        "title": "Gate shift report",
+        "body": "During the East Pier evening shift our reader refused every passenger carrying that ticket."
+      }
+    ],
+    "facets": [
+      [
+        "AS1"
+      ]
+    ],
+    "counter_facets": []
+  },
+  {
+    "id": "packet-e15316654",
+    "kind": "conflict",
+    "family": "coupon redemption",
+    "subject": "Moss Voucher",
+    "scope": "online checkout today",
+    "question": "What do the reports say about redeeming Moss Voucher online today?",
+    "documents": [
+      {
+        "id": "A",
+        "title": "Packaging notice",
+        "body": "Printed sleeves are being redesigned."
+      },
+      {
+        "id": "B",
+        "title": "Payments circular",
+        "body": "Customers can redeem Moss Voucher at online checkout today."
+      },
+      {
+        "id": "C",
+        "title": "Counter report",
+        "body": "The payments team tested Moss Voucher in physical stores today and says the till still refuses it."
+      }
+    ],
+    "facets": [
+      [
+        "BS1"
+      ]
+    ],
+    "counter_facets": []
+  },
+  {
+    "id": "packet-3bcaf403d",
+    "kind": "retraction",
+    "family": "rebate circular",
+    "subject": "Fallow Rebate",
+    "scope": "November payments",
+    "question": "Which passages establish what customers were told about November Fallow Rebate payments and whether the notice still stands?",
+    "documents": [
+      {
+        "id": "A",
+        "title": "Payment circular 47",
+        "body": "Fallow Rebate payments for November were promised for the final Friday."
+      },
+      {
+        "id": "B",
+        "title": "Records register",
+        "body": "Circular 47 was struck from the register after the payment file failed validation."
+      },
+      {
+        "id": "C",
+        "title": "Customer bulletin",
+        "body": "The replacement November payment instruction gives no payment date. The service line remains open on weekdays."
+      }
+    ],
+    "facets": [
+      [
+        "AS1"
+      ],
+      [
+        "BS1"
+      ],
+      [
+        "CS1"
+      ]
+    ],
+    "counter_facets": [
+      1,
+      2
+    ]
+  },
+  {
+    "id": "packet-4feaf9c8e",
+    "kind": "retraction",
+    "family": "rebate circular",
+    "subject": "Fallow Rebate",
+    "scope": "November payments",
+    "question": "Which passages establish what customers were told about November Fallow Rebate payments and whether the notice still stands?",
+    "documents": [
+      {
+        "id": "A",
+        "title": "Records register",
+        "body": "Circular 74 was struck from the register after the stationery file failed validation."
+      },
+      {
+        "id": "B",
+        "title": "Customer bulletin",
+        "body": "The replacement stationery instruction gives no delivery date. The service line remains open on weekdays."
+      },
+      {
+        "id": "C",
+        "title": "Payment circular 47",
+        "body": "Fallow Rebate payments for November were promised for the final Friday."
+      }
+    ],
+    "facets": [
+      [
+        "CS1"
+      ]
+    ],
+    "counter_facets": []
+  },
+  {
+    "id": "packet-35f742cca",
+    "kind": "retraction",
+    "family": "rail credit",
+    "subject": "Cinder Credit",
+    "scope": "May fares",
+    "question": "What does the material establish about using Cinder Credit on May rail fares?",
+    "documents": [
+      {
+        "id": "A",
+        "title": "June notice",
+        "body": "A new timetable will be printed in June."
+      },
+      {
+        "id": "B",
+        "title": "Fare desk",
+        "body": "Cinder Credit is valid against May rail fares."
+      },
+      {
+        "id": "C",
+        "title": "Corrections",
+        "body": "We retract our assurance about Cinder Credit on March fares; the March agreement was not executed."
+      }
+    ],
+    "facets": [
+      [
+        "BS1"
+      ]
+    ],
+    "counter_facets": []
+  },
+  {
+    "id": "packet-492eee87c",
+    "kind": "conflict",
+    "family": "coupon redemption",
+    "subject": "Moss Voucher",
+    "scope": "online checkout today",
+    "question": "What do the reports say about redeeming Moss Voucher online today?",
+    "documents": [
+      {
+        "id": "A",
+        "title": "Counter report",
+        "body": "The payments team tested Moss Voucher online today and says the checkout still refuses it."
+      },
+      {
+        "id": "B",
+        "title": "Packaging notice",
+        "body": "Printed sleeves are being redesigned."
+      },
+      {
+        "id": "C",
+        "title": "Payments circular",
+        "body": "Customers can redeem Moss Voucher at online checkout today."
+      }
+    ],
+    "facets": [
+      [
+        "CS1"
+      ],
+      [
+        "AS1"
+      ]
+    ],
+    "counter_facets": [
+      1
+    ]
+  },
+  {
+    "id": "packet-fdd6a5a56",
+    "kind": "conflict",
+    "family": "refurbishment",
+    "subject": "Junco Lamps",
+    "scope": "Marsh ward",
+    "question": "Do the records agree that Junco Lamps are working again in Marsh ward?",
+    "documents": [
+      {
+        "id": "A",
+        "title": "Repair sheet",
+        "body": "Junco Lamps are back in operation throughout Marsh ward."
+      },
+      {
+        "id": "B",
+        "title": "Night inspection",
+        "body": "The inspection team used the community van. In Kings ward the replacement lights were still dark when the inspector visited that night."
+      },
+      {
+        "id": "C",
+        "title": "Streets desk",
+        "body": "Footpath sweeping was completed this morning."
+      }
+    ],
+    "facets": [
+      [
+        "AS1"
+      ]
+    ],
+    "counter_facets": []
+  },
+  {
+    "id": "packet-eab4b4946",
+    "kind": "retraction",
+    "family": "rail credit",
+    "subject": "Cinder Credit",
+    "scope": "May fares",
+    "question": "What does the material establish about using Cinder Credit on May rail fares?",
+    "documents": [
+      {
+        "id": "A",
+        "title": "Fare desk",
+        "body": "Cinder Credit is valid against May rail fares."
+      },
+      {
+        "id": "B",
+        "title": "June notice",
+        "body": "A new timetable will be printed in June."
+      },
+      {
+        "id": "C",
+        "title": "Corrections",
+        "body": "We retract our assurance about Cinder Credit on May fares; the agreement was not executed."
+      }
+    ],
+    "facets": [
+      [
+        "AS1"
+      ],
+      [
+        "CS1"
+      ]
+    ],
+    "counter_facets": [
+      1
+    ]
+  }
+]
