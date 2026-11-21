@@ -20,6 +20,15 @@ class Receipts(unittest.TestCase):
   note=d('Memo','[7] Notice: Record.pdf is withdrawn without replacement for Amber.');v=ev(rule,actual,note)['result'];self.assertEqual(v['status'],'WITHDRAWN');self.assertEqual((v['withdrawal_span']['doc_id'],v['target_span']['doc_id']),('Memo','Record'));bad=dict(v);del bad['target_span'];z=ev(rule,actual,note,proposal=bad);self.assertEqual((z['result']['status'],z['result']['blocker_span']['doc_id']),('UNINTERPRETED','Memo'));self.assertTrue(z['contract_failures']);self.assertNotIn('withdraw',z['rendered']['message'].lower());self.assertEqual(set(z['result']),{'status','reason_code','blocker_span'})
   for newnote in ['Notice: Absent.pdf is withdrawn without replacement for Amber.','Notice: Record.pdf is withdrawn without replacement for Aspen.']:
    y=ev(rule,actual,d('Memo',newnote))['result'];self.assertEqual(y['status'],'UNINTERPRETED');self.assertEqual(y['blocker_span']['quote'],newnote)
+ def test_rule_engine_does_not_propose_unlinked_records(self):
+  b=R.indexed([rule,actual,d('Note','Notice: Absent.pdf is withdrawn without replacement for Amber.')]);self.assertIsInstance(R.decide(Q,b),R.Uninterpreted)
+  q='Did Fir meet its quarter-end unrestricted cash floor?';ds=[d('Policy','Fir must hold at least 8 million dollars of unrestricted cash at quarter end.'),d('Reconcile','The signed quarter-end reconciliation supersedes the diary and records 9 million dollars of unrestricted cash for Fir.'),d('Diary','The signed quarter-end ledger records 10 million dollars of total cash for Fir.')];v=R.decide(q,R.indexed(ds));self.assertIsInstance(v,R.Uninterpreted);self.assertEqual(v.reason_code,'UNLINKED_CORRECTION')
+ def test_unparsed_notes_never_let_a_valid_comparison_through(self):
+  v=ev(rule,actual,d('Note','[8] The asserted number is conditional.'));self.assertEqual(v['result']['status'],'UNINTERPRETED')
+ def test_foreign_proposal_rejected_even_if_packet_would_verify(self):
+  v=ev(rule,actual,proposal={'status':'WITHDRAWN'});self.assertEqual(v['result']['status'],'UNINTERPRETED')
+ def test_strict_equality_is_missed_inside_proposer(self):
+  obj=R.decide(Q,R.indexed([rule,actual]));self.assertEqual(obj.verdict,'missed')
  def test_no_promotion_from_any_unrecognized_supersession(self):
   raw=actual['pages'][0]+'\n\n[2] Record superseded by Schedule B; details not attached.';v=ev(rule,d('Record',raw),other)['result'];self.assertEqual((v['status'],v['blocker_span']['kind']),('UNINTERPRETED','footnote'));self.assertIn('Schedule B',v['blocker_span']['quote'])
  def test_conflict_requires_same_scope_and_role(self):
