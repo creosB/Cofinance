@@ -1,0 +1,628 @@
+{
+  "experimental": true,
+  "frozen_list_screen": {
+    "decision": {
+      "hinted": "INCONCLUSIVE",
+      "rule": "INCONCLUSIVE"
+    },
+    "experimental": true,
+    "paired": {
+      "hinted": {
+        "clusters": 7,
+        "descriptive_delta_interval": [
+          0.0,
+          0.188
+        ],
+        "losses": 1,
+        "ties": 15,
+        "wins": 2
+      },
+      "lexical": {
+        "clusters": 7,
+        "descriptive_delta_interval": [
+          -0.286,
+          0.5
+        ],
+        "losses": 4,
+        "ties": 7,
+        "wins": 7
+      },
+      "rule": {
+        "clusters": 7,
+        "descriptive_delta_interval": [
+          0.0,
+          0.7
+        ],
+        "losses": 3,
+        "ties": 5,
+        "wins": 10
+      }
+    },
+    "production_change": false,
+    "results": {
+      "all": {
+        "direct": {
+          "all_facts": 14,
+          "counter_missed": 0,
+          "counter_total": 4,
+          "empty_miss": 3,
+          "exact": 5,
+          "fn": 4,
+          "fp": 25,
+          "input_tokens": 5386,
+          "n": 18,
+          "needed": 22,
+          "output_tokens": 416,
+          "precision": 0.4186,
+          "recall": 0.8182,
+          "tp": 18,
+          "valid": 15
+        },
+        "hinted": {
+          "all_facts": 16,
+          "counter_missed": 0,
+          "counter_total": 4,
+          "empty_miss": 2,
+          "exact": 6,
+          "fn": 2,
+          "fp": 28,
+          "input_tokens": 5638,
+          "n": 18,
+          "needed": 22,
+          "output_tokens": 411,
+          "precision": 0.4167,
+          "recall": 0.9091,
+          "tp": 20,
+          "valid": 16
+        },
+        "lexical": {
+          "all_facts": 9,
+          "counter_missed": 4,
+          "counter_total": 4,
+          "empty_miss": 0,
+          "exact": 8,
+          "fn": 10,
+          "fp": 6,
+          "input_tokens": 0,
+          "n": 18,
+          "needed": 22,
+          "output_tokens": 0,
+          "precision": 0.6667,
+          "recall": 0.5455,
+          "tp": 12,
+          "valid": 18
+        },
+        "rule": {
+          "all_facts": 13,
+          "counter_missed": 4,
+          "counter_total": 4,
+          "empty_miss": 0,
+          "exact": 12,
+          "fn": 5,
+          "fp": 1,
+          "input_tokens": 0,
+          "n": 18,
+          "needed": 22,
+          "output_tokens": 0,
+          "precision": 0.9444,
+          "recall": 0.7727,
+          "tp": 17,
+          "valid": 18
+        }
+      },
+      "contrast": {
+        "direct": {
+          "all_facts": 9,
+          "counter_missed": 0,
+          "counter_total": 4,
+          "empty_miss": 0,
+          "exact": 4,
+          "fn": 1,
+          "fp": 12,
+          "input_tokens": 2168,
+          "n": 10,
+          "needed": 13,
+          "output_tokens": 164,
+          "precision": 0.5,
+          "recall": 0.9231,
+          "tp": 12,
+          "valid": 10
+        },
+        "hinted": {
+          "all_facts": 10,
+          "counter_missed": 0,
+          "counter_total": 4,
+          "empty_miss": 0,
+          "exact": 5,
+          "fn": 0,
+          "fp": 15,
+          "input_tokens": 2308,
+          "n": 10,
+          "needed": 13,
+          "output_tokens": 174,
+          "precision": 0.4643,
+          "recall": 1.0,
+          "tp": 13,
+          "valid": 10
+        },
+        "lexical": {
+          "all_facts": 4,
+          "counter_missed": 4,
+          "counter_total": 4,
+          "empty_miss": 0,
+          "exact": 3,
+          "fn": 7,
+          "fp": 4,
+          "input_tokens": 0,
+          "n": 10,
+          "needed": 13,
+          "output_tokens": 0,
+          "precision": 0.6,
+          "recall": 0.4615,
+          "tp": 6,
+          "valid": 10
+        },
+        "rule": {
+          "all_facts": 6,
+          "counter_missed": 4,
+          "counter_total": 4,
+          "empty_miss": 0,
+          "exact": 5,
+          "fn": 4,
+          "fp": 1,
+          "input_tokens": 0,
+          "n": 10,
+          "needed": 13,
+          "output_tokens": 0,
+          "precision": 0.9,
+          "recall": 0.6923,
+          "tp": 9,
+          "valid": 10
+        }
+      },
+      "issuer": {
+        "direct": {
+          "all_facts": 5,
+          "counter_missed": 0,
+          "counter_total": 0,
+          "empty_miss": 3,
+          "exact": 1,
+          "fn": 3,
+          "fp": 13,
+          "input_tokens": 3218,
+          "n": 8,
+          "needed": 9,
+          "output_tokens": 252,
+          "precision": 0.3158,
+          "recall": 0.6667,
+          "tp": 6,
+          "valid": 5
+        },
+        "hinted": {
+          "all_facts": 6,
+          "counter_missed": 0,
+          "counter_total": 0,
+          "empty_miss": 2,
+          "exact": 1,
+          "fn": 2,
+          "fp": 13,
+          "input_tokens": 3330,
+          "n": 8,
+          "needed": 9,
+          "output_tokens": 237,
+          "precision": 0.35,
+          "recall": 0.7778,
+          "tp": 7,
+          "valid": 6
+        },
+        "lexical": {
+          "all_facts": 5,
+          "counter_missed": 0,
+          "counter_total": 0,
+          "empty_miss": 0,
+          "exact": 5,
+          "fn": 3,
+          "fp": 2,
+          "input_tokens": 0,
+          "n": 8,
+          "needed": 9,
+          "output_tokens": 0,
+          "precision": 0.75,
+          "recall": 0.6667,
+          "tp": 6,
+          "valid": 8
+        },
+        "rule": {
+          "all_facts": 7,
+          "counter_missed": 0,
+          "counter_total": 0,
+          "empty_miss": 0,
+          "exact": 7,
+          "fn": 1,
+          "fp": 0,
+          "input_tokens": 0,
+          "n": 8,
+          "needed": 9,
+          "output_tokens": 0,
+          "precision": 1.0,
+          "recall": 0.8889,
+          "tp": 8,
+          "valid": 8
+        }
+      }
+    },
+    "sha_protocol": "7aa3b3eda894f781a9b87f13322be47e6c3e039ad9d08cfde531758dbc4196c8"
+  },
+  "limits": "Same 18 packets for both formats; sensitivity is not independent replication. No end-to-end answers or claims about factual truth of issuer statements.",
+  "list_audit": {
+    "audited_rows": 72,
+    "audited_selected_span_occurrences": 127,
+    "counterevidence_misses": {
+      "direct": [],
+      "hinted": [],
+      "lexical": [
+        [
+          "contrast0",
+          1
+        ],
+        [
+          "contrast2",
+          1
+        ],
+        [
+          "contrast4",
+          1
+        ],
+        [
+          "contrast8",
+          1
+        ]
+      ],
+      "rule": [
+        [
+          "contrast0",
+          1
+        ],
+        [
+          "contrast2",
+          1
+        ],
+        [
+          "contrast4",
+          1
+        ],
+        [
+          "contrast8",
+          1
+        ]
+      ]
+    },
+    "designated_counterevidence_facets": 4,
+    "new_issuer_urls_vs_two_recent_benchmarks": 14,
+    "order_permutations_code_only": 108,
+    "post_hoc_exact_document_set": {
+      "direct": 11,
+      "hinted": 10,
+      "lexical": 11,
+      "rule": 13
+    },
+    "protocol_sha": "7aa3b3eda894f781a9b87f13322be47e6c3e039ad9d08cfde531758dbc4196c8"
+  },
+  "mask_audit": {
+    "audited_rows": 72,
+    "audited_selected_span_occurrences": 153,
+    "counterevidence_misses": {
+      "direct": [
+        [
+          "contrast8",
+          1
+        ]
+      ],
+      "hinted": [
+        [
+          "contrast8",
+          1
+        ]
+      ],
+      "lexical": [
+        [
+          "contrast0",
+          1
+        ],
+        [
+          "contrast2",
+          1
+        ],
+        [
+          "contrast4",
+          1
+        ],
+        [
+          "contrast8",
+          1
+        ]
+      ],
+      "rule": [
+        [
+          "contrast0",
+          1
+        ],
+        [
+          "contrast2",
+          1
+        ],
+        [
+          "contrast4",
+          1
+        ],
+        [
+          "contrast8",
+          1
+        ]
+      ]
+    },
+    "designated_counterevidence_facets": 4,
+    "new_issuer_urls_vs_two_recent_benchmarks": 14,
+    "order_permutations_code_only": 108,
+    "post_hoc_exact_document_set": {
+      "direct": 13,
+      "hinted": 11,
+      "lexical": 11,
+      "rule": 13
+    },
+    "protocol_sha": "c6365a820c9287ff59c53b031dea0f884490fb4e4aec3dbf5fd12b97cdf15299"
+  },
+  "post_hoc_boolean_sensitivity": {
+    "decision": {
+      "hinted": "NO_PROMOTION",
+      "rule": "NO_PROMOTION"
+    },
+    "experimental": true,
+    "paired": {
+      "hinted": {
+        "clusters": 7,
+        "descriptive_delta_interval": [
+          0.0,
+          0.15
+        ],
+        "losses": 0,
+        "ties": 17,
+        "wins": 1
+      },
+      "lexical": {
+        "clusters": 7,
+        "descriptive_delta_interval": [
+          -0.286,
+          0.455
+        ],
+        "losses": 3,
+        "ties": 9,
+        "wins": 6
+      },
+      "rule": {
+        "clusters": 7,
+        "descriptive_delta_interval": [
+          -0.071,
+          0.654
+        ],
+        "losses": 2,
+        "ties": 7,
+        "wins": 9
+      }
+    },
+    "results": {
+      "all": {
+        "direct": {
+          "all_facts": 16,
+          "counter_missed": 1,
+          "counter_total": 4,
+          "empty_miss": 0,
+          "exact": 5,
+          "fn": 2,
+          "fp": 33,
+          "input_tokens": 5908,
+          "n": 18,
+          "needed": 22,
+          "output_tokens": 915,
+          "precision": 0.3774,
+          "recall": 0.9091,
+          "tp": 20,
+          "valid": 18
+        },
+        "hinted": {
+          "all_facts": 17,
+          "counter_missed": 1,
+          "counter_total": 4,
+          "empty_miss": 0,
+          "exact": 6,
+          "fn": 1,
+          "fp": 43,
+          "input_tokens": 6160,
+          "n": 18,
+          "needed": 22,
+          "output_tokens": 940,
+          "precision": 0.3281,
+          "recall": 0.9545,
+          "tp": 21,
+          "valid": 18
+        },
+        "lexical": {
+          "all_facts": 9,
+          "counter_missed": 4,
+          "counter_total": 4,
+          "empty_miss": 0,
+          "exact": 8,
+          "fn": 10,
+          "fp": 6,
+          "input_tokens": 0,
+          "n": 18,
+          "needed": 22,
+          "output_tokens": 0,
+          "precision": 0.6667,
+          "recall": 0.5455,
+          "tp": 12,
+          "valid": 18
+        },
+        "rule": {
+          "all_facts": 13,
+          "counter_missed": 4,
+          "counter_total": 4,
+          "empty_miss": 0,
+          "exact": 12,
+          "fn": 5,
+          "fp": 1,
+          "input_tokens": 0,
+          "n": 18,
+          "needed": 22,
+          "output_tokens": 0,
+          "precision": 0.9444,
+          "recall": 0.7727,
+          "tp": 17,
+          "valid": 18
+        }
+      },
+      "contrast": {
+        "direct": {
+          "all_facts": 9,
+          "counter_missed": 1,
+          "counter_total": 4,
+          "empty_miss": 0,
+          "exact": 4,
+          "fn": 1,
+          "fp": 12,
+          "input_tokens": 2458,
+          "n": 10,
+          "needed": 13,
+          "output_tokens": 393,
+          "precision": 0.5,
+          "recall": 0.9231,
+          "tp": 12,
+          "valid": 10
+        },
+        "hinted": {
+          "all_facts": 9,
+          "counter_missed": 1,
+          "counter_total": 4,
+          "empty_miss": 0,
+          "exact": 4,
+          "fn": 1,
+          "fp": 16,
+          "input_tokens": 2598,
+          "n": 10,
+          "needed": 13,
+          "output_tokens": 409,
+          "precision": 0.4286,
+          "recall": 0.9231,
+          "tp": 12,
+          "valid": 10
+        },
+        "lexical": {
+          "all_facts": 4,
+          "counter_missed": 4,
+          "counter_total": 4,
+          "empty_miss": 0,
+          "exact": 3,
+          "fn": 7,
+          "fp": 4,
+          "input_tokens": 0,
+          "n": 10,
+          "needed": 13,
+          "output_tokens": 0,
+          "precision": 0.6,
+          "recall": 0.4615,
+          "tp": 6,
+          "valid": 10
+        },
+        "rule": {
+          "all_facts": 6,
+          "counter_missed": 4,
+          "counter_total": 4,
+          "empty_miss": 0,
+          "exact": 5,
+          "fn": 4,
+          "fp": 1,
+          "input_tokens": 0,
+          "n": 10,
+          "needed": 13,
+          "output_tokens": 0,
+          "precision": 0.9,
+          "recall": 0.6923,
+          "tp": 9,
+          "valid": 10
+        }
+      },
+      "issuer": {
+        "direct": {
+          "all_facts": 7,
+          "counter_missed": 0,
+          "counter_total": 0,
+          "empty_miss": 0,
+          "exact": 1,
+          "fn": 1,
+          "fp": 21,
+          "input_tokens": 3450,
+          "n": 8,
+          "needed": 9,
+          "output_tokens": 522,
+          "precision": 0.2759,
+          "recall": 0.8889,
+          "tp": 8,
+          "valid": 8
+        },
+        "hinted": {
+          "all_facts": 8,
+          "counter_missed": 0,
+          "counter_total": 0,
+          "empty_miss": 0,
+          "exact": 2,
+          "fn": 0,
+          "fp": 27,
+          "input_tokens": 3562,
+          "n": 8,
+          "needed": 9,
+          "output_tokens": 531,
+          "precision": 0.25,
+          "recall": 1.0,
+          "tp": 9,
+          "valid": 8
+        },
+        "lexical": {
+          "all_facts": 5,
+          "counter_missed": 0,
+          "counter_total": 0,
+          "empty_miss": 0,
+          "exact": 5,
+          "fn": 3,
+          "fp": 2,
+          "input_tokens": 0,
+          "n": 8,
+          "needed": 9,
+          "output_tokens": 0,
+          "precision": 0.75,
+          "recall": 0.6667,
+          "tp": 6,
+          "valid": 8
+        },
+        "rule": {
+          "all_facts": 7,
+          "counter_missed": 0,
+          "counter_total": 0,
+          "empty_miss": 0,
+          "exact": 7,
+          "fn": 1,
+          "fp": 0,
+          "input_tokens": 0,
+          "n": 8,
+          "needed": 9,
+          "output_tokens": 0,
+          "precision": 1.0,
+          "recall": 0.8889,
+          "tp": 8,
+          "valid": 8
+        }
+      }
+    },
+    "same_cases_after_format_failure": true,
+    "sha_protocol": "c6365a820c9287ff59c53b031dea0f884490fb4e4aec3dbf5fd12b97cdf15299"
+  }
+}

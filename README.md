@@ -26,7 +26,7 @@ Python owns tool use, policy and writes. The optional Deep think setting changes
 | --- | --- | --- |
 | Can the answers be inspected and their numbers traced? | In a 72-case replay, all 393 numbers in final answers matched a tool value or served headline. A matching number can still be used incorrectly. | [Grounding report](docs/benchmarks/grounding-2026-11-17.json) |
 | Does more model review improve decisions? | At equal coverage, quote-backed review got 35/62 historical calls right versus 36/62 for the unchanged judge. The cases were reused. | [Reviewed headlines](docs/benchmarks/REVIEWED_HEADLINES.md) |
-| Does the workflow beat direct Q&A? | Not established. Speed, source matching and next-price direction do not answer this question. | [Methods and proposed comparison](docs/METHOD.md) |
+| Does the document workflow beat direct Q&A? | Not on the 12-question document screen: 3 fully supported, correctly cited decisions versus 6 for direct Q&A. The workflow avoided three confident errors, but returned nine excerpt-only answers. | [Document decision gate](docs/benchmarks/DOCUMENT_DECISION_GATE.md) |
 
 The [scorecard](docs/SCORECARD.md) indexes the experiments, including unsuccessful ideas. Nothing here establishes predictive edge or readiness for consequential decisions.
 
