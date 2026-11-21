@@ -48,7 +48,34 @@ def normalize(text: str) -> str:
     return re.sub(r'\s+', ' ', text or '').strip()[:MAX_PAGE_CHARS]
 
 
-def extract_pages(data: bytes, *, timeout: float = PARSE_TIMEOUT_S, command: Sequence[str] | None = None) -> List[str]:
+class ExtractedPages(list):
+    """Normalized search pages plus bounded, complete parser text. No PDF bytes or inferred layout."""
+
+    def __init__(self, raw_pages):
+        if not isinstance(raw_pages, (tuple, list)) or len(raw_pages) > MAX_PAGES or any(not isinstance(p, str) for p in raw_pages):
+            raise DocumentError('Invalid page data from PDF extraction.')
+        super().__init__(normalize(p) for p in raw_pages)
+        self.source_pages = tuple(p if len(p) <= MAX_PAGE_CHARS else None for p in raw_pages)
+
+
+def _source_page(document, index):
+    pages, source = document.get('pages'), document.get('source_pages')
+    if not isinstance(pages, (list, tuple)) or not isinstance(source, (list, tuple)) or len(source) != len(pages):
+        return None
+    raw = source[index]
+    return raw if isinstance(raw, str) and len(raw) <= MAX_PAGE_CHARS and normalize(raw) == pages[index] else None
+
+
+def evidence_pages(document):
+    """Complete source view only. Never synthesize a missing witness from legacy search text."""
+    pages = document.get('pages') or []
+    src = [_source_page(document, i) for i in range(len(pages))]
+    if not src or any(p is None for p in src):
+        raise DocumentError('Complete extracted page text is unavailable; normalized text is for search only.')
+    return src
+
+
+def extract_pages(data: bytes, *, timeout: float = PARSE_TIMEOUT_S, command: Sequence[str] | None = None) -> ExtractedPages:
     """Page texts, first page first. Raises DocumentError with a message fit for the user."""
     if not isinstance(data, (bytes, bytearray)) or not data:
         raise DocumentError('The file is empty.')
@@ -68,7 +95,7 @@ def extract_pages(data: bytes, *, timeout: float = PARSE_TIMEOUT_S, command: Seq
         raise DocumentError('This file could not be read as a PDF.') from None
     if out.get('error'):
         raise DocumentError(str(out['error'])[:200])
-    pages = [normalize(p) for p in out.get('pages') or [] if isinstance(p, str)]
+    pages = ExtractedPages(out.get('pages') or [])
     if sum(len(p) for p in pages) < MIN_TEXT_CHARS:
         raise DocumentError('This PDF has no text layer (it may be scanned). Scanned PDFs are not supported.')
     return pages
@@ -78,24 +105,50 @@ def terms(text: str) -> List[str]:
     return [w for w in re.findall(r'[a-z]{3,}|\d+(?:[.,]\d+)*', (text or '').lower()) if w not in STOP]
 
 
-def _window(text: str, wanted: set) -> str:
-    """The WINDOW_CHARS stretch of a page holding the most distinct question words, cut at word boundaries."""
+def _bounds(text: str, wanted: set):
+    """Half-open indices in search text; find occurrences on the original string, not a length-changing case fold."""
     if len(text) <= WINDOW_CHARS:
-        return text
-    low = text.lower()
-    starts = sorted({m.start() for t in wanted for m in re.finditer(r'\b' + re.escape(t), low)}) or [0]
-    best, best_hits = 0, -1
-    for s in starts:
-        a = max(0, s - 120)
-        hits = sum(1 for t in wanted if t in low[a:a + WINDOW_CHARS])
-        if hits > best_hits:
-            best, best_hits = a, hits
-    piece = text[best:best + WINDOW_CHARS]
-    if best > 0:
-        piece = piece.split(' ', 1)[-1]
-    if best + WINDOW_CHARS < len(text):
-        piece = piece.rsplit(' ', 1)[0]
-    return ('...' if best > 0 else '') + piece + ('...' if best + WINDOW_CHARS < len(text) else '')
+        return 0, len(text)
+    starts = sorted({m.start() for t in wanted for m in re.finditer(r'\b' + re.escape(t), text, re.I)}) or [0]
+    a = max((max(0, s-120) for s in starts), key=lambda i: sum(t in text[i:i+WINDOW_CHARS].lower() for t in wanted))
+    b = min(len(text), a+WINDOW_CHARS)
+    if a and text[a-1] != ' ' and text[a] != ' ':
+        gap = text.find(' ', a, b)
+        if gap >= 0 and gap+1 < b:
+            a = gap+1
+    if b < len(text) and text[b] != ' ' and text[b-1] != ' ':
+        gap = text.rfind(' ', a, b)
+        if gap > a:
+            b = gap
+    return a, b
+
+
+def _window(text: str, wanted: set) -> str:
+    a, b = _bounds(text, wanted)
+    return ('...' if a else '') + text[a:b] + ('...' if b < len(text) else '')
+
+
+def _excerpt(document, i, text, wanted, matched):
+    from hashlib import sha256
+    out = {'document_id': document.get('id'), 'name': document.get('name'), 'page': i+1, 'matched': matched}
+    raw = _source_page(document, i)
+    if raw is None:
+        return dict(out, text=_window(text, wanted))
+    lo, hi = _bounds(text, wanted)
+    # Positions are Python character offsets in one extracted page. One normalized space can represent a whole gap.
+    offsets = []
+    last = 0
+    for m in re.finditer(r'\S+', raw):
+        if offsets:
+            offsets.append((last, m.start()))
+        offsets.extend((k, k+1) for k in range(m.start(), m.end()))
+        last = m.end()
+    a, b = offsets[lo][0], offsets[hi-1][1]
+    if b-a > WINDOW_CHARS:
+        hits = [m.start() for t in wanted for m in re.finditer(r'\b'+re.escape(t), text[lo:hi], re.I)]
+        center = offsets[lo+min(hits)][0] if hits else a
+        a = min(max(a, center-120), b-WINDOW_CHARS); b = a+WINDOW_CHARS
+    return dict(out, text=raw[a:b], source_span={'start':a,'end':b,'page_sha256':sha256(raw.encode('utf-8')).hexdigest()})
 
 
 def select_excerpts(documents: Sequence[Mapping[str, Any]], question: str, top: int = TOP_PAGES) -> List[Dict[str, Any]]:
@@ -117,5 +170,4 @@ def select_excerpts(documents: Sequence[Mapping[str, Any]], question: str, top: 
     if not chosen:
         first = [x for x in pages if x[0] is pages[0][0]][:2]
         chosen = [(d, i, p, False) for d, i, p in first]
-    return [{'document_id': d.get('id'), 'name': d.get('name'), 'page': i + 1, 'matched': matched,
-             'text': _window(p, wanted)} for d, i, p, matched in chosen]
+    return [_excerpt(d, i, p, wanted, matched) for d, i, p, matched in chosen]

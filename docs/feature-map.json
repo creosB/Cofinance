@@ -21,7 +21,7 @@
     {"id": "documents", "name": "Attach PDFs to a conversation", "view": "chat", "reach": "Chat composer: paperclip button; quoted pages listed under the answer",
      "api": ["/api/documents/upload", "/api/documents/remove"],
      "code": ["core/documents.py", "core/pdf_worker.py", "core/chat_store.py", "core/orchestrator.py", "frontend/src/components/attachments.tsx"],
-     "proof": ["tests/test_documents.py", "frontend/src/components/attachments.test.tsx"]},
+     "proof": ["tests/test_documents.py", "tests/test_pdf_evidence.py", "frontend/src/components/attachments.test.tsx"]},
     {"id": "deep_think", "name": "Deep think: optional thinking for the final answer", "view": "chat", "reach": "Chat composer: Deep think switch; Models view: Test deep think",
      "api": [],
      "code": ["core/local_models.py", "core/chat_service.py", "frontend/src/components/deep-think.tsx"],

@@ -49,6 +49,10 @@ class ChatStore:
             CREATE TABLE IF NOT EXISTS chat_jobs(id TEXT PRIMARY KEY,request_id TEXT UNIQUE NOT NULL,session_id TEXT NOT NULL,query TEXT NOT NULL,model TEXT NOT NULL,status TEXT NOT NULL,stage TEXT NOT NULL,created REAL NOT NULL,updated REAL NOT NULL,error TEXT NOT NULL DEFAULT '');
             CREATE TABLE IF NOT EXISTS user_watchlist(ticker TEXT PRIMARY KEY,added REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS chat_documents(id TEXT PRIMARY KEY,session_id TEXT NOT NULL,name TEXT NOT NULL,sha256 TEXT NOT NULL,bytes INTEGER NOT NULL,page_count INTEGER NOT NULL,pages TEXT NOT NULL,created REAL NOT NULL,UNIQUE(session_id,sha256));
+            CREATE TABLE IF NOT EXISTS pdf_source_v1(document_id TEXT PRIMARY KEY,pages TEXT NOT NULL);
+            CREATE TRIGGER IF NOT EXISTS pdf_source_on_remove AFTER DELETE ON chat_documents BEGIN
+                DELETE FROM pdf_source_v1 WHERE document_id=OLD.id;
+            END;
             """)
 
     @contextlib.contextmanager
@@ -131,6 +135,9 @@ class ChatStore:
                 raise ValueError(f"A conversation can hold {self.DOCUMENT_LIMIT} PDFs. Remove one first.")
             doc={'id':uuid.uuid4().hex,'name':name,'bytes':int(size),'page_count':len(pages),'created':time.time()}
             db.execute("INSERT INTO chat_documents VALUES (?,?,?,?,?,?,?,?)",(doc['id'],session_id,name,sha256,doc['bytes'],doc['page_count'],json.dumps(list(pages)),doc['created']))
+            from .documents import ExtractedPages
+            if isinstance(pages, ExtractedPages):
+                db.execute('INSERT INTO pdf_source_v1(document_id,pages) VALUES (?,?)',(doc['id'],json.dumps(pages.source_pages)))
             db.execute("UPDATE chat_sessions SET updated=? WHERE id=?",(doc['created'],session_id))
         return dict(doc,duplicate=False)
 
@@ -138,7 +145,9 @@ class ChatStore:
         """Every attached PDF of one conversation with its page texts, read when a run starts."""
         valid_id(session_id)
         with self.db() as db:
-            return [dict(r,pages=json.loads(r['pages'])) for r in db.execute("SELECT id,name,page_count,pages FROM chat_documents WHERE session_id=? ORDER BY created",(session_id,))]
+            rows=db.execute('SELECT d.id,d.name,d.page_count,d.pages,s.pages AS source FROM chat_documents d LEFT JOIN pdf_source_v1 s ON s.document_id=d.id WHERE d.session_id=? ORDER BY d.created',(session_id,))
+            return [dict(id=r['id'],name=r['name'],page_count=r['page_count'],pages=json.loads(r['pages']),
+                         **({'source_pages':json.loads(r['source'])} if r['source'] is not None else {})) for r in rows]
 
     def remove_document(self,session_id,document_id):
         valid_id(session_id);valid_id(document_id)
