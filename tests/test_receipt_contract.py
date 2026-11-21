@@ -53,6 +53,10 @@ class Receipts(unittest.TestCase):
   for bad in bads:
    with self.subTest(proposal=bad):
     o=ev(*docs,proposal=bad);self.assertEqual(o['result']['status'],'UNINTERPRETED');self.assertEqual(o['result']['reason_code'],'CONTRACT_REJECTED');self.assertEqual(len(o['contract_failures']),1);self.assertEqual(o['rendered']['message'],'I could not verify a conclusion from this passage.')
+ def test_whole_packet_veto_survives_internal_producer_fault(self):
+  candidate=R.decide(Q,R.indexed([rule,actual]));additions=[d('Late','[5] Final disposition pending.'),d('Later','The signed full-month uptime ledger for Amber shows 92 percent.'),d('Memo','Notice: Record.pdf is withdrawn without replacement for Amber.')]
+  for extra in additions:
+   with self.subTest(extra=extra['id']),patch.object(R,'decide',return_value=candidate):o=ev(rule,actual,extra);self.assertEqual(o['result']['status'],'UNINTERPRETED');self.assertEqual(o['result']['blocker_span']['doc_id'],extra['id']);self.assertTrue(o['contract_failures'])
  def test_runtime_validates_even_internal_candidate(self):
   bs=R.indexed([rule,actual]);o=R.decide(Q,bs);bad=replace(o,value='111');self.assertFalse(R.proof_ok(Q,bad,bs));
   with patch.object(R,'decide',return_value=bad):result=ev(rule,actual)

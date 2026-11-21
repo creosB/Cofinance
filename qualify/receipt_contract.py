@@ -149,14 +149,46 @@ def proof_ok(q,obj,bs):
     if not a['replaces']:return not refs
     return len(refs)==1 and refs[0] in bs and refs[0].document.casefold()==a['replaces']+'.pdf' and bool(f:=read(refs[0])) and fields(f)==target and f['role'] in ('preliminary','signed')
 
+def _packet_veto(q,obj,bs):
+    # Cited positive evidence alone is insufficient: an omitted third block can defeat a true-looking proof.
+    if isinstance(obj,Uninterpreted):return None
+    target=E.context(q);fs=[];ns=[]
+    for b in bs:
+        f=fact(b)
+        if f is not None:fs.append((b,f));continue
+        if notice(b) is None:return b
+        ns.append(b)
+    if ns and (not isinstance(obj,Withdrawn) or len(ns)!=1 or ns[0]!=obj.withdrawal_span):return next((b for b in ns if not isinstance(obj,Withdrawn) or b!=obj.withdrawal_span),ns[0])
+    active=[(b,f) for b,f in fs if fields(f)==target];revisions=[(b,f) for b,f in active if f['replaces']];removed={}
+    if len(revisions)>1:return revisions[1][0]
+    for b,f in revisions:
+        prior=[a for a,h in active if a!=b and a.document.casefold()==f['replaces']+'.pdf' and h['role'] in ('signed','preliminary')]
+        if len(prior)!=1:return b
+        removed[prior[0]]=b
+    if isinstance(obj,Verified):
+        if obj.observation in removed:return removed[obj.observation]
+        for b,f in active:
+            if b in removed:continue
+            if f['role']=='rule' and (f['op']!=obj.operator or Decimal(f['value'])!=Decimal(obj.threshold)):return b
+            if f['role'] in ('signed','preliminary') and Decimal(f['value'])!=Decimal(obj.value):return b
+    elif isinstance(obj,Conflict):
+        for b in (obj.span_a,obj.span_b):
+            if b in removed:return removed[b]
+    elif isinstance(obj,Withdrawn):
+        if obj.target_span in removed:return removed[obj.target_span]
+        for b,f in active:
+            if f['role']=='signed' and b not in removed and b!=obj.target_span:return b
+    return None
+
 NOT_GIVEN=object()
 def evaluate(q,docs,proposal=NOT_GIVEN):
     bs=indexed(docs);trusted=decide(q,bs);expected=wire(trusted);log=[]
     raw=expected if proposal is NOT_GIVEN else proposal
     try:matches=isinstance(raw,dict) and json.dumps(raw,sort_keys=True,allow_nan=False)==json.dumps(expected,sort_keys=True,allow_nan=False) and proof_ok(q,trusted,bs)
     except (TypeError,ValueError,RecursionError):matches=False
-    if not matches:
+    veto=_packet_veto(q,trusted,bs) if matches else None
+    if not matches or veto is not None:
         # The blocker comes from the trusted index, never from a rejected candidate's quote or message.
-        b=anchor(trusted);b=b if b in bs else bs[0];tag=raw.get('status') if isinstance(raw,dict) else None
+        b=veto if veto is not None else anchor(trusted);b=b if b in bs else bs[0];tag=raw.get('status') if isinstance(raw,dict) else None
         log.append({'code':'CONTRACT_REJECTED','proposed_tag':tag if isinstance(tag,str) and tag in ('VERIFIED','CONFLICT','WITHDRAWN','UNINTERPRETED') else 'INVALID','blocker':[b.doc_id,b.page,b.start,b.end]});trusted=Uninterpreted(b,'CONTRACT_REJECTED')
     return {'result':wire(trusted),'rendered':_render(trusted),'contract_failures':log}
