@@ -8,6 +8,15 @@ def d(i,s):return {'id':i,'name':i+'.pdf','pages':[s]}
 Q='Did Amber meet its full-month uptime commitment?';rule=d('Terms','Amber requires strictly above 97 percent uptime for the entire month.');actual=d('Record','The signed full-month uptime ledger for Amber shows 97 percent.');other=d('Panel','The dashboard for Amber showed 99.9 percent uptime for the first week only.')
 def ev(*ds,**kwargs):return R.evaluate(Q,list(ds),**kwargs)
 class Receipts(unittest.TestCase):
+ def test_real_pdf_layout_contract(self):
+  import io
+  from pypdf import PdfWriter,PdfReader
+  from pypdf.generic import DecodedStreamObject,DictionaryObject,NameObject
+  from core.documents import extract_pages
+  w=PdfWriter();page=w.add_blank_page(width=650,height=800);font=DictionaryObject({NameObject('/Type'):NameObject('/Font'),NameObject('/Subtype'):NameObject('/Type1'),NameObject('/BaseFont'):NameObject('/Helvetica')}); fonts=DictionaryObject({NameObject('/F1'):w._add_object(font)});page[NameObject('/Resources')]=DictionaryObject({NameObject('/Font'):fonts});cs=DecodedStreamObject();lines=[actual['pages'][0],'[1] Notice: Record.pdf is withdrawn without replacement for Amber.'];cs.set_data(('BT /F1 10 Tf 40 720 Td ('+lines[0]+') Tj 0 -18 Td ('+lines[1]+') Tj ET').encode('ascii'));page[NameObject('/Contents')]=w._add_object(cs);buf=io.BytesIO();w.write(buf);b=buf.getvalue();raw=PdfReader(io.BytesIO(b)).pages[0].extract_text();stored=extract_pages(b)[0];self.assertEqual(ev(rule,d('Record',raw))['result']['status'],'WITHDRAWN');out=ev(rule,d('Record',stored));self.assertIn(out['result']['status'],{'WITHDRAWN','UNINTERPRETED'});self.assertNotEqual(out['result']['status'],'VERIFIED')
+  # Allow future imports to preserve structure; any cited text must be exact for the supplied representation.
+  for receipt in out['rendered']['citations']:
+   src=stored if receipt['doc_id']=='Record' else rule['pages'][0];self.assertEqual(src[receipt['start']:receipt['end']],receipt['quote'])
  def test_offsets_raw_pages_not_cleaned_text(self):
   raw='  # Evidence\r\n\r\n\tFirst café 🐋 line\r\n wraps here. \r\n\r\nID | Scope\r\n[a] | usd\r\n[2] Pending: read this.\r\n';doc=d('Book',raw);doc['pages'].append('First café 🐋 line');bs=R.indexed([doc]); self.assertEqual([b.kind for b in bs],['header','paragraph','table_row','table_row','footnote','paragraph']);self.assertEqual(bs[1].quote,'First café 🐋 line\r\n wraps here.');self.assertEqual(bs[-1].page,2)
   for b in bs:
