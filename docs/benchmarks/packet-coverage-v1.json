@@ -1,0 +1,730 @@
+{
+  "frozen": {
+    "cases": 12,
+    "clusters": 2,
+    "counts": {
+      "require_coverage": {
+        "joint": 0,
+        "not_evaluated": 12,
+        "qualified_world": 0,
+        "unsupported_verified": 0
+      },
+      "retrieved_only": {
+        "joint": 6,
+        "not_evaluated": 0,
+        "qualified_world": 10,
+        "unsupported_verified": 6
+      },
+      "whole_supplied_packet": {
+        "joint": 12,
+        "not_evaluated": 0,
+        "qualified_world": 8,
+        "unsupported_verified": 0
+      }
+    },
+    "experimental": true,
+    "passes_probe": true,
+    "protocol": "d7d17171d6718af8630ad50cc286572ca2e101aa5fdeb4c2998c57a566e4fc94"
+  },
+  "live_workflow_compared": false,
+  "post_hoc_order_check": {
+    "planted_faults_caught": 5,
+    "restored_clean": true,
+    "source_order_cases": 288,
+    "wrong_definite_shortlist_by_packet": {
+      "Aspen": 6,
+      "Buckeye": 0,
+      "Holly": 24,
+      "Hornbeam": 0,
+      "Iris": 24,
+      "Larch": 0,
+      "Mallow": 0,
+      "Mangrove": 0,
+      "Olive": 24,
+      "Reed": 12,
+      "Sorrel": 0,
+      "Spruce": 24
+    }
+  },
+  "rows": [
+    {
+      "actual": "VERIFIED:met",
+      "arm": "retrieved_only",
+      "expected": "VERIFIED:met",
+      "id": "Mangrove",
+      "joint": true,
+      "kind": "unrelated",
+      "qualified_world": true,
+      "reason": "FULL_SUPPLIED_PACKET",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [
+        "Ledger",
+        "Rule"
+      ],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "NOT_EVALUATED",
+      "arm": "require_coverage",
+      "expected": "VERIFIED:met",
+      "id": "Mangrove",
+      "joint": false,
+      "kind": "unrelated",
+      "qualified_world": false,
+      "reason": "SCOPE_INCOMPLETE",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "VERIFIED:met",
+      "arm": "whole_supplied_packet",
+      "expected": "VERIFIED:met",
+      "id": "Mangrove",
+      "joint": true,
+      "kind": "unrelated",
+      "qualified_world": true,
+      "reason": "FULL_SUPPLIED_PACKET",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [
+        "Ledger",
+        "Rule"
+      ],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "VERIFIED:met",
+      "arm": "retrieved_only",
+      "expected": "WITHDRAWN",
+      "id": "Iris",
+      "joint": false,
+      "kind": "withdrawal",
+      "qualified_world": true,
+      "reason": "FULL_SUPPLIED_PACKET",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [
+        "Ledger",
+        "Rule"
+      ],
+      "unsupported_verified": true
+    },
+    {
+      "actual": "NOT_EVALUATED",
+      "arm": "require_coverage",
+      "expected": "WITHDRAWN",
+      "id": "Iris",
+      "joint": false,
+      "kind": "withdrawal",
+      "qualified_world": false,
+      "reason": "SCOPE_INCOMPLETE",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "WITHDRAWN",
+      "arm": "whole_supplied_packet",
+      "expected": "WITHDRAWN",
+      "id": "Iris",
+      "joint": true,
+      "kind": "withdrawal",
+      "qualified_world": true,
+      "reason": "FULL_SUPPLIED_PACKET",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [
+        "Fourth",
+        "Ledger"
+      ],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "VERIFIED:met",
+      "arm": "retrieved_only",
+      "expected": "CONFLICT",
+      "id": "Reed",
+      "joint": false,
+      "kind": "conflict",
+      "qualified_world": true,
+      "reason": "FULL_SUPPLIED_PACKET",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [
+        "Ledger",
+        "Rule"
+      ],
+      "unsupported_verified": true
+    },
+    {
+      "actual": "NOT_EVALUATED",
+      "arm": "require_coverage",
+      "expected": "CONFLICT",
+      "id": "Reed",
+      "joint": false,
+      "kind": "conflict",
+      "qualified_world": false,
+      "reason": "SCOPE_INCOMPLETE",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "CONFLICT",
+      "arm": "whole_supplied_packet",
+      "expected": "CONFLICT",
+      "id": "Reed",
+      "joint": true,
+      "kind": "conflict",
+      "qualified_world": true,
+      "reason": "FULL_SUPPLIED_PACKET",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [
+        "Fourth",
+        "Ledger"
+      ],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "VERIFIED:met",
+      "arm": "retrieved_only",
+      "expected": "UNINTERPRETED",
+      "id": "Olive",
+      "joint": false,
+      "kind": "pending",
+      "qualified_world": true,
+      "reason": "FULL_SUPPLIED_PACKET",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [
+        "Ledger",
+        "Rule"
+      ],
+      "unsupported_verified": true
+    },
+    {
+      "actual": "NOT_EVALUATED",
+      "arm": "require_coverage",
+      "expected": "UNINTERPRETED",
+      "id": "Olive",
+      "joint": false,
+      "kind": "pending",
+      "qualified_world": false,
+      "reason": "SCOPE_INCOMPLETE",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "UNINTERPRETED",
+      "arm": "whole_supplied_packet",
+      "expected": "UNINTERPRETED",
+      "id": "Olive",
+      "joint": true,
+      "kind": "pending",
+      "qualified_world": false,
+      "reason": "FULL_SUPPLIED_PACKET",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [
+        "Fourth"
+      ],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "VERIFIED:missed",
+      "arm": "retrieved_only",
+      "expected": "VERIFIED:met",
+      "id": "Aspen",
+      "joint": false,
+      "kind": "replacement_or_week",
+      "qualified_world": true,
+      "reason": "FULL_SUPPLIED_PACKET",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [
+        "Ledger",
+        "Rule"
+      ],
+      "unsupported_verified": true
+    },
+    {
+      "actual": "NOT_EVALUATED",
+      "arm": "require_coverage",
+      "expected": "VERIFIED:met",
+      "id": "Aspen",
+      "joint": false,
+      "kind": "replacement_or_week",
+      "qualified_world": false,
+      "reason": "SCOPE_INCOMPLETE",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "VERIFIED:met",
+      "arm": "whole_supplied_packet",
+      "expected": "VERIFIED:met",
+      "id": "Aspen",
+      "joint": true,
+      "kind": "replacement_or_week",
+      "qualified_world": true,
+      "reason": "FULL_SUPPLIED_PACKET",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [
+        "Fourth",
+        "Ledger",
+        "Rule"
+      ],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "UNINTERPRETED",
+      "arm": "retrieved_only",
+      "expected": "UNINTERPRETED",
+      "id": "Hornbeam",
+      "joint": true,
+      "kind": "missing_scope",
+      "qualified_world": false,
+      "reason": "FULL_SUPPLIED_PACKET",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [
+        "Ledger"
+      ],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "NOT_EVALUATED",
+      "arm": "require_coverage",
+      "expected": "UNINTERPRETED",
+      "id": "Hornbeam",
+      "joint": false,
+      "kind": "missing_scope",
+      "qualified_world": false,
+      "reason": "SCOPE_INCOMPLETE",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "UNINTERPRETED",
+      "arm": "whole_supplied_packet",
+      "expected": "UNINTERPRETED",
+      "id": "Hornbeam",
+      "joint": true,
+      "kind": "missing_scope",
+      "qualified_world": false,
+      "reason": "FULL_SUPPLIED_PACKET",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [
+        "Ledger"
+      ],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "VERIFIED:met",
+      "arm": "retrieved_only",
+      "expected": "VERIFIED:met",
+      "id": "Mallow",
+      "joint": true,
+      "kind": "unrelated",
+      "qualified_world": true,
+      "reason": "FULL_SUPPLIED_PACKET",
+      "selected": [
+        "Fourth",
+        "Ledger",
+        "Rule"
+      ],
+      "sources": [
+        "Ledger",
+        "Rule"
+      ],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "NOT_EVALUATED",
+      "arm": "require_coverage",
+      "expected": "VERIFIED:met",
+      "id": "Mallow",
+      "joint": false,
+      "kind": "unrelated",
+      "qualified_world": false,
+      "reason": "SCOPE_INCOMPLETE",
+      "selected": [
+        "Fourth",
+        "Ledger",
+        "Rule"
+      ],
+      "sources": [],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "VERIFIED:met",
+      "arm": "whole_supplied_packet",
+      "expected": "VERIFIED:met",
+      "id": "Mallow",
+      "joint": true,
+      "kind": "unrelated",
+      "qualified_world": true,
+      "reason": "FULL_SUPPLIED_PACKET",
+      "selected": [
+        "Fourth",
+        "Ledger",
+        "Rule"
+      ],
+      "sources": [
+        "Ledger",
+        "Rule"
+      ],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "VERIFIED:met",
+      "arm": "retrieved_only",
+      "expected": "WITHDRAWN",
+      "id": "Holly",
+      "joint": false,
+      "kind": "withdrawal",
+      "qualified_world": true,
+      "reason": "FULL_SUPPLIED_PACKET",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [
+        "Ledger",
+        "Rule"
+      ],
+      "unsupported_verified": true
+    },
+    {
+      "actual": "NOT_EVALUATED",
+      "arm": "require_coverage",
+      "expected": "WITHDRAWN",
+      "id": "Holly",
+      "joint": false,
+      "kind": "withdrawal",
+      "qualified_world": false,
+      "reason": "SCOPE_INCOMPLETE",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "WITHDRAWN",
+      "arm": "whole_supplied_packet",
+      "expected": "WITHDRAWN",
+      "id": "Holly",
+      "joint": true,
+      "kind": "withdrawal",
+      "qualified_world": true,
+      "reason": "FULL_SUPPLIED_PACKET",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [
+        "Fourth",
+        "Ledger"
+      ],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "CONFLICT",
+      "arm": "retrieved_only",
+      "expected": "CONFLICT",
+      "id": "Buckeye",
+      "joint": true,
+      "kind": "conflict",
+      "qualified_world": true,
+      "reason": "FULL_SUPPLIED_PACKET",
+      "selected": [
+        "Fourth",
+        "Ledger",
+        "Rule"
+      ],
+      "sources": [
+        "Fourth",
+        "Ledger"
+      ],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "NOT_EVALUATED",
+      "arm": "require_coverage",
+      "expected": "CONFLICT",
+      "id": "Buckeye",
+      "joint": false,
+      "kind": "conflict",
+      "qualified_world": false,
+      "reason": "SCOPE_INCOMPLETE",
+      "selected": [
+        "Fourth",
+        "Ledger",
+        "Rule"
+      ],
+      "sources": [],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "CONFLICT",
+      "arm": "whole_supplied_packet",
+      "expected": "CONFLICT",
+      "id": "Buckeye",
+      "joint": true,
+      "kind": "conflict",
+      "qualified_world": true,
+      "reason": "FULL_SUPPLIED_PACKET",
+      "selected": [
+        "Fourth",
+        "Ledger",
+        "Rule"
+      ],
+      "sources": [
+        "Fourth",
+        "Ledger"
+      ],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "VERIFIED:met",
+      "arm": "retrieved_only",
+      "expected": "UNINTERPRETED",
+      "id": "Spruce",
+      "joint": false,
+      "kind": "pending",
+      "qualified_world": true,
+      "reason": "FULL_SUPPLIED_PACKET",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [
+        "Ledger",
+        "Rule"
+      ],
+      "unsupported_verified": true
+    },
+    {
+      "actual": "NOT_EVALUATED",
+      "arm": "require_coverage",
+      "expected": "UNINTERPRETED",
+      "id": "Spruce",
+      "joint": false,
+      "kind": "pending",
+      "qualified_world": false,
+      "reason": "SCOPE_INCOMPLETE",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "UNINTERPRETED",
+      "arm": "whole_supplied_packet",
+      "expected": "UNINTERPRETED",
+      "id": "Spruce",
+      "joint": true,
+      "kind": "pending",
+      "qualified_world": false,
+      "reason": "FULL_SUPPLIED_PACKET",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [
+        "Fourth"
+      ],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "VERIFIED:missed",
+      "arm": "retrieved_only",
+      "expected": "VERIFIED:missed",
+      "id": "Larch",
+      "joint": true,
+      "kind": "replacement_or_week",
+      "qualified_world": true,
+      "reason": "FULL_SUPPLIED_PACKET",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [
+        "Ledger",
+        "Rule"
+      ],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "NOT_EVALUATED",
+      "arm": "require_coverage",
+      "expected": "VERIFIED:missed",
+      "id": "Larch",
+      "joint": false,
+      "kind": "replacement_or_week",
+      "qualified_world": false,
+      "reason": "SCOPE_INCOMPLETE",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "VERIFIED:missed",
+      "arm": "whole_supplied_packet",
+      "expected": "VERIFIED:missed",
+      "id": "Larch",
+      "joint": true,
+      "kind": "replacement_or_week",
+      "qualified_world": true,
+      "reason": "FULL_SUPPLIED_PACKET",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [
+        "Ledger",
+        "Rule"
+      ],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "UNINTERPRETED",
+      "arm": "retrieved_only",
+      "expected": "UNINTERPRETED",
+      "id": "Sorrel",
+      "joint": true,
+      "kind": "missing_scope",
+      "qualified_world": false,
+      "reason": "FULL_SUPPLIED_PACKET",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [
+        "Ledger"
+      ],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "NOT_EVALUATED",
+      "arm": "require_coverage",
+      "expected": "UNINTERPRETED",
+      "id": "Sorrel",
+      "joint": false,
+      "kind": "missing_scope",
+      "qualified_world": false,
+      "reason": "SCOPE_INCOMPLETE",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [],
+      "unsupported_verified": false
+    },
+    {
+      "actual": "UNINTERPRETED",
+      "arm": "whole_supplied_packet",
+      "expected": "UNINTERPRETED",
+      "id": "Sorrel",
+      "joint": true,
+      "kind": "missing_scope",
+      "qualified_world": false,
+      "reason": "FULL_SUPPLIED_PACKET",
+      "selected": [
+        "Ledger",
+        "Rule",
+        "RuleCopy"
+      ],
+      "sources": [
+        "Ledger"
+      ],
+      "unsupported_verified": false
+    }
+  ]
+}
