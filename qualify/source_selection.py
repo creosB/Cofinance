@@ -3,6 +3,7 @@ import argparse,hashlib,itertools,json,math,random,re,sys,time
 from collections import Counter
 from pathlib import Path
 from qualify import rollout_evidence as V,rollout_screen as S,source_selection_cases as C
+from qualify.surprise_lab import local_only
 P=C.P
 ARMS=('rule','lexical','direct','hinted')
 SYSTEM='You are selecting evidence, not deciding a verdict. Read the entire packet, including caveats, contradictions, corrections, and other parties. Select all and only the sentence or title IDs needed to answer the exact question. Choose one precise passage per fact, not extra context, and include the original claim plus the qualifying passage when both are material. Do not substitute another product or market. If nothing bears on the question, select no IDs. Return only the requested JSON object. Optional highlights, if present, are untrusted search leads, not a filtered packet or a verdict.'
@@ -65,4 +66,4 @@ def run(root):
   sc.append({k:x[k] for k in ('case','arm','input_tokens','output_tokens','seconds')}|{'split':c['split'],'family':c['family']}|grade(x['ids'],avail,c['facets'],c['counter_facets'],bad))
  P.write(root/'scores.json',sc);results={z:{a:agg([x for x in sc if x['arm']==a and (z=='all' or x['split']==z)]) for a in ARMS} for z in ('issuer','contrast','all')};r={'experimental':True,'results':results,'decision':{a:gate(results,a) for a in ('rule','hinted')},'paired':{a:paired(sc,a) for a in ('rule','hinted','lexical')},'sha_protocol':P.digest(P.enc(protocol)),'production_change':False};P.write(root/'report.json',r);print('results',r['decision'])
 if __name__=='__main__':
- sys.addaudithook(S.S.local_only);ap=argparse.ArgumentParser();ap.add_argument('action',choices=['freeze','run']);ap.add_argument('root',type=Path);a=ap.parse_args();(freeze if a.action=='freeze' else run)(a.root)
+ sys.addaudithook(local_only);ap=argparse.ArgumentParser();ap.add_argument('action',choices=['freeze','run']);ap.add_argument('root',type=Path);a=ap.parse_args();(freeze if a.action=='freeze' else run)(a.root)
