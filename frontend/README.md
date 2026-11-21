@@ -1,6 +1,6 @@
 # Cofinance local research workspace
 
-Open work is listed in the main [README](../README.md#open-work).
+[Project scope](../README.md) | [How the pipeline works](../docs/METHOD.md) | [Measured results](../docs/SCORECARD.md)
 This is a working interactive slice, not a calibrated or fully complete finance-research product.
 
 ## Start on Windows
@@ -27,9 +27,10 @@ python -S -E -B -m ui.workbench --port 8876
 
 - Chat: persistent v2 conversations, new chat, idempotent background runs, Stop,
   source-backed charts, explicit asset tracking, and a process map for each answer.
-- Memory (brain button in the chat top bar): what the conversation can recall. Remember a short note, forget
+- Memory (Conversation options): what the conversation can recall. Remember a short note, forget
   one item, or forget the whole conversation; *Forget from memory* sits under each answer. Forgetting stops recall
   only: the answer stays in the history. Notes are context for the narrator, never evidence.
+- Attachments: text PDFs with page citations; no OCR. Optional qualified Deep think applies to the final narrator only.
 - Research: recorded synthesis, specialist reports, and gate decisions.
 - Execution: switch between Run map and Step list. Select a node or observation
   to inspect input, emitted labels or text, number validation, and accepted output.
@@ -82,8 +83,7 @@ turn the semantic side off). Recalled text is context only: its numbers never pa
 
 One production loopback origin serves the frontend, read-only trace/corpus routes, and
 interactive routes. Host and Origin checks remain. A user-activated top-level navigation
-may open `/`; cross-site API reads and frames are blocked. Mutations require exact same
-Origin, JSON, a bounded body, and the server's request token. No wildcard CORS.
+may open `/`; cross-site API reads and frames are blocked. Mutations require the expected origin, a bounded body and the request token. Most use JSON; PDF upload uses a raw PDF body. No wildcard CORS.
 
 Read routes: `/api/runs`, `/api/run?id=...`, `/api/corpus`, `/api/state`,
 `/api/conversation?id=...`, `/api/job?id=...`, `/api/labels`, `/api/memory?session_id=...`,

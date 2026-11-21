@@ -1,65 +1,33 @@
-# System scorecard
+# Evidence and experiment index
 
 > [!WARNING]
-> **Experimental measurements of a research tool.** Not a trading signal or financial advice. Cofinance never trades. Every number links to its method and result file.
+> Experimental findings, not trading signals or financial advice. There is no single Cofinance accuracy percentage: source matching, answer quality, forecast ranking and runtime speed measure different things.
 
-One page, every measurement side by side. Direction skill is reported as **ranking AUC**: whether the system puts more weight on UP for the assets that then rose. 0.50 is no skill whatever the market did, so a constant UP call scores exactly 0.50. Accuracy against a lopsided window is reported only as context.
+**Primary question: does structured research beat direct Q&A? Not established.** The [architecture comparison](METHOD.md#the-architecture-comparison) specifies the evidence, compute and grading controls. The studies below diagnose parts of the system; none substitutes for that comparison.
 
-## Is the system grounded?
+## Research quality and runtime
 
-| Check | Result | Source |
+| What we tested | What happened | Interpretation |
 | --- | --- | --- |
-| Numbers in final answers traced to a tool value or served headline | 393 of 393 | [Grounding](benchmarks/REPLAY.md) |
-| Numbers in Data Analyst and News Researcher summaries traced | 613 of 613 | [Result file](benchmarks/grounding-2026-11-17.json) |
-| Final answers accepted by the guards (rest fall back to Python-built text) | 61 of 72 | [Replay v2](benchmarks/REPLAY.md) |
-| Stock cases with fundamentals unavailable, answers inventing one | 63 cases, 0 untraced numbers | [Result file](benchmarks/grounding-2026-11-17.json) |
-| Citation chips on a live NVDA question | 5 of 5 to the right field (2026-11-16) | live check |
+| [Grounding](benchmarks/grounding-2026-11-17.json) | In 72 replay cases, 393/393 final-answer numbers and 613/613 specialist-summary numbers traced to supplied values. Guards accepted 61 final answers; 11 used fallback. | Value provenance, not independently graded meaning. |
+| [Replay and synthesis](benchmarks/REPLAY.md) | Bounding specialist output fixed observed truncations. Several news-narration variants still misattributed sources or overstated announcements. | Keep the Python news digest; a fluent summary need not be more faithful. |
+| [Semantic surprise and quote review](benchmarks/REVIEWED_HEADLINES.md) | The semantic prompt got both sides right on 0/8 naturally worded challenge pairs. The explicit arithmetic checker applied to 0/213 cached titles. | A correct comparison on templated inputs does not imply comprehension or real-world coverage. |
+| [Narrator comparison](benchmarks/NARRATOR-CANDIDATE.md), [GPU speed](benchmarks/SPEED.md), [Deep think](benchmarks/THINK_LAB.md) | A local GPU shortened calls. Optional thinking cost more time and tokens; it did not improve headline ranking in the development screen. | Runtime and qualification are separate from research-answer quality. AtomicChat is the default narrator; headline thinking stays off. |
 
-## Is the pipeline healthy?
+## Finance-specific diagnostics
 
-| Check | Before | After | Source |
-| --- | --- | --- | --- |
-| Data Analyst token-cap failures, 72 replay cases | 51 | 0 | [Replay v1 to v2](benchmarks/REPLAY.md) |
-| Median seconds per full-team case, CPU | 38.7 | 28.9 | [Replay v1 to v2](benchmarks/REPLAY.md) |
-| Screening a Decision change, 72 cases | about 35 minutes (full team) | 1 to 10 minutes (cached reports) | [Fast screening](benchmarks/REPLAY.md) |
+| Method and evidence | Finding and disposition |
+| --- | --- |
+| [Price-only historical forecast](benchmarks/HISTORICAL.md); [strategy baselines](benchmarks/LAB.md); [risk flags](benchmarks/RISK_LAB.md) | The price-only narrator called UP on all 125 cases. No direction rule passed the strategy screen. A volatility flag did not confirm across new assets. No general edge established. |
+| [Per-headline judgments](benchmarks/REPLAY.md); [one-look window result](benchmarks/window-2026-11-09-headline-result.json) | AUC 0.681 on 24 of 40 sealed cases with known exits, across three dates. Passed the narrow frozen rule, not broad validation. The summed signal remains an experimental card. |
+| [Cached-news simulation](benchmarks/LOCAL_NEWS_SIMULATION.md) | On reused outcomes, headline count ranked nearly as well as the model. Removing the strongest headline weakened ranking. |
+| [Price regimes and news follow-through](benchmarks/PRICE_NEWS_METHODS.md) | Neither passed the adoption screen. At an exploratory equal budget, follow-through got 29/47 vs 26/47, but lost on the later subset. |
+| [Quote-backed judgment](benchmarks/REVIEWED_HEADLINES.md) | On 96 reused cases, quote review got 35/62 calls correct vs 36/62 at matched coverage. No change to the live method. |
+| [Crowd calibration](benchmarks/POLYMARKET.md); [Bitcoin vs crowd](benchmarks/BTC_VS_CROWD.md); [tuned baseline](benchmarks/BTC_BASELINE.md) | Crowd calibration describes market prices, not Cofinance. Tuning the Python model or adding its score to the crowd did not establish an improvement. |
+| [Model readout](benchmarks/READOUT_CHECK.md); [Polymarket records](benchmarks/PM_REPLAY.md); [forward ledger](benchmarks/FORWARD.md) | No tested narrator readout passed the coherence checks. Existing ledgers preserve protocols and sealed records, not an ongoing schedule or a validated probability. |
 
-News Researcher summaries passed the guards in only 17 of 72 cases, and accepted ones still misattributed sources. Since 2026-11-17 the News Researcher is a Python digest: the served headlines, quoted and grouped by their source (company announcements, shared links), with no model narration. Four prompt and guard variants were tried first; none met a rule written before its data. The Team Lead still narrates the final answer under the number, wording and risk guards.
+## Reading the numbers
 
-## Does the decision have skill?
+AUC measures ranking (0.5 is chance), not the fraction of calls correct. Check the sample, dates, coverage and abstention policy before comparing percentages. Brier measures probability error (lower is better). A reused replay and a fresh evaluation do not carry the same weight. Each report retains its original protocol, evidence and limits.
 
-Dev window: nine overlapping origins (2026-10-27 to 2026-11-06), eight assets, 72 correlated cases, a falling market. Tuning here is expected; no claim rests on it.
-
-| Decision technique | Ranking AUC | Outcome |
-| --- | --- | --- |
-| Team answer, one-word call (v1, v2) | 0.50 by construction (UP on every valid call) | no skill |
-| Model label probabilities, Python call (prob-v1) | 0.511 | no skill |
-| Rise and fall asked separately (pair-v1) | 0.540 | below the gate labels |
-| **Model judges each headline, Python sums (headline-v1)** | **0.585**, interval 0.525 to 0.654 | **shortlisted** |
-| Gate's own headline labels, context | 0.556 | reference |
-| 20-session return, context | 0.406 | reference |
-
-The shortlisted technique was sealed on the unseen window 2026-11-09 to 2026-11-13 and scored once, early, on 2026-11-19 (Baris's call): AUC 0.681 (origin-cluster interval 0.619 to 0.857) on the 24 of 40 cases whose exits had closed, so it passed its frozen rule; thin evidence (3 origins, a falling week, gate-label counting 0.663 on the same cases), and the other 16 cases are never scored. The mean addendum (0.669) did not beat the sum; the AtomicChat arm tied the base and stays the live judge. [Result](benchmarks/window-2026-11-09-headline-result.json) It also runs live as a labeled experimental line under chat answers: headlines are judged after each news collection with the same code as the screen, and Python sums the judgments of exactly the headlines that answer was served. It is not narrated and not confirmed. A second aggregation, the mean instead of the sum (dev AUC 0.666 versus 0.585, found after looking at dev outcomes), is registered on the same sealed judgments before any exit price existed, and is scored in the same single look: [addendum](benchmarks/window-2026-11-09-headline-mean-addendum.json). [Method and every candidate](benchmarks/REPLAY.md) · [Compact results](benchmarks/decision-screen-2026-11-17.json)
-
-## Other measurements
-
-| Benchmark | Result | Source |
-| --- | --- | --- |
-| Narrator speed, Vulkan GPU vs CPU | Decision call 0.56 s vs 5.3 s; headline labels 39 of 40 identical, AUC 0.574 vs 0.585 | [Speed](benchmarks/SPEED.md) |
-| Price-only LFM3 forecast, 125 cases | UP every time, balanced accuracy 50% | [Historical](benchmarks/HISTORICAL.md) |
-| Strategy lab, 2,826 cases, 2014 to 2026 | no direction rule passes; dual momentum cut dev drawdown 59% to 20% | [Lab](benchmarks/LAB.md) |
-| Risk flag on new assets | not confirmed: 5 of 9 assets agreed, 6 needed | [Risk lab](benchmarks/RISK_LAB.md) |
-| Polymarket crowd calibration | Brier 0.176, 0.168, 0.094 at 1, 7, 30 days; two cheap-outcome patterns not confirmed on a fresh sample | [Polymarket](benchmarks/POLYMARKET.md) |
-| Bitcoin threshold odds, model vs crowd | crowd better a day out (Brier 0.1340 vs 0.1378) | [BTC vs crowd](benchmarks/BTC_VS_CROWD.md) |
-| Forward weekly ledger | in progress; no claim before 26 matured batches | [Forward](benchmarks/FORWARD.md) |
-| Polymarket replay, narrator probability vs crowd price | v3 recording since 2026-11-18, nothing settled yet. Record 1: 18 markets sealed before settlement; the narrator said YES at 0.99 or more on all 18 (crowd 0.28 to 0.61), and gave 1.99 in total to pairs of outcomes that cannot both happen. The readout is not yet shown to be a probability. No claim before 100 events in 20 clusters | [Polymarket replay](benchmarks/PM_REPLAY.md) · [ledger](benchmarks/pm-replay-ledger-v3.jsonl) |
-| Python baseline for Bitcoin thresholds (price, volatility, horizon), 2026-11-19 | No claim holds. Chosen on the first half (Student-t, 4 df), scored once on the second: Brier 0.1399 vs crowd 0.1369, difference +0.0030 (-0.0016 to +0.0071); vs untuned -0.0006 (-0.0027 to +0.0015). Adding the price model to the crowd's price did not help (+0.0014, weight on the model about 0). The crowd stays the reference | [Baseline](benchmarks/BTC_BASELINE.md) · [result](benchmarks/btc-baseline-v1.json) |
-| Readout coherence (can a probability be read from the model?), AtomicChat on GPU, 2026-11-19 | No. On 54 questions answered by its own price card or tied by logic, none of three readouts passes: the replay's first-token readout says about 0.996 YES to everything (above + below = 1.99), the JSON label ranks known facts at AUC 0.73 but half its ladder steps rise, the stated number is 55 on 26 of 54 (known-fact AUC 0.48). No model-read probability is used as a forecast | [Readout check](benchmarks/READOUT_CHECK.md) · [result](benchmarks/readout-check-v1.json) |
-| Deep think (thinking mode), AtomicChat on GPU, 2026-11-19 | Chat answers: passes every smoke gate, but 2.5 s and 426 tokens per answer vs 0.39 s and 36. Headline judging: worse, AUC 0.508 vs 0.625 without thinking; near certain on 32 of 40 headlines vs 15. Headline judging stays thinking-off | [Deep think](benchmarks/THINK_LAB.md) · [result](benchmarks/think-lab-v1.json) |
-| Narrator smoke comparison, CPU, 2026-11-09 | LFM3 1.7B, MiniCPM5-1B and 2B all passed 7 unique cases; MiniCPM5-1B faster, not better. AtomicChat compared separately | [Recorded scores](../frontend/src/lib/narrator-benchmark.json) · [AtomicChat](benchmarks/NARRATOR-CANDIDATE.md) |
-| Headline materiality judge, 91 model-labeled rows | GLiNER 72.5% accuracy, AUC 0.790, kept. MiniCPM5-2B-Jev AUC 0.874 but compressed probabilities and about 48 s per row: not adopted. d1-2B failed to load | train split only, labels written by a model |
-
-## What this page does not show
-
-No independent window has been scored yet. Grounding is value matching with the same matcher the guards use, not an independent judge of meaning. No fresh install, long-running use or production readiness has been verified.
-
-How these numbers are produced, and which habits carry over to other systems: [method note](METHOD.md).
+[Project scope](../README.md) | [Methods](METHOD.md)

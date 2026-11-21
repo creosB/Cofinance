@@ -58,9 +58,7 @@ One run on 2026-11-19 (180 calls, 90 s). Compact result: [readout-check-v1.json]
   whether the fact is true or false (averages 0.38 and 0.37). It is the only arm whose above and below roughly add up, because 55 and 45 do.
 
 **Decision under the frozen rules.** No readout is coherent on these checks. No model-read probability is used
-as a forecast. The next accuracy step starts from a Python baseline (price, volatility, horizon) and adds model
-features only if they improve ranking and Brier on held-out data. The Polymarket replay records continue under
-their own frozen rules; their team arm should be read as a near-constant YES, not as the model's view.
+as a forecast. A subsequent [price and volatility baseline](BTC_BASELINE.md) did not establish improvement over the crowd. The existing prediction-market record is preserved, not an ongoing collection.
 
 ## Not tested
 

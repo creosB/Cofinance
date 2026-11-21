@@ -52,8 +52,7 @@ One run on 2026-11-19, after the rules were published. Compact result:
 **Decisions under the frozen rules.**
 
 - **Chat:** the thinking arm passed every gate, so an opt-in Deep think switch is allowed. It costs about 6.6
-  times the time and 12 times the output tokens per answer. Whether to build it is Baris's call; it needs the live
-  narrator restarted with thinking flags and qualified on that fingerprint.
+  times the time and 12 times the output tokens per answer. The switch subsequently shipped for the final narrator only, off by default, with separate qualification. This experiment did not grade the quality of a real chat answer.
 - **Headline judgments:** not a candidate. Thinking lost the ranking skill the thinking-off judge showed on this
   dev window, leaned UP, and became near certain on most headlines, which flattens the graded scores the ranking
   needs. Headline judging stays thinking-off.

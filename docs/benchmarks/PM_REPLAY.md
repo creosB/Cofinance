@@ -1,7 +1,7 @@
 # Polymarket replay: team probability versus the crowd price
 
 > [!WARNING]
-> **Experimental, in progress, nothing scored yet.** Forecasts are recorded for measurement only. Crowd prices are crowd opinion, not facts. Not a trading signal or financial advice. Cofinance never trades: no orders, keys or wallets.
+> **Experimental historical record; no outcome score is reported here.** Forecasts are recorded for measurement only. Crowd prices are crowd opinion, not facts. Not a trading signal or financial advice. Cofinance never trades: no orders, keys or wallets.
 
 ## Question
 
@@ -9,7 +9,7 @@ Given an open Polymarket question about one of our assets, plus the local news d
 
 ## Why forward
 
-The live news store expires old rows and no point-in-time news archive exists, so a replay over past markets would quietly feed the model later news. Markets are therefore picked and forecasts sealed at T, published before settlement, and scored afterwards. Slower, but it cannot leak.
+The live news store expires old rows and no point-in-time news archive exists, so a replay over past markets would quietly feed the model later news. Markets are therefore picked and forecasts sealed at T, published before settlement, and scored afterwards. This reduces hindsight risk; it does not protect against every form of leakage.
 
 ## Rules (v3, frozen before its first record)
 
@@ -32,7 +32,7 @@ The $10k event-volume floor was chosen after counting open listings by volume on
 | --- | --- | --- |
 | [v1](pm-replay-protocol.json) | First rules: general market listing, whole-token YES/NO readout | none: a probe on made-up questions showed AtomicChat writes YES as "Y" + "ES", so this readout would have ignored most of the YES mass |
 | [v2](pm-replay-protocol-v2.json) | Readout counts first tokens that can start an answer; nothing else changed | 1 record, 1 market: the general listing barely reaches our assets ([ledger](pm-replay-ledger.jsonl)) |
-| v3 | Events listed by asset tag, event-volume floor, cluster verdict | recording since 2026-11-18 |
+| v3 | Events listed by asset tag, event-volume floor, cluster verdict | first record sealed 2026-11-18 |
 
 Each version lives in its own folder with its own code path; a sealed record is always scored under the rules it was recorded with.
 
@@ -50,9 +50,9 @@ No outcome is known yet, but one thing is already visible without any: **the pro
 
 What this shows: the first-token YES share measures how the model starts its reply, and on these inputs that is almost always "Y". It has **not been shown to be an event probability**. What it does not show: whether the scores rank outcomes at all, because nothing has settled. Brier and AUC are computed only after settlement, and the frozen verdict waits for 100 events.
 
-## Next
+## Subsequent findings
 
-v3 keeps recording unchanged, so its result stays honest. Separately, under its own rules frozen first, the readout itself gets checked on questions whose answers are known or forced: complementary pairs (above and below the same level), mutually exclusive ranges, and true and false statements about the inputs. A forecaster that fails those cannot pass this benchmark, and they need no market outcomes.
+No new records are planned. The original rules still govern the sealed record. The separate [coherence test](READOUT_CHECK.md) found no reliable probability readout. Do not interpret the narrator score as a calibrated probability.
 
 ## Reproduce
 

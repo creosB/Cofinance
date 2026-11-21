@@ -145,7 +145,7 @@ Two yes/no questions per case over the signals-v1 input, "will it close higher" 
 
 The shortlisted headline-v1 ran unchanged on origins 2026-11-09 to 2026-11-13 (40 cases, 29 with news, 34 unique headlines, zero failures), using only the session calendar and the gated corpus; no prices enter its prediction. Calls: 10 UP, 12 DOWN, 18 ABSTAIN. Sealed 2026-11-17 06:37 UTC, before most of these exits (2026-11-16 to 2026-11-20) had closed and with no outcome on disk; the hashes are [published here](window-2026-11-09-headline-sealed.json). Confirmation needs AUC above 0.50 with the origin-cluster interval excluding 0.50.
 
-**Scored 2026-11-19 (one look, early).** At Baris's request the window was scored before it fully matured, on prices through 2026-11-18, the last completed US session. Origins 11/09 to 11/11 had their exits; the 16 cases at 11/12 and 11/13 did not, and they stay unscored because the scorer refuses a second look. On the 24 scored cases (3 origins, 4 of 24 rose):
+**Scored 2026-11-19 (one look, early).** The window was scored before it fully matured, on prices through 2026-11-18, the last completed US session. Origins 11/09 to 11/11 had their exits; the 16 cases at 11/12 and 11/13 did not, and they stay unscored because the scorer refuses a second look. On the 24 scored cases (3 origins, 4 of 24 rose):
 
 | Arm | AUC | Origin-cluster interval | Python call (UP / DOWN / ABSTAIN) | Under the frozen rule |
 | --- | --- | --- | --- | --- |

@@ -3,7 +3,7 @@
 > [!WARNING]
 > **Experimental development screen.** Output-guard acceptance is not factual accuracy or financial prediction skill. Not a trading signal or financial advice. Cofinance never trades.
 
-**Result: two jobs, two answers.** For written news summaries, AtomicChat AD-Q4_K_M is a wash: it passes the frozen narrator smoke checks and writes shorter, cleaner replies, but fails this screen's historical-news guard non-regression rule and still invents sources and implications. For headline judgments (the shortlisted headline-v1 technique), it ranked dev outcomes better than the base and passes the frozen shortlist rule, so it is sealed as a second arm on the unseen 11/09 to 11/13 window. Nothing is switched until that single look.
+**Result: two jobs, two answers.** For written news summaries, AtomicChat AD-Q4_K_M is a wash: it passes the frozen narrator smoke checks and writes shorter, cleaner replies, but fails this screen's historical-news guard non-regression rule and still invents sources and implications. For headline judgments (the shortlisted headline-v1 technique), it ranked dev outcomes better than the base and passes the frozen shortlist rule, so it is sealed as a second arm on the unseen 11/09 to 11/13 window. That one look has since been scored: [window result](window-2026-11-09-headline-result.json). The judges tied on the 24 available outcomes; AtomicChat remains the live judge.
 
 [Compact results and protocol fingerprints](narrator-atomic-2026-11-17.json). [Headline dev screen and sealed window arm](window-2026-11-09-headline-atomic-sealed.json).
 
@@ -18,7 +18,7 @@ Same headline-v1 prompt, label-probability readout, sum per case and plus or min
 | Origin-cluster 95% interval | 0.505 to 0.652 | 0.592 to 0.672 |
 | Mean aggregation, post hoc | 0.659 | 0.694 |
 
-Gate labels alone rank at 0.556 on the same cases. AtomicChat abstains more (18 of 40 headlines versus 12) and gives the same label as the base on 34 of 40. The intervals overlap, the cases are correlated and the outcomes were known, so this is a reason to test, not evidence of a better model. The sealed window arm makes the same call as the base on 38 of 40 cases; it may replace the base for live headline judging only if its window AUC is above 0.50 with the interval excluding 0.50 and at least the base arm's AUC. That rule and the arm's hashes were published before any window outcome was scored.
+Gate labels alone rank at 0.556 on the same cases. AtomicChat abstains more (18 of 40 headlines versus 12) and gives the same label as the base on 34 of 40. The intervals overlap, the cases are correlated and the outcomes were known, so this is a reason to test, not evidence of a better model. The sealed window arm makes the same call as the base on 38 of 40 cases; the predeclared rule allowed replacement only if its window AUC is above 0.50 with the interval excluding 0.50 and at least the base arm's AUC. That rule and the arm's hashes were published before any window outcome was scored.
 
 ## Method
 

@@ -37,7 +37,7 @@ Lower is better. At 24 h, the model was worse than the crowd in both halves (con
 - **Missing spot:** 385 markets at 24 h had no usable spot or volatility because Yahoo's hourly series has gaps (one of 101 hours from 2025-11-17, five shorter). They fall in Nov and Dec 2025 (363), May and Jul 2026. The gaps come from the data provider, not from outcomes, but the first half of the year is thinner.
 - **Did the model see the right price?** At settlement time the Yahoo price was on the same side of the threshold as Polymarket's result for 99.8% of 3,691 markets; 62 thresholds were within 0.2% of the price, where the two sources can disagree.
 - **Repeatable:** both halves of the year point the same way.
-- **Untuned on purpose:** this tests one plain model. A better volatility estimate (faster-reacting or fat-tailed) could do better; it would need its own frozen run, not a tweak to this one.
+- **Untuned on purpose:** this tests one plain model. A [separate frozen baseline comparison](BTC_BASELINE.md) later tested these variants and did not establish an advantage over the crowd.
 
 ## Reproduce
 

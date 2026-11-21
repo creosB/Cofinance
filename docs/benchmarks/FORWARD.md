@@ -33,14 +33,9 @@ The protocol (prompts, arms, windows, rules) is written to `protocol.json` on th
 - **Public timestamp:** each batch appends its labels and ledger hash to [forward-ledger.jsonl](forward-ledger.jsonl), committed to GitHub before entry. The commit time is independent evidence the forecast existed first.
 - **Errors and abstentions** stay in the all-case denominator. Missing outcomes are listed, not dropped silently.
 
-## Weekly routine
+## Status of this protocol
 
-1. Monday morning, before 17:30 Istanbul: collect news in the dashboard.
-2. `python -m qualify.forward record --root data/forward_benchmark --publish docs/benchmarks/forward-ledger.jsonl`
-3. Commit and push `docs/benchmarks/forward-ledger.jsonl` before the US open.
-4. Any time after Friday's session: `python -m qualify.forward score --root data/forward_benchmark`
-
-No scheduler runs this. Missed weeks are simply missing, not backfilled.
+Historical reference, not an instruction to start collecting. The existing records and scoring rules are preserved. No new batches or scheduled runs are planned. Missing weeks are not backfilled.
 
 ## Reading the score
 
