@@ -9,6 +9,7 @@
 
 | What we tested | What happened | Interpretation |
 | --- | --- | --- |
+| [Source scope and checked decisions](benchmarks/SOURCE_SCOPE.md) | On 12 authored packets a checked card raised model verdicts from 4 to 8 correct, but neither model arm selected exactly the decisive sources with the correct verdict. Code alone did so on 7. | Separate evidence extraction, decision correctness and citation selection. Not a live model change. |
 | [Grounding](benchmarks/grounding-2026-11-17.json) | In 72 replay cases, 393/393 final-answer numbers and 613/613 specialist-summary numbers traced to supplied values. Guards accepted 61 final answers; 11 used fallback. | Value provenance, not independently graded meaning. |
 | [Replay and synthesis](benchmarks/REPLAY.md) | Bounding specialist output fixed observed truncations. Several news-narration variants still misattributed sources or overstated announcements. | Keep the Python news digest; a fluent summary need not be more faithful. |
 | [Semantic surprise and quote review](benchmarks/REVIEWED_HEADLINES.md) | The semantic prompt got both sides right on 0/8 naturally worded challenge pairs. The explicit arithmetic checker applied to 0/213 cached titles. | A correct comparison on templated inputs does not imply comprehension or real-world coverage. |
