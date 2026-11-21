@@ -1,0 +1,1459 @@
+{
+  "cases": "cfef89b10ea3f2e6d840a6cde8e118e30f577ba3019a918cbb49e78d928c58ef",
+  "cases_detail": {
+    "packet-03bd1ef28": {
+      "arms": {
+        "all": {
+          "ids": [
+            "AT1",
+            "AS1",
+            "BT1",
+            "BS1",
+            "CT1",
+            "CS1"
+          ],
+          "valid": true
+        },
+        "direct": {
+          "ids": [],
+          "valid": true
+        },
+        "second": {
+          "ids": [
+            "AS1"
+          ],
+          "valid": true
+        },
+        "seed": {
+          "ids": [
+            "AS1"
+          ],
+          "valid": true
+        }
+      },
+      "counter_facets": [],
+      "facets": [],
+      "family": "unrelated coverage",
+      "kind": "empty"
+    },
+    "packet-1225e713a": {
+      "arms": {
+        "all": {
+          "ids": [
+            "AT1",
+            "AS1",
+            "BT1",
+            "BS1",
+            "BS2",
+            "CT1",
+            "CS1"
+          ],
+          "valid": true
+        },
+        "direct": {
+          "ids": [
+            "CS1",
+            "CT1"
+          ],
+          "valid": true
+        },
+        "second": {
+          "ids": [
+            "CS1",
+            "CT1"
+          ],
+          "valid": true
+        },
+        "seed": {
+          "ids": [
+            "CS1"
+          ],
+          "valid": true
+        }
+      },
+      "counter_facets": [
+        1
+      ],
+      "facets": [
+        [
+          "CS1"
+        ],
+        [
+          "BS2"
+        ]
+      ],
+      "family": "refurbishment",
+      "kind": "conflict"
+    },
+    "packet-35f742cca": {
+      "arms": {
+        "all": {
+          "ids": [
+            "AT1",
+            "AS1",
+            "BT1",
+            "BS1",
+            "CT1",
+            "CS1"
+          ],
+          "valid": true
+        },
+        "direct": {
+          "ids": [
+            "BS1",
+            "BT1"
+          ],
+          "valid": true
+        },
+        "second": {
+          "ids": [
+            "BS1",
+            "BT1",
+            "CS1"
+          ],
+          "valid": true
+        },
+        "seed": {
+          "ids": [
+            "BS1",
+            "CS1"
+          ],
+          "valid": true
+        }
+      },
+      "counter_facets": [],
+      "facets": [
+        [
+          "BS1"
+        ]
+      ],
+      "family": "rail credit",
+      "kind": "retraction"
+    },
+    "packet-3bcaf403d": {
+      "arms": {
+        "all": {
+          "ids": [
+            "AT1",
+            "AS1",
+            "BT1",
+            "BS1",
+            "CT1",
+            "CS1",
+            "CS2"
+          ],
+          "valid": true
+        },
+        "direct": {
+          "ids": [
+            "AS1",
+            "AT1",
+            "CS1",
+            "CS2",
+            "CT1"
+          ],
+          "valid": true
+        },
+        "second": {
+          "ids": [
+            "AS1",
+            "AT1",
+            "BS1",
+            "BT1",
+            "CS1",
+            "CS2",
+            "CT1"
+          ],
+          "valid": true
+        },
+        "seed": {
+          "ids": [
+            "AS1"
+          ],
+          "valid": true
+        }
+      },
+      "counter_facets": [
+        1,
+        2
+      ],
+      "facets": [
+        [
+          "AS1"
+        ],
+        [
+          "BS1"
+        ],
+        [
+          "CS1"
+        ]
+      ],
+      "family": "rebate circular",
+      "kind": "retraction"
+    },
+    "packet-401e8e90a": {
+      "arms": {
+        "all": {
+          "ids": [
+            "AT1",
+            "AS1",
+            "BT1",
+            "BS1",
+            "CT1",
+            "CS1"
+          ],
+          "valid": true
+        },
+        "direct": {
+          "ids": [
+            "BS1",
+            "BT1"
+          ],
+          "valid": true
+        },
+        "second": {
+          "ids": [
+            "BS1",
+            "BT1"
+          ],
+          "valid": true
+        },
+        "seed": {
+          "ids": [
+            "BS1"
+          ],
+          "valid": true
+        }
+      },
+      "counter_facets": [
+        1
+      ],
+      "facets": [
+        [
+          "BS1"
+        ],
+        [
+          "AS1"
+        ]
+      ],
+      "family": "transfer fee",
+      "kind": "restriction"
+    },
+    "packet-492eee87c": {
+      "arms": {
+        "all": {
+          "ids": [
+            "AT1",
+            "AS1",
+            "BT1",
+            "BS1",
+            "CT1",
+            "CS1"
+          ],
+          "valid": true
+        },
+        "direct": {
+          "ids": [
+            "AS1",
+            "CS1",
+            "CT1"
+          ],
+          "valid": true
+        },
+        "second": {
+          "ids": [
+            "AS1",
+            "CS1",
+            "CT1"
+          ],
+          "valid": true
+        },
+        "seed": {
+          "ids": [
+            "CS1"
+          ],
+          "valid": true
+        }
+      },
+      "counter_facets": [
+        1
+      ],
+      "facets": [
+        [
+          "CS1"
+        ],
+        [
+          "AS1"
+        ]
+      ],
+      "family": "coupon redemption",
+      "kind": "conflict"
+    },
+    "packet-4feaf9c8e": {
+      "arms": {
+        "all": {
+          "ids": [
+            "AT1",
+            "AS1",
+            "BT1",
+            "BS1",
+            "BS2",
+            "CT1",
+            "CS1"
+          ],
+          "valid": true
+        },
+        "direct": {
+          "ids": [
+            "CS1",
+            "CT1"
+          ],
+          "valid": true
+        },
+        "second": {
+          "ids": [
+            "CS1",
+            "CT1"
+          ],
+          "valid": true
+        },
+        "seed": {
+          "ids": [
+            "CS1"
+          ],
+          "valid": true
+        }
+      },
+      "counter_facets": [],
+      "facets": [
+        [
+          "CS1"
+        ]
+      ],
+      "family": "rebate circular",
+      "kind": "retraction"
+    },
+    "packet-75dbf49da": {
+      "arms": {
+        "all": {
+          "ids": [
+            "AT1",
+            "AS1",
+            "AS2",
+            "BT1",
+            "BS1",
+            "CT1",
+            "CS1"
+          ],
+          "valid": true
+        },
+        "direct": {
+          "ids": [
+            "AS1",
+            "AT1"
+          ],
+          "valid": true
+        },
+        "second": {
+          "ids": [
+            "AS1",
+            "AS2"
+          ],
+          "valid": true
+        },
+        "seed": {
+          "ids": [
+            "AS1"
+          ],
+          "valid": true
+        }
+      },
+      "counter_facets": [],
+      "facets": [
+        [
+          "AS1"
+        ]
+      ],
+      "family": "room booking",
+      "kind": "retraction"
+    },
+    "packet-7a397ddf5": {
+      "arms": {
+        "all": {
+          "ids": [
+            "AT1",
+            "AS1",
+            "BT1",
+            "BS1",
+            "CT1",
+            "CS1"
+          ],
+          "valid": true
+        },
+        "direct": {
+          "ids": [
+            "AS1",
+            "BS1",
+            "BT1",
+            "CS1",
+            "CT1"
+          ],
+          "valid": true
+        },
+        "second": {
+          "ids": [
+            "AS1",
+            "BS1",
+            "BT1",
+            "CS1",
+            "CT1"
+          ],
+          "valid": true
+        },
+        "seed": {
+          "ids": [
+            "CS1"
+          ],
+          "valid": true
+        }
+      },
+      "counter_facets": [
+        1,
+        2
+      ],
+      "facets": [
+        [
+          "CS1"
+        ],
+        [
+          "BS1"
+        ],
+        [
+          "AS1"
+        ]
+      ],
+      "family": "scanner acceptance",
+      "kind": "conflict"
+    },
+    "packet-7ebd8395a": {
+      "arms": {
+        "all": {
+          "ids": [
+            "AT1",
+            "AS1",
+            "BT1",
+            "BS1",
+            "CT1",
+            "CS1"
+          ],
+          "valid": true
+        },
+        "direct": {
+          "ids": [
+            "AS1",
+            "AT1"
+          ],
+          "valid": true
+        },
+        "second": {
+          "ids": [
+            "AS1"
+          ],
+          "valid": true
+        },
+        "seed": {
+          "ids": [
+            "AS1"
+          ],
+          "valid": true
+        }
+      },
+      "counter_facets": [],
+      "facets": [
+        [
+          "AS1"
+        ]
+      ],
+      "family": "scanner acceptance",
+      "kind": "conflict"
+    },
+    "packet-9308d8a50": {
+      "arms": {
+        "all": {
+          "ids": [
+            "AT1",
+            "AS1",
+            "BT1",
+            "BS1",
+            "BS2",
+            "CT1",
+            "CS1",
+            "CS2"
+          ],
+          "valid": true
+        },
+        "direct": {
+          "ids": [
+            "CS1",
+            "CT1"
+          ],
+          "valid": true
+        },
+        "second": {
+          "ids": [
+            "CS1",
+            "CT1"
+          ],
+          "valid": true
+        },
+        "seed": {
+          "ids": [
+            "CS1"
+          ],
+          "valid": true
+        }
+      },
+      "counter_facets": [],
+      "facets": [
+        [
+          "CS1"
+        ]
+      ],
+      "family": "district passes",
+      "kind": "restriction"
+    },
+    "packet-a02a2efdd": {
+      "arms": {
+        "all": {
+          "ids": [
+            "AT1",
+            "AS1",
+            "BT1",
+            "BS1",
+            "CT1",
+            "CS1",
+            "CS2"
+          ],
+          "valid": true
+        },
+        "direct": {
+          "ids": [
+            "CS1",
+            "CS2",
+            "CT1"
+          ],
+          "valid": true
+        },
+        "second": {
+          "ids": [
+            "CS1",
+            "CS2",
+            "CT1"
+          ],
+          "valid": true
+        },
+        "seed": {
+          "ids": [
+            "CS1"
+          ],
+          "valid": true
+        }
+      },
+      "counter_facets": [
+        1
+      ],
+      "facets": [
+        [
+          "CS1"
+        ],
+        [
+          "CS2"
+        ]
+      ],
+      "family": "room booking",
+      "kind": "retraction"
+    },
+    "packet-a03731452": {
+      "arms": {
+        "all": {
+          "ids": [
+            "AT1",
+            "AS1",
+            "BT1",
+            "BS1",
+            "CT1",
+            "CS1"
+          ],
+          "valid": true
+        },
+        "direct": {
+          "ids": [
+            "AS1",
+            "AT1"
+          ],
+          "valid": true
+        },
+        "second": {
+          "ids": [
+            "AS1"
+          ],
+          "valid": true
+        },
+        "seed": {
+          "ids": [
+            "AS1"
+          ],
+          "valid": true
+        }
+      },
+      "counter_facets": [],
+      "facets": [
+        [
+          "AS1"
+        ]
+      ],
+      "family": "transfer fee",
+      "kind": "restriction"
+    },
+    "packet-bfc021f39": {
+      "arms": {
+        "all": {
+          "ids": [
+            "AT1",
+            "AS1",
+            "AS2",
+            "BT1",
+            "BS1",
+            "CT1",
+            "CS1"
+          ],
+          "valid": true
+        },
+        "direct": {
+          "ids": [
+            "AS1",
+            "AS2",
+            "AT1"
+          ],
+          "valid": true
+        },
+        "second": {
+          "ids": [
+            "AS1",
+            "AS2"
+          ],
+          "valid": true
+        },
+        "seed": {
+          "ids": [
+            "AS1"
+          ],
+          "valid": true
+        }
+      },
+      "counter_facets": [
+        1
+      ],
+      "facets": [
+        [
+          "AS1"
+        ],
+        [
+          "AS2"
+        ]
+      ],
+      "family": "refill",
+      "kind": "restriction"
+    },
+    "packet-c1c5e3d86": {
+      "arms": {
+        "all": {
+          "ids": [
+            "AT1",
+            "AS1",
+            "BT1",
+            "BS1",
+            "CT1",
+            "CS1"
+          ],
+          "valid": true
+        },
+        "direct": {
+          "ids": [],
+          "valid": true
+        },
+        "second": {
+          "ids": [
+            "BS1"
+          ],
+          "valid": true
+        },
+        "seed": {
+          "ids": [
+            "BS1"
+          ],
+          "valid": true
+        }
+      },
+      "counter_facets": [],
+      "facets": [],
+      "family": "unrelated repairs",
+      "kind": "empty"
+    },
+    "packet-db0eaa956": {
+      "arms": {
+        "all": {
+          "ids": [
+            "AT1",
+            "AS1",
+            "BT1",
+            "BS1",
+            "CT1",
+            "CS1",
+            "CS2"
+          ],
+          "valid": true
+        },
+        "direct": {
+          "ids": [
+            "CS1",
+            "CS2",
+            "CT1"
+          ],
+          "valid": true
+        },
+        "second": {
+          "ids": [
+            "CS1",
+            "CS2"
+          ],
+          "valid": true
+        },
+        "seed": {
+          "ids": [
+            "CS1"
+          ],
+          "valid": true
+        }
+      },
+      "counter_facets": [],
+      "facets": [
+        [
+          "CS1"
+        ]
+      ],
+      "family": "refill",
+      "kind": "restriction"
+    },
+    "packet-e15316654": {
+      "arms": {
+        "all": {
+          "ids": [
+            "AT1",
+            "AS1",
+            "BT1",
+            "BS1",
+            "CT1",
+            "CS1"
+          ],
+          "valid": true
+        },
+        "direct": {
+          "ids": [
+            "BS1",
+            "BT1",
+            "CS1",
+            "CT1"
+          ],
+          "valid": true
+        },
+        "second": {
+          "ids": [
+            "BS1",
+            "BT1",
+            "CT1"
+          ],
+          "valid": true
+        },
+        "seed": {
+          "ids": [
+            "BS1"
+          ],
+          "valid": true
+        }
+      },
+      "counter_facets": [],
+      "facets": [
+        [
+          "BS1"
+        ]
+      ],
+      "family": "coupon redemption",
+      "kind": "conflict"
+    },
+    "packet-eab4b4946": {
+      "arms": {
+        "all": {
+          "ids": [
+            "AT1",
+            "AS1",
+            "BT1",
+            "BS1",
+            "CT1",
+            "CS1"
+          ],
+          "valid": true
+        },
+        "direct": {
+          "ids": [
+            "AS1",
+            "AT1",
+            "CS1",
+            "CT1"
+          ],
+          "valid": true
+        },
+        "second": {
+          "ids": [
+            "AS1",
+            "AT1",
+            "CS1",
+            "CT1"
+          ],
+          "valid": true
+        },
+        "seed": {
+          "ids": [
+            "CS1"
+          ],
+          "valid": true
+        }
+      },
+      "counter_facets": [
+        1
+      ],
+      "facets": [
+        [
+          "AS1"
+        ],
+        [
+          "CS1"
+        ]
+      ],
+      "family": "rail credit",
+      "kind": "retraction"
+    },
+    "packet-f32aaa3a5": {
+      "arms": {
+        "all": {
+          "ids": [
+            "AT1",
+            "AS1",
+            "BT1",
+            "BS1",
+            "BS2",
+            "CT1",
+            "CS1",
+            "CS2"
+          ],
+          "valid": true
+        },
+        "direct": {
+          "ids": [
+            "CS1",
+            "CT1"
+          ],
+          "valid": true
+        },
+        "second": {
+          "ids": [
+            "CS1",
+            "CT1"
+          ],
+          "valid": true
+        },
+        "seed": {
+          "ids": [
+            "CS1"
+          ],
+          "valid": true
+        }
+      },
+      "counter_facets": [
+        1,
+        2
+      ],
+      "facets": [
+        [
+          "CS1"
+        ],
+        [
+          "BS2"
+        ],
+        [
+          "AS1"
+        ]
+      ],
+      "family": "district passes",
+      "kind": "restriction"
+    },
+    "packet-fdd6a5a56": {
+      "arms": {
+        "all": {
+          "ids": [
+            "AT1",
+            "AS1",
+            "BT1",
+            "BS1",
+            "BS2",
+            "CT1",
+            "CS1"
+          ],
+          "valid": true
+        },
+        "direct": {
+          "ids": [
+            "AS1"
+          ],
+          "valid": true
+        },
+        "second": {
+          "ids": [
+            "AS1"
+          ],
+          "valid": true
+        },
+        "seed": {
+          "ids": [
+            "AS1"
+          ],
+          "valid": true
+        }
+      },
+      "counter_facets": [],
+      "facets": [
+        [
+          "AS1"
+        ]
+      ],
+      "family": "refurbishment",
+      "kind": "conflict"
+    }
+  },
+  "decision": "NO_PROMOTION",
+  "experimental": true,
+  "fixture": "../../qualify/counterevidence_cases.json",
+  "invalid_count": 0,
+  "lexicographic_halves": {
+    "first": {
+      "all": {
+        "counter_hits": 7,
+        "counter_total": 7,
+        "exact": 0,
+        "fp": 48
+      },
+      "direct": {
+        "counter_hits": 4,
+        "counter_total": 7,
+        "exact": 1,
+        "fp": 12
+      },
+      "second": {
+        "counter_hits": 5,
+        "counter_total": 7,
+        "exact": 1,
+        "fp": 14
+      },
+      "seed": {
+        "counter_hits": 0,
+        "counter_total": 7,
+        "exact": 3,
+        "fp": 2
+      }
+    },
+    "last": {
+      "all": {
+        "counter_hits": 5,
+        "counter_total": 5,
+        "exact": 0,
+        "fp": 54
+      },
+      "direct": {
+        "counter_hits": 3,
+        "counter_total": 5,
+        "exact": 2,
+        "fp": 12
+      },
+      "second": {
+        "counter_hits": 3,
+        "counter_total": 5,
+        "exact": 3,
+        "fp": 9
+      },
+      "seed": {
+        "counter_hits": 1,
+        "counter_total": 5,
+        "exact": 5,
+        "fp": 1
+      }
+    }
+  },
+  "median_arm_seconds": {
+    "all": 0.0,
+    "direct": 4.655,
+    "second": 4.812,
+    "seed": 0.0
+  },
+  "model": "lfm3-1.7b-atomic-ad-q4km",
+  "output_sha256": "1f777eb3c001286059b4e7bdfa60fa3e8c90698e1e166b2a1f6ff34b640e5ba7",
+  "paired": {
+    "exact_delta_interval": [
+      -0.188,
+      0.238
+    ],
+    "families": 11,
+    "recall_delta_interval": [
+      0.0,
+      0.231
+    ]
+  },
+  "production_change": false,
+  "protocol": "439fa0e158e40f5c11d1fa1ffa2cca48cde4ed6c966d069b1dcb77d6d88e39ed",
+  "results": {
+    "all": {
+      "all": {
+        "all_facts": 20,
+        "counter_hits": 12,
+        "counter_missed": 0,
+        "counter_total": 12,
+        "empty_miss": 0,
+        "exact": 0,
+        "fn": 0,
+        "fp": 102,
+        "input_tokens": 0,
+        "n": 20,
+        "needed": 30,
+        "noisy_controls": 11,
+        "output_tokens": 0,
+        "precision": 0.2273,
+        "recall": 1.0,
+        "tp": 30,
+        "unnamed_hits": 9,
+        "unnamed_total": 9,
+        "valid": 20
+      },
+      "direct": {
+        "all_facts": 16,
+        "counter_hits": 7,
+        "counter_missed": 5,
+        "counter_total": 12,
+        "empty_miss": 0,
+        "exact": 3,
+        "fn": 5,
+        "fp": 24,
+        "input_tokens": 5302,
+        "n": 20,
+        "needed": 30,
+        "noisy_controls": 8,
+        "output_tokens": 882,
+        "precision": 0.5102,
+        "recall": 0.8333,
+        "tp": 25,
+        "unnamed_hits": 4,
+        "unnamed_total": 9,
+        "valid": 20
+      },
+      "second": {
+        "all_facts": 17,
+        "counter_hits": 8,
+        "counter_missed": 4,
+        "counter_total": 12,
+        "empty_miss": 0,
+        "exact": 4,
+        "fn": 4,
+        "fp": 23,
+        "input_tokens": 5645,
+        "n": 20,
+        "needed": 30,
+        "noisy_controls": 8,
+        "output_tokens": 936,
+        "precision": 0.5306,
+        "recall": 0.8667,
+        "tp": 26,
+        "unnamed_hits": 5,
+        "unnamed_total": 9,
+        "valid": 20
+      },
+      "seed": {
+        "all_facts": 11,
+        "counter_hits": 1,
+        "counter_missed": 11,
+        "counter_total": 12,
+        "empty_miss": 0,
+        "exact": 8,
+        "fn": 12,
+        "fp": 3,
+        "input_tokens": 0,
+        "n": 20,
+        "needed": 30,
+        "noisy_controls": 3,
+        "output_tokens": 0,
+        "precision": 0.8571,
+        "recall": 0.6,
+        "tp": 18,
+        "unnamed_hits": 0,
+        "unnamed_total": 9,
+        "valid": 20
+      }
+    },
+    "conflict": {
+      "all": {
+        "all_facts": 6,
+        "counter_hits": 4,
+        "counter_missed": 0,
+        "counter_total": 4,
+        "empty_miss": 0,
+        "exact": 0,
+        "fn": 0,
+        "fp": 28,
+        "input_tokens": 0,
+        "n": 6,
+        "needed": 10,
+        "noisy_controls": 3,
+        "output_tokens": 0,
+        "precision": 0.2632,
+        "recall": 1.0,
+        "tp": 10,
+        "unnamed_hits": 3,
+        "unnamed_total": 3,
+        "valid": 6
+      },
+      "direct": {
+        "all_facts": 5,
+        "counter_hits": 3,
+        "counter_missed": 1,
+        "counter_total": 4,
+        "empty_miss": 0,
+        "exact": 1,
+        "fn": 1,
+        "fp": 8,
+        "input_tokens": 1580,
+        "n": 6,
+        "needed": 10,
+        "noisy_controls": 2,
+        "output_tokens": 250,
+        "precision": 0.5294,
+        "recall": 0.9,
+        "tp": 9,
+        "unnamed_hits": 2,
+        "unnamed_total": 3,
+        "valid": 6
+      },
+      "second": {
+        "all_facts": 5,
+        "counter_hits": 3,
+        "counter_missed": 1,
+        "counter_total": 4,
+        "empty_miss": 0,
+        "exact": 2,
+        "fn": 1,
+        "fp": 6,
+        "input_tokens": 1682,
+        "n": 6,
+        "needed": 10,
+        "noisy_controls": 1,
+        "output_tokens": 277,
+        "precision": 0.6,
+        "recall": 0.9,
+        "tp": 9,
+        "unnamed_hits": 2,
+        "unnamed_total": 3,
+        "valid": 6
+      },
+      "seed": {
+        "all_facts": 3,
+        "counter_hits": 0,
+        "counter_missed": 4,
+        "counter_total": 4,
+        "empty_miss": 0,
+        "exact": 3,
+        "fn": 4,
+        "fp": 0,
+        "input_tokens": 0,
+        "n": 6,
+        "needed": 10,
+        "noisy_controls": 0,
+        "output_tokens": 0,
+        "precision": 1.0,
+        "recall": 0.6,
+        "tp": 6,
+        "unnamed_hits": 0,
+        "unnamed_total": 3,
+        "valid": 6
+      }
+    },
+    "empty": {
+      "all": {
+        "all_facts": 2,
+        "counter_hits": 0,
+        "counter_missed": 0,
+        "counter_total": 0,
+        "empty_miss": 0,
+        "exact": 0,
+        "fn": 0,
+        "fp": 12,
+        "input_tokens": 0,
+        "n": 2,
+        "needed": 0,
+        "noisy_controls": 2,
+        "output_tokens": 0,
+        "precision": 0.0,
+        "recall": null,
+        "tp": 0,
+        "unnamed_hits": 0,
+        "unnamed_total": 0,
+        "valid": 2
+      },
+      "direct": {
+        "all_facts": 2,
+        "counter_hits": 0,
+        "counter_missed": 0,
+        "counter_total": 0,
+        "empty_miss": 0,
+        "exact": 2,
+        "fn": 0,
+        "fp": 0,
+        "input_tokens": 477,
+        "n": 2,
+        "needed": 0,
+        "noisy_controls": 0,
+        "output_tokens": 75,
+        "precision": null,
+        "recall": null,
+        "tp": 0,
+        "unnamed_hits": 0,
+        "unnamed_total": 0,
+        "valid": 2
+      },
+      "second": {
+        "all_facts": 2,
+        "counter_hits": 0,
+        "counter_missed": 0,
+        "counter_total": 0,
+        "empty_miss": 0,
+        "exact": 0,
+        "fn": 0,
+        "fp": 2,
+        "input_tokens": 511,
+        "n": 2,
+        "needed": 0,
+        "noisy_controls": 2,
+        "output_tokens": 74,
+        "precision": 0.0,
+        "recall": null,
+        "tp": 0,
+        "unnamed_hits": 0,
+        "unnamed_total": 0,
+        "valid": 2
+      },
+      "seed": {
+        "all_facts": 2,
+        "counter_hits": 0,
+        "counter_missed": 0,
+        "counter_total": 0,
+        "empty_miss": 0,
+        "exact": 0,
+        "fn": 0,
+        "fp": 2,
+        "input_tokens": 0,
+        "n": 2,
+        "needed": 0,
+        "noisy_controls": 2,
+        "output_tokens": 0,
+        "precision": 0.0,
+        "recall": null,
+        "tp": 0,
+        "unnamed_hits": 0,
+        "unnamed_total": 0,
+        "valid": 2
+      }
+    },
+    "restriction": {
+      "all": {
+        "all_facts": 6,
+        "counter_hits": 4,
+        "counter_missed": 0,
+        "counter_total": 4,
+        "empty_miss": 0,
+        "exact": 0,
+        "fn": 0,
+        "fp": 32,
+        "input_tokens": 0,
+        "n": 6,
+        "needed": 10,
+        "noisy_controls": 3,
+        "output_tokens": 0,
+        "precision": 0.2381,
+        "recall": 1.0,
+        "tp": 10,
+        "unnamed_hits": 3,
+        "unnamed_total": 3,
+        "valid": 6
+      },
+      "direct": {
+        "all_facts": 4,
+        "counter_hits": 1,
+        "counter_missed": 3,
+        "counter_total": 4,
+        "empty_miss": 0,
+        "exact": 0,
+        "fn": 3,
+        "fp": 7,
+        "input_tokens": 1621,
+        "n": 6,
+        "needed": 10,
+        "noisy_controls": 3,
+        "output_tokens": 276,
+        "precision": 0.5,
+        "recall": 0.7,
+        "tp": 7,
+        "unnamed_hits": 0,
+        "unnamed_total": 3,
+        "valid": 6
+      },
+      "second": {
+        "all_facts": 4,
+        "counter_hits": 1,
+        "counter_missed": 3,
+        "counter_total": 4,
+        "empty_miss": 0,
+        "exact": 2,
+        "fn": 3,
+        "fp": 4,
+        "input_tokens": 1723,
+        "n": 6,
+        "needed": 10,
+        "noisy_controls": 2,
+        "output_tokens": 303,
+        "precision": 0.6364,
+        "recall": 0.7,
+        "tp": 7,
+        "unnamed_hits": 0,
+        "unnamed_total": 3,
+        "valid": 6
+      },
+      "seed": {
+        "all_facts": 3,
+        "counter_hits": 0,
+        "counter_missed": 4,
+        "counter_total": 4,
+        "empty_miss": 0,
+        "exact": 3,
+        "fn": 4,
+        "fp": 0,
+        "input_tokens": 0,
+        "n": 6,
+        "needed": 10,
+        "noisy_controls": 0,
+        "output_tokens": 0,
+        "precision": 1.0,
+        "recall": 0.6,
+        "tp": 6,
+        "unnamed_hits": 0,
+        "unnamed_total": 3,
+        "valid": 6
+      }
+    },
+    "retraction": {
+      "all": {
+        "all_facts": 6,
+        "counter_hits": 4,
+        "counter_missed": 0,
+        "counter_total": 4,
+        "empty_miss": 0,
+        "exact": 0,
+        "fn": 0,
+        "fp": 30,
+        "input_tokens": 0,
+        "n": 6,
+        "needed": 10,
+        "noisy_controls": 3,
+        "output_tokens": 0,
+        "precision": 0.25,
+        "recall": 1.0,
+        "tp": 10,
+        "unnamed_hits": 3,
+        "unnamed_total": 3,
+        "valid": 6
+      },
+      "direct": {
+        "all_facts": 5,
+        "counter_hits": 3,
+        "counter_missed": 1,
+        "counter_total": 4,
+        "empty_miss": 0,
+        "exact": 0,
+        "fn": 1,
+        "fp": 9,
+        "input_tokens": 1624,
+        "n": 6,
+        "needed": 10,
+        "noisy_controls": 3,
+        "output_tokens": 281,
+        "precision": 0.5,
+        "recall": 0.9,
+        "tp": 9,
+        "unnamed_hits": 2,
+        "unnamed_total": 3,
+        "valid": 6
+      },
+      "second": {
+        "all_facts": 6,
+        "counter_hits": 4,
+        "counter_missed": 0,
+        "counter_total": 4,
+        "empty_miss": 0,
+        "exact": 0,
+        "fn": 0,
+        "fp": 11,
+        "input_tokens": 1729,
+        "n": 6,
+        "needed": 10,
+        "noisy_controls": 3,
+        "output_tokens": 282,
+        "precision": 0.4762,
+        "recall": 1.0,
+        "tp": 10,
+        "unnamed_hits": 3,
+        "unnamed_total": 3,
+        "valid": 6
+      },
+      "seed": {
+        "all_facts": 3,
+        "counter_hits": 1,
+        "counter_missed": 3,
+        "counter_total": 4,
+        "empty_miss": 0,
+        "exact": 2,
+        "fn": 4,
+        "fp": 1,
+        "input_tokens": 0,
+        "n": 6,
+        "needed": 10,
+        "noisy_controls": 1,
+        "output_tokens": 0,
+        "precision": 0.8571,
+        "recall": 0.6,
+        "tp": 6,
+        "unnamed_hits": 0,
+        "unnamed_total": 3,
+        "valid": 6
+      }
+    }
+  },
+  "runtime": {
+    "backend": "vulkan",
+    "model_sha256": "b22df65673b54ed326f18f74826d76f3b65dadc237ffd6306cd52be04544827d"
+  },
+  "scope": "Fresh authored paired screen, not independent field evidence, answer quality or forecasting skill."
+}
