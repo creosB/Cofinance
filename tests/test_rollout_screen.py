@@ -30,8 +30,12 @@ class Rollout(unittest.TestCase):
   for branch,arm,field,val,result in [('all','code','joint',12,'NO_PROMOTION'),('all','code','miss',2,'NO_PROMOTION'),('all','direct','false_live',1,'NO_PROMOTION'),('archive','code','joint',4,'NO_PROMOTION'),('all','direct','valid',22,'INCONCLUSIVE')]:
    tmp=deepcopy(base);tmp[branch][arm][field]=val;self.assertEqual(S.decision(tmp),result)
  def test_deterministic_exhibit_shuffle_and_no_rewrite(self):
-  cs=P.build();self.assertEqual(len(cs),24);self.assertEqual(P.enc(cs),P.enc(P.build()));self.assertTrue(all(len({d['id'] for d in c['documents']})==3 for c in cs));
+  import json
+  from unittest.mock import patch
   with tempfile.TemporaryDirectory() as tmp:
+   cache=Path(tmp)/'notices.jsonl'; names=sorted({prefix for row in P.ARCH for prefix in row[4]}); cache.write_text('\n'.join(json.dumps({'source':'fixture newsroom','title':name+' fixture','text':'Local synthetic notice.','url':'urn:fixture:'+str(i)}) for i,name in enumerate(names)),encoding='utf8')
+   with patch.object(P,'CACHE',cache):
+    cs=P.build();self.assertEqual(len(cs),24);self.assertEqual(P.enc(cs),P.enc(P.build()));self.assertTrue(all(len({d['id'] for d in c['documents']})==3 for c in cs))
    p=Path(tmp)/'test.json';P.write(p,{'a':1});
    with self.assertRaises(FileExistsError):P.write(p,{'a':2})
  def test_paired_ties_count_and_clusters_do_not_split_twins(self):
