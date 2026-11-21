@@ -30,5 +30,10 @@ class Selector(unittest.TestCase):
   q=tq();s=C.index(q['documents']);ref=S.rule(q,s);h=S.lexical(q,s);self.assertEqual(len(h),1)
   for p in itertools.permutations(q['documents']):
    t=dict(q,documents=list(p));ss=C.index(t['documents']);self.assertEqual(S.rule(t,ss),ref);self.assertEqual(S.lexical(t,ss),h)
+ def test_total_boolean_interface(self):
+  from qualify import source_selection_mask as M
+  ids=['AS1','BS2'];self.assertEqual(M.decode('{"BS2":false,"AS1":true}',ids),['AS1']);self.assertEqual(M.schema(ids)['required'],ids)
+  for x in ('{"AS1":true}', '{"AS1":true,"BS2":false,"CS1":true}', '{"AS1":true,"AS1":false,"BS2":true}', '{"AS1":0,"BS2":false}', '{"AS1":"false","BS2":false}', '["AS1","BS2"]'):
+   with self.assertRaises(ValueError):M.decode(x,ids)
  def test_bootstrap_not_pseudoreplicating_arms(self):
   rows=[dict(case=str(i),split='issuer',family=str(i//2),arm=a,exact=(a=='rule' and i==0) or i==2) for i,a in itertools.product(range(4),('rule','direct'))];r=S.paired(rows,'rule');self.assertEqual((r['wins'],r['ties'],r['losses'],r['clusters']),(1,3,0,2))
