@@ -1,0 +1,76 @@
+{
+  "arms": {
+    "current": {
+      "citations": 3,
+      "ends": 0,
+      "error": 0,
+      "fallback": 9,
+      "grounded": 3,
+      "input": 12530,
+      "joint": 3,
+      "median_s": 22.4535,
+      "no_decision": 9,
+      "output": 2659,
+      "stance": 3,
+      "total_tokens": 15189,
+      "unnecessary": 5,
+      "wrong_definite": 0
+    },
+    "direct": {
+      "citations": 10,
+      "ends": 0,
+      "error": 0,
+      "fallback": 0,
+      "grounded": 7,
+      "input": 4251,
+      "joint": 6,
+      "median_s": 16.164,
+      "no_decision": 0,
+      "output": 2366,
+      "stance": 9,
+      "total_tokens": 6617,
+      "unnecessary": 0,
+      "wrong_definite": 3
+    }
+  },
+  "control_pass": true,
+  "controls": [
+    6,
+    6,
+    6
+  ],
+  "grade_sha": "70889ccd7412fd770d87f9043932a4d10b07428bcdb1c7539e15c1aaeb3c4ee6",
+  "n": 12,
+  "paired": {
+    "cluster_descriptive_95": [
+      -0.6666666666666666,
+      0.16666666666666666
+    ],
+    "losses": 4,
+    "per_case": {
+      "calendar": 0,
+      "capacity": 0,
+      "coverage": -1,
+      "eligibility": 0,
+      "homeview": 0,
+      "koreastack": 0,
+      "localization": -1,
+      "milestones": -1,
+      "periods": 1,
+      "sellthrough": -1,
+      "stage": 0,
+      "surprise": 0
+    },
+    "per_family": {
+      "deployment": 0,
+      "reporting": 1,
+      "rollout": -2,
+      "scope": -2
+    },
+    "ties": 7,
+    "wins": 1
+  },
+  "protocol_sha": "e59e299a5f8f88f8fe2a2390ba354819ebfa0d4421d04bc83d76f4a2a694e892",
+  "result": "NO-GO",
+  "valid": true
+}

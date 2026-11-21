@@ -3,7 +3,7 @@
 > [!WARNING]
 > Experimental findings, not trading signals or financial advice. There is no single Cofinance accuracy percentage: source matching, answer quality, forecast ranking and runtime speed measure different things.
 
-**Primary question: does structured research beat direct Q&A? Not established.** The [architecture comparison](METHOD.md#the-architecture-comparison) specifies the evidence, compute and grading controls. The studies below diagnose parts of the system; none substitutes for that comparison.
+**Primary question: does structured research beat direct Q&A? Not established.** The [architecture comparison](METHOD.md#the-architecture-comparison) specifies the evidence, compute and grading controls. A [fixed document-route screen](benchmarks/DOCUMENT_DECISION_GATE.md) returned **NO-GO**: 3/12 jointly correct workflow answers vs 6/12 direct, on identical archived evidence. This applies to that route, not every task.
 
 ## Research quality and runtime
 
