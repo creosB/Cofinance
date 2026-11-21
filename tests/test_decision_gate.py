@@ -19,7 +19,9 @@ class DecisionGate(unittest.TestCase):
   for bad in [arm(6),arm(7,w=2),arm(7,u=3),arm(7,t=151),arm(7,s=7.51)]:self.assertEqual(G.decision(bad,base,f,True),'NO-GO')
   self.assertEqual(G.decision(arm(),base,{'x':0,'y':0},True),'NO-GO');self.assertEqual(G.decision(gain,base,{'only':2},True),'NO-GO');self.assertEqual(G.decision(gain,base,f,False),'INCONCLUSIVE')
  def test_blind_boundary(self):
-  with self.assertRaises(ValueError):G.blindview({'case':'x','question':'q','documents':[],'verdict':'S'})
+  with patch.object(G.C,'docs_view',return_value='valid fixture') as renderer:
+   with self.assertRaises(ValueError):G.blindview({'case':'x','question':'q','documents':[],'verdict':'S'})
+   renderer.assert_not_called()
  def test_grades_cannot_smuggle_confidence_or_duplicates(self):
   for row in (['yes',1,[]],['S',True,[]],['S',0,['B','A']],['S',0,['A','A']],['C',1,['Z']]): self.assertFalse(G.valid(row))
  def test_file_is_sealed(self):
