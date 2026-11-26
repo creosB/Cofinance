@@ -1,0 +1,256 @@
+{
+  "format": "cofinance-memory-benchmark-cases/1",
+  "provenance": {
+    "authored_by": "30-Turn Memory Author subagent (Gemini 4 Neon)",
+    "reviewed_by": "Memory Suite Reviewer subagent (Gemini 4 Neon, audited zero-overlap paraphrases and negative purity)",
+    "human_live_usage": false
+  },
+  "sessions": [
+    {
+      "session_id": "s1",
+      "turns": [
+        {
+          "run_id": "s1_r01",
+          "question": "How should I interpret NVIDIA's gross profit margin trend?",
+          "answer": "Illustrative figures only: a move from 72% to 75% would indicate stronger mix and manufacturing efficiency; it is not a claim about live reported results.",
+          "tickers": ["NVDA"]
+        },
+        {
+          "run_id": "s1_r02",
+          "question": "What does NVIDIA's data-center capex outlook imply for free cash flow?",
+          "answer": "Illustrative scenario: raising annual infrastructure investment from $8 billion to $12 billion would reduce near-term free cash flow, although capacity could support later growth; this is not a live forecast.",
+          "tickers": ["NVDA"]
+        },
+        {
+          "run_id": "s1_r03",
+          "question": "Which export-control exposures matter for NVIDIA's accelerator business?",
+          "answer": "The key risks are licensing limits, China-specific restrictions, customer substitution, and geographic concentration; assess each separately from demand assumptions.",
+          "tickers": ["NVDA"]
+        },
+        {
+          "run_id": "s1_r04",
+          "question": "How could advanced-packaging supply constrain NVIDIA shipments?",
+          "answer": "Limited CoWoS capacity and substrate lead times can cap accelerator output even when demand is strong; supplier diversification and prepayments may reduce the bottleneck.",
+          "tickers": ["NVDA"]
+        },
+        {
+          "run_id": "s1_r05",
+          "question": "What valuation risks arise if NVIDIA's AI growth decelerates?",
+          "answer": "A slower growth path could compress the valuation multiple as well as earnings expectations, so scenario analysis should separate revenue growth, margins, and the discount rate.",
+          "tickers": ["NVDA"]
+        }
+      ]
+    },
+    {
+      "session_id": "s2",
+      "turns": [
+        {
+          "run_id": "s2_r01",
+          "question": "How should I analyze Apple's Services gross margin?",
+          "answer": "Services can carry higher incremental margins than hardware, but content licensing, payment fees, and regulation can narrow the spread.",
+          "tickers": ["AAPL"]
+        },
+        {
+          "run_id": "s2_r02",
+          "question": "Does Apple's net cash position provide a meaningful debt cushion?",
+          "answer": "Illustrative balance-sheet test: cash and liquid investments above total borrowings provide a cushion, but lease liabilities and buybacks still matter.",
+          "tickers": ["AAPL"]
+        },
+        {
+          "run_id": "s2_r03",
+          "question": "How should investors evaluate the next iPhone product launch?",
+          "answer": "Treat an iPhone launch as a scenario: premium mix, replacement demand, and channel inventory matter more than announced features alone.",
+          "tickers": ["AAPL"]
+        },
+        {
+          "run_id": "s2_r04",
+          "question": "What China supply-chain dependencies matter for Apple hardware?",
+          "answer": "Assembly concentration and component sourcing in China create disruption and diversification risks; model dual-sourcing and logistics lead times.",
+          "tickers": ["AAPL"]
+        },
+        {
+          "run_id": "s2_r05",
+          "question": "What App Store antitrust or regulatory remedies could affect Apple?",
+          "answer": "Possible remedies include changes to commissions, payment steering, or default settings; estimate effects on both Services revenue and developer behavior.",
+          "tickers": ["AAPL"]
+        }
+      ]
+    },
+    {
+      "session_id": "s3",
+      "turns": [
+        {
+          "run_id": "s3_r01",
+          "question": "How is Microsoft's Azure data-center capex affecting free cash flow?",
+          "answer": "Illustrative scenario: faster Azure data-center investment can depress near-term free cash flow before new capacity generates revenue; capex timing matters.",
+          "tickers": ["MSFT"]
+        },
+        {
+          "run_id": "s3_r02",
+          "question": "What drives Microsoft's Intelligent Cloud operating margin?",
+          "answer": "Mix, Azure scale, server depreciation, energy costs, and AI-infrastructure utilization are the main operating-margin variables.",
+          "tickers": ["MSFT"]
+        },
+        {
+          "run_id": "s3_r03",
+          "question": "How should investors assess Microsoft Copilot adoption?",
+          "answer": "Track paid seats, usage frequency, retention, attach rates, and incremental revenue rather than treating trial activity as durable adoption.",
+          "tickers": ["MSFT"]
+        },
+        {
+          "run_id": "s3_r04",
+          "question": "What balance-sheet cushion does Microsoft have for acquisitions?",
+          "answer": "Illustrative balance-sheet case: cash and liquid investments exceed total borrowings, giving Microsoft room for acquisitions while leaving room for buybacks and investment.",
+          "tickers": ["MSFT"]
+        },
+        {
+          "run_id": "s3_r05",
+          "question": "What regulatory risks surround Microsoft's cloud bundling?",
+          "answer": "Competition authorities may examine bundling, licensing terms, interoperability, and self-preferencing; remedies could change customer economics.",
+          "tickers": ["MSFT"]
+        }
+      ]
+    },
+    {
+      "session_id": "s4",
+      "turns": [
+        {
+          "run_id": "s4_r01",
+          "question": "How might Tesla's automotive gross margin respond to price cuts?",
+          "answer": "Price reductions can lower per-vehicle gross profit before volume or lower input costs offset the pressure; use reported mix and cost data when available.",
+          "tickers": ["TSLA"]
+        },
+        {
+          "run_id": "s4_r02",
+          "question": "What battery-mineral and supplier risks matter for Tesla's production?",
+          "answer": "Lithium, nickel, cathode contracts, and single-source suppliers can affect pack costs and output; stress-test substitution and lead times.",
+          "tickers": ["TSLA"]
+        },
+        {
+          "run_id": "s4_r03",
+          "question": "What regulatory approvals are needed for Tesla's driver-assistance features?",
+          "answer": "Approval paths vary by jurisdiction; separate driver-assistance validation, liability rules, and permission for specific features.",
+          "tickers": ["TSLA"]
+        },
+        {
+          "run_id": "s4_r04",
+          "question": "Does Tesla's cash balance exceed its debt by enough to support resilience?",
+          "answer": "Illustrative balance-sheet test: cash above debt supports resilience, but working-capital needs and maturities determine usable liquidity.",
+          "tickers": ["TSLA"]
+        },
+        {
+          "run_id": "s4_r05",
+          "question": "Can Tesla's energy-storage business diversify earnings?",
+          "answer": "Grid-scale battery deployments could diversify revenue, but compare backlog quality, project margins, and service obligations rather than counting announcements as sales.",
+          "tickers": ["TSLA"]
+        }
+      ]
+    },
+    {
+      "session_id": "s5",
+      "turns": [
+        {
+          "run_id": "s5_r01",
+          "question": "How does a Bitcoin halving affect miner economics?",
+          "answer": "A halving-style reward cut reduces coin revenue per block; operator survival then depends on power costs, fleet efficiency, transaction fees, and token exposure. Illustrative figures are not a live forecast.",
+          "tickers": ["BTC"]
+        },
+        {
+          "run_id": "s5_r02",
+          "question": "How can spot Bitcoin ETFs affect market liquidity?",
+          "answer": "A listed fund gives brokerage accounts a regulated wrapper; share creation or redemption can transmit demand, but flows are not automatic price forecasts.",
+          "tickers": ["BTC"]
+        },
+        {
+          "run_id": "s5_r03",
+          "question": "What custody and security controls matter for Bitcoin holdings?",
+          "answer": "Segregated cold storage, multisignature approval, withdrawal limits, key recovery, and incident response reduce but do not eliminate custody loss risk.",
+          "tickers": ["BTC"]
+        },
+        {
+          "run_id": "s5_r04",
+          "question": "How do Bitcoin transaction fees respond when blockspace is scarce?",
+          "answer": "When demand for block inclusion rises, users may bid higher fees; assess fee pressure alongside throughput, batching, and mempool conditions.",
+          "tickers": ["BTC"]
+        },
+        {
+          "run_id": "s5_r05",
+          "question": "How does macro liquidity affect Bitcoin's risk profile?",
+          "answer": "Changes in real yields, dollar liquidity, and investor risk appetite can alter correlation and volatility; macro exposure should not be treated as a guaranteed price signal.",
+          "tickers": ["BTC"]
+        }
+      ]
+    },
+    {
+      "session_id": "s6",
+      "turns": [
+        {
+          "run_id": "s6_r01",
+          "question": "How do Ethereum staking validators earn returns, and what are the risks?",
+          "answer": "Validator returns combine protocol issuance, transaction-related income, and penalties; uptime, lock-up terms, and concentration shape the risk. Illustrative rates are not live estimates.",
+          "tickers": ["ETH"]
+        },
+        {
+          "run_id": "s6_r02",
+          "question": "How do Ethereum gas fees react to congestion?",
+          "answer": "Congestion can raise the bid needed for timely inclusion; compare base fee, priority fee, and demand rather than treating one fee snapshot as permanent.",
+          "tickers": ["ETH"]
+        },
+        {
+          "run_id": "s6_r03",
+          "question": "How do Ethereum layer-2 rollups affect value capture?",
+          "answer": "Rollups move execution off the base chain; sequencing revenue, settlement demand, and token ownership help assess where value may accrue.",
+          "tickers": ["ETH"]
+        },
+        {
+          "run_id": "s6_r04",
+          "question": "How could protocol upgrades involving blob transactions affect Ethereum economics?",
+          "answer": "Blob-style data availability can lower rollup costs while changing fee composition; evaluate adoption and validator economics together.",
+          "tickers": ["ETH"]
+        },
+        {
+          "run_id": "s6_r05",
+          "question": "What regulatory classification risks apply to Ethereum and staking services?",
+          "answer": "Regulatory analysis should separate asset characteristics, staking services, custody, and investment-product structure; classification is jurisdiction-specific.",
+          "tickers": ["ETH"]
+        }
+      ]
+    }
+  ],
+  "followups": [
+    {"id": "f01", "session_id": "s1", "category": "lexical", "query": "How did NVIDIA's gross profit margin change, and what caused that margin move?", "expected_run_ids": ["s1_r01"]},
+    {"id": "f02", "session_id": "s1", "category": "lexical", "query": "What export-control risks could reduce accelerator sales in China?", "expected_run_ids": ["s1_r03"]},
+    {"id": "f03", "session_id": "s1", "category": "paraphrase", "query": "If the buildout accelerates, what might happen to residual liquidity?", "expected_run_ids": ["s1_r02"]},
+    {"id": "f04", "session_id": "s1", "category": "paraphrase", "query": "Which factory hurdle might leave buyers unserved despite healthy bookings?", "expected_run_ids": ["s1_r04"]},
+    {"id": "f05", "session_id": "s1", "category": "negative", "query": "How are Ethereum validator rewards determined?", "expected_run_ids": []},
+    {"id": "f06", "session_id": "s2", "category": "lexical", "query": "Does Apple's net cash still exceed total debt?", "expected_run_ids": ["s2_r02"]},
+    {"id": "f07", "session_id": "s2", "category": "lexical", "query": "What App Store antitrust remedies might hurt Services economics?", "expected_run_ids": ["s2_r05"]},
+    {"id": "f08", "session_id": "s2", "category": "paraphrase", "query": "What could compress unit profitability in the subscription division?", "expected_run_ids": ["s2_r01"]},
+    {"id": "f09", "session_id": "s2", "category": "paraphrase", "query": "Which new handset event should anchor analysis of buyer upgrade activity?", "expected_run_ids": ["s2_r03"]},
+    {"id": "f10", "session_id": "s2", "category": "paraphrase", "query": "Which regional production exposure could interrupt finished goods availability?", "expected_run_ids": ["s2_r04"]},
+    {"id": "f11", "session_id": "s3", "category": "lexical", "query": "How could Microsoft's Azure data-center capex pressure free cash flow?", "expected_run_ids": ["s3_r01"]},
+    {"id": "f12", "session_id": "s3", "category": "lexical", "query": "What metrics show whether Copilot adoption is durable?", "expected_run_ids": ["s3_r03"]},
+    {"id": "f13", "session_id": "s3", "category": "paraphrase", "query": "Which inputs determine earnings efficiency in the hosted-computing segment?", "expected_run_ids": ["s3_r02"]},
+    {"id": "f14", "session_id": "s3", "category": "paraphrase", "query": "Would its financial reserves permit a major takeover without endangering stability?", "expected_run_ids": ["s3_r04"]},
+    {"id": "f15", "session_id": "s3", "category": "negative", "query": "How can an insured deposit ladder handle renewal uncertainty?", "expected_run_ids": []},
+    {"id": "f16", "session_id": "s4", "category": "lexical", "query": "How did Tesla's automotive gross margin respond to price cuts?", "expected_run_ids": ["s4_r01"]},
+    {"id": "f17", "session_id": "s4", "category": "lexical", "query": "Does Tesla's cash balance exceed its debt?", "expected_run_ids": ["s4_r04"]},
+    {"id": "f18", "session_id": "s4", "category": "paraphrase", "query": "Which ore-related vulnerability poses the greatest factory threat?", "expected_run_ids": ["s4_r02"]},
+    {"id": "f19", "session_id": "s4", "category": "paraphrase", "query": "Which government clearance could delay automated-driving rollout?", "expected_run_ids": ["s4_r03"]},
+    {"id": "f20", "session_id": "s4", "category": "paraphrase", "query": "Could utility installations make the automaker less reliant on vehicle income?", "expected_run_ids": ["s4_r05"]},
+    {"id": "f21", "session_id": "s5", "category": "lexical", "query": "How do Bitcoin transaction fees respond when blockspace is scarce?", "expected_run_ids": ["s5_r04"]},
+    {"id": "f22", "session_id": "s5", "category": "paraphrase", "query": "With protocol payouts compressed, can proof-of-work enterprises keep their businesses afloat?", "expected_run_ids": ["s5_r01"]},
+    {"id": "f23", "session_id": "s5", "category": "paraphrase", "query": "How can a pooled vehicle channel fresh participation into digital asset trading?", "expected_run_ids": ["s5_r02"]},
+    {"id": "f24", "session_id": "s5", "category": "paraphrase", "query": "Which protections lessen the chance that an outside actor steals client assets?", "expected_run_ids": ["s5_r03"]},
+    {"id": "f25", "session_id": "s5", "category": "negative", "query": "Which queue governs validator departures on Ethereum?", "expected_run_ids": []},
+    {"id": "f26", "session_id": "s6", "category": "lexical", "query": "How do Ethereum gas fees react to congestion?", "expected_run_ids": ["s6_r02"]},
+    {"id": "f27", "session_id": "s6", "category": "paraphrase", "query": "What incentive and sanction mechanisms govern participation by network-security operators?", "expected_run_ids": ["s6_r01"]},
+    {"id": "f28", "session_id": "s6", "category": "paraphrase", "query": "Do secondary computation networks weaken or reinforce the main ledger's ability to monetize activity?", "expected_run_ids": ["s6_r03"]},
+    {"id": "f29", "session_id": "s6", "category": "negative", "query": "How does Apple's subscription arm's profitability differ?", "expected_run_ids": []},
+    {"id": "f30", "session_id": "s6", "category": "negative", "query": "What does a decade-long government bond's price sensitivity mean?", "expected_run_ids": []}
+  ],
+  "forget_checks": [
+    {"session_id": "s1", "forget_run_id": "s1_r01", "query": "What were NVIDIA's gross profit margin drivers?"},
+    {"session_id": "s4", "forget_run_id": "s4_r03", "query": "Which official sign-offs could delay hands-free driving deployment?"}
+  ]
+}
