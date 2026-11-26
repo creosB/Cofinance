@@ -75,6 +75,8 @@ def parse_market(m: dict) -> Optional[dict]:
     tags = event.get("tags") if isinstance(event.get("tags"), list) else []
     return {
         "id": str(m.get("id") or ""), "question": str(m.get("question") or "")[:300],
+        "description": str(m.get("description") or "")[:4000],
+        "resolution_source": str(m.get("resolutionSource") or m.get("resolution_source") or "")[:400],
         "slug": str(m.get("slug") or "")[:200], "start": m.get("startDate"), "end": m.get("endDate"),
         "closed_time": m.get("closedTime"),
         "closed": bool(m.get("closed")), "active": bool(m.get("active")),
