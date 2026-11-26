@@ -36,7 +36,7 @@ The [scorecard](docs/SCORECARD.md) indexes the experiments, including unsuccessf
 
 ## Development
 
-`core/` holds the active research pipeline; `ui/` and `frontend/` serve the local dashboard. `qualify/` contains gates and experiments. `tests/` contains regression and integrity checks. The Streamlit v1 code is historical.
+`core/` holds the active v2 research pipeline; `ui/` and `frontend/` serve the local dashboard. `qualify/` contains gates and experiments. `tests/` contains v2 regression and integrity checks. The archived Streamlit v1 app and its legacy tests live under [`v1/`](v1/README.md).
 
 ```text
 python -m unittest discover -s tests -t .
@@ -52,6 +52,6 @@ npm run build
 
 ## History and license
 
-v1 was a Streamlit app on hosted models. Its README was removed from the tree on 2026-11-18 and stays in git history (`git show 21cee11:README.old.md`); its code is kept, not migrated.
+v1 was a Streamlit app on hosted models. Its code is archived under [`v1/`](v1/README.md), not migrated, and its old README stays in git history (`git show 21cee11:README.old.md`).
 
 Please contact the author first to share or make changes anywhere. This work retains its existing [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International license](http://creativecommons.org/licenses/by-nc-sa/4.0/). Model and runtime components have their own licenses; see their pinned sources and local license copies.

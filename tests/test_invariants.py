@@ -68,8 +68,8 @@ class TestArchitecture(unittest.TestCase):
                          'the approved hosts.')
 
 
-V1_PACKAGES = {'agents', 'tools', 'storage', 'app'}
-V1_UI = {'layout', 'styles'}          # ui/layout.py and ui/styles.py belong to the v1 Streamlit app (app.py)
+V1_PACKAGES = {'v1', 'agents', 'tools', 'utils', 'storage', 'app'}
+V1_ROOT_PATHS = ('app.py', 'agents', 'tools', 'utils', 'screenshots', 'ui/layout.py', 'ui/styles.py')
 CORE_MAY_IMPORT_FROM_QUALIFY = {'qualify.decide_eval', 'qualify.run', 'qualify.scorers'}
 
 
@@ -83,12 +83,15 @@ def imported(path):
 
 class TestBoundaries(unittest.TestCase):
     def test_v2_never_imports_v1(self):
-        v2 = [*(ROOT / 'core').glob('*.py'), *(ROOT / 'qualify').glob('*.py'),
-              *(p for p in (ROOT / 'ui').glob('*.py') if p.stem not in V1_UI)]
+        v2 = [*(ROOT / 'core').glob('*.py'), *(ROOT / 'qualify').glob('*.py'), *(ROOT / 'ui').glob('*.py')]
         bad = [f'{p.relative_to(ROOT)}:{line} {name}' for p in v2 for name, line in imported(p)
-               if name.split('.')[0] in V1_PACKAGES or name in {f'ui.{m}' for m in V1_UI}]
-        self.assertEqual(bad, [], 'v1 (app.py, agents/, tools/, storage/, ui/layout.py, ui/styles.py) is kept as history. '
+               if name.split('.')[0] in V1_PACKAGES]
+        self.assertEqual(bad, [], 'v1 lives under v1/ as history. '
                          'v2 must not depend on it; copy what you need into core/ and test it there.')
+
+    def test_v1_files_stay_under_v1_folder(self):
+        leaked = [rel for rel in V1_ROOT_PATHS if (ROOT / rel).exists()]
+        self.assertEqual(leaked, [], 'Archived v1 files belong under v1/ so they stay separated from v2.')
 
     def test_core_stays_headless(self):
         bad = []
