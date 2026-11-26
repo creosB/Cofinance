@@ -1,0 +1,5573 @@
+{
+  "cases_sha": "a043e003981921ded4a0550592cdd4ec5fbc785f3e1bb13253b8b5052ee1abd2",
+  "decision": "INCONCLUSIVE",
+  "experimental": true,
+  "paired": {
+    "arm_a": "direct",
+    "arm_b": "two_stage",
+    "draws": 2000,
+    "exact_link_accuracy_delta_ci95": [
+      -0.4167,
+      -0.1667
+    ],
+    "families": 12,
+    "link_f1_delta_ci95": [
+      -0.5385,
+      -0.1429
+    ],
+    "restriction_recall_delta_ci95": [
+      -0.6667,
+      -0.1667
+    ]
+  },
+  "production_change": false,
+  "protocol_sha": "e70f9bc0f868773987fb786e7661694ea6222cdda880863167fec226874d6e03",
+  "results": {
+    "all": {
+      "direct": {
+        "claim": {
+          "f1": 0.7714,
+          "gold": 36,
+          "precision": 0.7941,
+          "pred": 34,
+          "recall": 0.75,
+          "tp": 27
+        },
+        "clean_any_link_hits": 0,
+        "clean_any_link_rate": 0.0,
+        "clean_controls_total": 12,
+        "clean_pair_false_link_rate": 0.0,
+        "cond_wrong_link_rate": 0.5,
+        "exact_link_accuracy": 0.5,
+        "exact_link_hits": 12,
+        "input_tokens": 7515,
+        "link": {
+          "f1": 0.4,
+          "gold": 12,
+          "precision": 0.5,
+          "pred": 8,
+          "recall": 0.3333,
+          "tp": 4
+        },
+        "malformed": 7,
+        "malformed_rate": 0.2917,
+        "n": 24,
+        "output_tokens": 1262,
+        "restriction": {
+          "f1": 0.5882,
+          "gold": 12,
+          "precision": 1.0,
+          "pred": 5,
+          "recall": 0.4167,
+          "tp": 5
+        },
+        "seconds": 14.471,
+        "valid": 17,
+        "wrong_target_hits": 4,
+        "wrong_target_rate": 0.6667,
+        "wrong_target_total": 6
+      },
+      "lexical": {
+        "claim": {
+          "f1": 0.9474,
+          "gold": 36,
+          "precision": 0.9,
+          "pred": 40,
+          "recall": 1.0,
+          "tp": 36
+        },
+        "clean_any_link_hits": 0,
+        "clean_any_link_rate": 0.0,
+        "clean_controls_total": 12,
+        "clean_pair_false_link_rate": 0.0,
+        "cond_wrong_link_rate": 0.1667,
+        "exact_link_accuracy": 0.9167,
+        "exact_link_hits": 22,
+        "input_tokens": 0,
+        "link": {
+          "f1": 0.8696,
+          "gold": 12,
+          "precision": 0.9091,
+          "pred": 11,
+          "recall": 0.8333,
+          "tp": 10
+        },
+        "malformed": 0,
+        "malformed_rate": 0.0,
+        "n": 24,
+        "output_tokens": 0,
+        "restriction": {
+          "f1": 0.9565,
+          "gold": 12,
+          "precision": 1.0,
+          "pred": 11,
+          "recall": 0.9167,
+          "tp": 11
+        },
+        "seconds": 0.0,
+        "valid": 24,
+        "wrong_target_hits": 1,
+        "wrong_target_rate": 0.1667,
+        "wrong_target_total": 6
+      },
+      "select_all": {
+        "claim": {
+          "f1": 0.4337,
+          "gold": 36,
+          "precision": 0.2769,
+          "pred": 130,
+          "recall": 1.0,
+          "tp": 36
+        },
+        "clean_any_link_hits": 12,
+        "clean_any_link_rate": 1.0,
+        "clean_controls_total": 12,
+        "clean_pair_false_link_rate": 1.0,
+        "cond_wrong_link_rate": 0.8286,
+        "exact_link_accuracy": 0.0,
+        "exact_link_hits": 0,
+        "input_tokens": 0,
+        "link": {
+          "f1": 0.0377,
+          "gold": 12,
+          "precision": 0.0192,
+          "pred": 624,
+          "recall": 1.0,
+          "tp": 12
+        },
+        "malformed": 0,
+        "malformed_rate": 0.0,
+        "n": 24,
+        "output_tokens": 0,
+        "restriction": {
+          "f1": 0.169,
+          "gold": 12,
+          "precision": 0.0923,
+          "pred": 130,
+          "recall": 1.0,
+          "tp": 12
+        },
+        "seconds": 0.0,
+        "valid": 24,
+        "wrong_target_hits": 6,
+        "wrong_target_rate": 1.0,
+        "wrong_target_total": 6
+      },
+      "two_stage": {
+        "claim": {
+          "f1": 0.5063,
+          "gold": 36,
+          "precision": 0.4651,
+          "pred": 43,
+          "recall": 0.5556,
+          "tp": 20
+        },
+        "clean_any_link_hits": 5,
+        "clean_any_link_rate": 0.4167,
+        "clean_controls_total": 12,
+        "clean_pair_false_link_rate": 0.0385,
+        "cond_wrong_link_rate": 0.0,
+        "exact_link_accuracy": 0.2083,
+        "exact_link_hits": 5,
+        "input_tokens": 12047,
+        "link": {
+          "f1": 0.0,
+          "gold": 12,
+          "precision": 0.0,
+          "pred": 15,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "malformed": 10,
+        "malformed_rate": 0.4167,
+        "n": 24,
+        "output_tokens": 3103,
+        "restriction": {
+          "f1": 0.0,
+          "gold": 12,
+          "precision": 0.0,
+          "pred": 28,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "seconds": 37.029,
+        "valid": 14,
+        "wrong_target_hits": 0,
+        "wrong_target_rate": 0.0,
+        "wrong_target_total": 6
+      }
+    },
+    "dates": {
+      "direct": {
+        "claim": {
+          "f1": 0.7826,
+          "gold": 12,
+          "precision": 0.8182,
+          "pred": 11,
+          "recall": 0.75,
+          "tp": 9
+        },
+        "clean_any_link_hits": 0,
+        "clean_any_link_rate": 0.0,
+        "clean_controls_total": 4,
+        "clean_pair_false_link_rate": 0.0,
+        "cond_wrong_link_rate": 0.5,
+        "exact_link_accuracy": 0.5,
+        "exact_link_hits": 4,
+        "input_tokens": 2502,
+        "link": {
+          "f1": 0.3333,
+          "gold": 4,
+          "precision": 0.5,
+          "pred": 2,
+          "recall": 0.25,
+          "tp": 1
+        },
+        "malformed": 2,
+        "malformed_rate": 0.25,
+        "n": 8,
+        "output_tokens": 381,
+        "restriction": {
+          "f1": 0.6667,
+          "gold": 4,
+          "precision": 1.0,
+          "pred": 2,
+          "recall": 0.5,
+          "tp": 2
+        },
+        "seconds": 4.577,
+        "valid": 6,
+        "wrong_target_hits": 1,
+        "wrong_target_rate": 0.5,
+        "wrong_target_total": 2
+      },
+      "lexical": {
+        "claim": {
+          "f1": 0.9231,
+          "gold": 12,
+          "precision": 0.8571,
+          "pred": 14,
+          "recall": 1.0,
+          "tp": 12
+        },
+        "clean_any_link_hits": 0,
+        "clean_any_link_rate": 0.0,
+        "clean_controls_total": 4,
+        "clean_pair_false_link_rate": 0.0,
+        "cond_wrong_link_rate": 0.5,
+        "exact_link_accuracy": 0.75,
+        "exact_link_hits": 6,
+        "input_tokens": 0,
+        "link": {
+          "f1": 0.5714,
+          "gold": 4,
+          "precision": 0.6667,
+          "pred": 3,
+          "recall": 0.5,
+          "tp": 2
+        },
+        "malformed": 0,
+        "malformed_rate": 0.0,
+        "n": 8,
+        "output_tokens": 0,
+        "restriction": {
+          "f1": 0.8571,
+          "gold": 4,
+          "precision": 1.0,
+          "pred": 3,
+          "recall": 0.75,
+          "tp": 3
+        },
+        "seconds": 0.0,
+        "valid": 8,
+        "wrong_target_hits": 1,
+        "wrong_target_rate": 0.5,
+        "wrong_target_total": 2
+      },
+      "select_all": {
+        "claim": {
+          "f1": 0.4444,
+          "gold": 12,
+          "precision": 0.2857,
+          "pred": 42,
+          "recall": 1.0,
+          "tp": 12
+        },
+        "clean_any_link_hits": 4,
+        "clean_any_link_rate": 1.0,
+        "clean_controls_total": 4,
+        "clean_pair_false_link_rate": 1.0,
+        "cond_wrong_link_rate": 0.8182,
+        "exact_link_accuracy": 0.0,
+        "exact_link_hits": 0,
+        "input_tokens": 0,
+        "link": {
+          "f1": 0.0408,
+          "gold": 4,
+          "precision": 0.0208,
+          "pred": 192,
+          "recall": 1.0,
+          "tp": 4
+        },
+        "malformed": 0,
+        "malformed_rate": 0.0,
+        "n": 8,
+        "output_tokens": 0,
+        "restriction": {
+          "f1": 0.1739,
+          "gold": 4,
+          "precision": 0.0952,
+          "pred": 42,
+          "recall": 1.0,
+          "tp": 4
+        },
+        "seconds": 0.0,
+        "valid": 8,
+        "wrong_target_hits": 2,
+        "wrong_target_rate": 1.0,
+        "wrong_target_total": 2
+      },
+      "two_stage": {
+        "claim": {
+          "f1": 0.5333,
+          "gold": 12,
+          "precision": 0.4444,
+          "pred": 18,
+          "recall": 0.6667,
+          "tp": 8
+        },
+        "clean_any_link_hits": 2,
+        "clean_any_link_rate": 0.5,
+        "clean_controls_total": 4,
+        "clean_pair_false_link_rate": 0.0625,
+        "cond_wrong_link_rate": 0.0,
+        "exact_link_accuracy": 0.25,
+        "exact_link_hits": 2,
+        "input_tokens": 4236,
+        "link": {
+          "f1": 0.0,
+          "gold": 4,
+          "precision": 0.0,
+          "pred": 6,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "malformed": 2,
+        "malformed_rate": 0.25,
+        "n": 8,
+        "output_tokens": 796,
+        "restriction": {
+          "f1": 0.0,
+          "gold": 4,
+          "precision": 0.0,
+          "pred": 9,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "seconds": 10.828,
+        "valid": 6,
+        "wrong_target_hits": 0,
+        "wrong_target_rate": 0.0,
+        "wrong_target_total": 2
+      }
+    },
+    "entitlements": {
+      "direct": {
+        "claim": {
+          "f1": 0.8333,
+          "gold": 12,
+          "precision": 0.8333,
+          "pred": 12,
+          "recall": 0.8333,
+          "tp": 10
+        },
+        "clean_any_link_hits": 0,
+        "clean_any_link_rate": 0.0,
+        "clean_controls_total": 4,
+        "clean_pair_false_link_rate": 0.0,
+        "cond_wrong_link_rate": 0.5,
+        "exact_link_accuracy": 0.5,
+        "exact_link_hits": 4,
+        "input_tokens": 2527,
+        "link": {
+          "f1": 0.5,
+          "gold": 4,
+          "precision": 0.5,
+          "pred": 4,
+          "recall": 0.5,
+          "tp": 2
+        },
+        "malformed": 2,
+        "malformed_rate": 0.25,
+        "n": 8,
+        "output_tokens": 376,
+        "restriction": {
+          "f1": 0.6667,
+          "gold": 4,
+          "precision": 1.0,
+          "pred": 2,
+          "recall": 0.5,
+          "tp": 2
+        },
+        "seconds": 4.597,
+        "valid": 6,
+        "wrong_target_hits": 2,
+        "wrong_target_rate": 1.0,
+        "wrong_target_total": 2
+      },
+      "lexical": {
+        "claim": {
+          "f1": 1.0,
+          "gold": 12,
+          "precision": 1.0,
+          "pred": 12,
+          "recall": 1.0,
+          "tp": 12
+        },
+        "clean_any_link_hits": 0,
+        "clean_any_link_rate": 0.0,
+        "clean_controls_total": 4,
+        "clean_pair_false_link_rate": 0.0,
+        "cond_wrong_link_rate": 0.0,
+        "exact_link_accuracy": 1.0,
+        "exact_link_hits": 8,
+        "input_tokens": 0,
+        "link": {
+          "f1": 1.0,
+          "gold": 4,
+          "precision": 1.0,
+          "pred": 4,
+          "recall": 1.0,
+          "tp": 4
+        },
+        "malformed": 0,
+        "malformed_rate": 0.0,
+        "n": 8,
+        "output_tokens": 0,
+        "restriction": {
+          "f1": 1.0,
+          "gold": 4,
+          "precision": 1.0,
+          "pred": 4,
+          "recall": 1.0,
+          "tp": 4
+        },
+        "seconds": 0.0,
+        "valid": 8,
+        "wrong_target_hits": 0,
+        "wrong_target_rate": 0.0,
+        "wrong_target_total": 2
+      },
+      "select_all": {
+        "claim": {
+          "f1": 0.4286,
+          "gold": 12,
+          "precision": 0.2727,
+          "pred": 44,
+          "recall": 1.0,
+          "tp": 12
+        },
+        "clean_any_link_hits": 4,
+        "clean_any_link_rate": 1.0,
+        "clean_controls_total": 4,
+        "clean_pair_false_link_rate": 1.0,
+        "cond_wrong_link_rate": 0.8333,
+        "exact_link_accuracy": 0.0,
+        "exact_link_hits": 0,
+        "input_tokens": 0,
+        "link": {
+          "f1": 0.0364,
+          "gold": 4,
+          "precision": 0.0185,
+          "pred": 216,
+          "recall": 1.0,
+          "tp": 4
+        },
+        "malformed": 0,
+        "malformed_rate": 0.0,
+        "n": 8,
+        "output_tokens": 0,
+        "restriction": {
+          "f1": 0.1667,
+          "gold": 4,
+          "precision": 0.0909,
+          "pred": 44,
+          "recall": 1.0,
+          "tp": 4
+        },
+        "seconds": 0.0,
+        "valid": 8,
+        "wrong_target_hits": 2,
+        "wrong_target_rate": 1.0,
+        "wrong_target_total": 2
+      },
+      "two_stage": {
+        "claim": {
+          "f1": 0.3333,
+          "gold": 12,
+          "precision": 0.5,
+          "pred": 6,
+          "recall": 0.25,
+          "tp": 3
+        },
+        "clean_any_link_hits": 1,
+        "clean_any_link_rate": 0.25,
+        "clean_controls_total": 4,
+        "clean_pair_false_link_rate": 0.0185,
+        "cond_wrong_link_rate": 0.0,
+        "exact_link_accuracy": 0.125,
+        "exact_link_hits": 1,
+        "input_tokens": 3604,
+        "link": {
+          "f1": 0.0,
+          "gold": 4,
+          "precision": 0.0,
+          "pred": 2,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "malformed": 6,
+        "malformed_rate": 0.75,
+        "n": 8,
+        "output_tokens": 1262,
+        "restriction": {
+          "f1": 0.0,
+          "gold": 4,
+          "precision": 0.0,
+          "pred": 5,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "seconds": 13.733,
+        "valid": 2,
+        "wrong_target_hits": 0,
+        "wrong_target_rate": 0.0,
+        "wrong_target_total": 2
+      }
+    },
+    "fees": {
+      "direct": {
+        "claim": {
+          "f1": 0.6957,
+          "gold": 12,
+          "precision": 0.7273,
+          "pred": 11,
+          "recall": 0.6667,
+          "tp": 8
+        },
+        "clean_any_link_hits": 0,
+        "clean_any_link_rate": 0.0,
+        "clean_controls_total": 4,
+        "clean_pair_false_link_rate": 0.0,
+        "cond_wrong_link_rate": 0.5,
+        "exact_link_accuracy": 0.5,
+        "exact_link_hits": 4,
+        "input_tokens": 2486,
+        "link": {
+          "f1": 0.3333,
+          "gold": 4,
+          "precision": 0.5,
+          "pred": 2,
+          "recall": 0.25,
+          "tp": 1
+        },
+        "malformed": 3,
+        "malformed_rate": 0.375,
+        "n": 8,
+        "output_tokens": 505,
+        "restriction": {
+          "f1": 0.4,
+          "gold": 4,
+          "precision": 1.0,
+          "pred": 1,
+          "recall": 0.25,
+          "tp": 1
+        },
+        "seconds": 5.297,
+        "valid": 5,
+        "wrong_target_hits": 1,
+        "wrong_target_rate": 0.5,
+        "wrong_target_total": 2
+      },
+      "lexical": {
+        "claim": {
+          "f1": 0.9231,
+          "gold": 12,
+          "precision": 0.8571,
+          "pred": 14,
+          "recall": 1.0,
+          "tp": 12
+        },
+        "clean_any_link_hits": 0,
+        "clean_any_link_rate": 0.0,
+        "clean_controls_total": 4,
+        "clean_pair_false_link_rate": 0.0,
+        "cond_wrong_link_rate": 0.0,
+        "exact_link_accuracy": 1.0,
+        "exact_link_hits": 8,
+        "input_tokens": 0,
+        "link": {
+          "f1": 1.0,
+          "gold": 4,
+          "precision": 1.0,
+          "pred": 4,
+          "recall": 1.0,
+          "tp": 4
+        },
+        "malformed": 0,
+        "malformed_rate": 0.0,
+        "n": 8,
+        "output_tokens": 0,
+        "restriction": {
+          "f1": 1.0,
+          "gold": 4,
+          "precision": 1.0,
+          "pred": 4,
+          "recall": 1.0,
+          "tp": 4
+        },
+        "seconds": 0.0,
+        "valid": 8,
+        "wrong_target_hits": 0,
+        "wrong_target_rate": 0.0,
+        "wrong_target_total": 2
+      },
+      "select_all": {
+        "claim": {
+          "f1": 0.4286,
+          "gold": 12,
+          "precision": 0.2727,
+          "pred": 44,
+          "recall": 1.0,
+          "tp": 12
+        },
+        "clean_any_link_hits": 4,
+        "clean_any_link_rate": 1.0,
+        "clean_controls_total": 4,
+        "clean_pair_false_link_rate": 1.0,
+        "cond_wrong_link_rate": 0.8333,
+        "exact_link_accuracy": 0.0,
+        "exact_link_hits": 0,
+        "input_tokens": 0,
+        "link": {
+          "f1": 0.0364,
+          "gold": 4,
+          "precision": 0.0185,
+          "pred": 216,
+          "recall": 1.0,
+          "tp": 4
+        },
+        "malformed": 0,
+        "malformed_rate": 0.0,
+        "n": 8,
+        "output_tokens": 0,
+        "restriction": {
+          "f1": 0.1667,
+          "gold": 4,
+          "precision": 0.0909,
+          "pred": 44,
+          "recall": 1.0,
+          "tp": 4
+        },
+        "seconds": 0.0,
+        "valid": 8,
+        "wrong_target_hits": 2,
+        "wrong_target_rate": 1.0,
+        "wrong_target_total": 2
+      },
+      "two_stage": {
+        "claim": {
+          "f1": 0.5806,
+          "gold": 12,
+          "precision": 0.4737,
+          "pred": 19,
+          "recall": 0.75,
+          "tp": 9
+        },
+        "clean_any_link_hits": 2,
+        "clean_any_link_rate": 0.5,
+        "clean_controls_total": 4,
+        "clean_pair_false_link_rate": 0.037,
+        "cond_wrong_link_rate": 0.0,
+        "exact_link_accuracy": 0.25,
+        "exact_link_hits": 2,
+        "input_tokens": 4207,
+        "link": {
+          "f1": 0.0,
+          "gold": 4,
+          "precision": 0.0,
+          "pred": 7,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "malformed": 2,
+        "malformed_rate": 0.25,
+        "n": 8,
+        "output_tokens": 1045,
+        "restriction": {
+          "f1": 0.0,
+          "gold": 4,
+          "precision": 0.0,
+          "pred": 14,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "seconds": 12.468,
+        "valid": 6,
+        "wrong_target_hits": 0,
+        "wrong_target_rate": 0.0,
+        "wrong_target_total": 2
+      }
+    },
+    "single": {
+      "direct": {
+        "claim": {
+          "f1": 0.5385,
+          "gold": 12,
+          "precision": 0.5,
+          "pred": 14,
+          "recall": 0.5833,
+          "tp": 7
+        },
+        "clean_any_link_hits": 0,
+        "clean_any_link_rate": 0.0,
+        "clean_controls_total": 6,
+        "clean_pair_false_link_rate": 0.0,
+        "cond_wrong_link_rate": 0.0,
+        "exact_link_accuracy": 0.5,
+        "exact_link_hits": 6,
+        "input_tokens": 3346,
+        "link": {
+          "f1": 0.0,
+          "gold": 6,
+          "precision": 0.0,
+          "pred": 0,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "malformed": 5,
+        "malformed_rate": 0.4167,
+        "n": 12,
+        "output_tokens": 522,
+        "restriction": {
+          "f1": 0.2857,
+          "gold": 6,
+          "precision": 1.0,
+          "pred": 1,
+          "recall": 0.1667,
+          "tp": 1
+        },
+        "seconds": 6.328,
+        "valid": 7,
+        "wrong_target_hits": 0,
+        "wrong_target_rate": 0.0,
+        "wrong_target_total": 0
+      },
+      "lexical": {
+        "claim": {
+          "f1": 1.0,
+          "gold": 12,
+          "precision": 1.0,
+          "pred": 12,
+          "recall": 1.0,
+          "tp": 12
+        },
+        "clean_any_link_hits": 0,
+        "clean_any_link_rate": 0.0,
+        "clean_controls_total": 6,
+        "clean_pair_false_link_rate": 0.0,
+        "cond_wrong_link_rate": 0.0,
+        "exact_link_accuracy": 0.9167,
+        "exact_link_hits": 11,
+        "input_tokens": 0,
+        "link": {
+          "f1": 0.9091,
+          "gold": 6,
+          "precision": 1.0,
+          "pred": 5,
+          "recall": 0.8333,
+          "tp": 5
+        },
+        "malformed": 0,
+        "malformed_rate": 0.0,
+        "n": 12,
+        "output_tokens": 0,
+        "restriction": {
+          "f1": 0.9091,
+          "gold": 6,
+          "precision": 1.0,
+          "pred": 5,
+          "recall": 0.8333,
+          "tp": 5
+        },
+        "seconds": 0.0,
+        "valid": 12,
+        "wrong_target_hits": 0,
+        "wrong_target_rate": 0.0,
+        "wrong_target_total": 0
+      },
+      "select_all": {
+        "claim": {
+          "f1": 0.4,
+          "gold": 12,
+          "precision": 0.25,
+          "pred": 48,
+          "recall": 1.0,
+          "tp": 12
+        },
+        "clean_any_link_hits": 6,
+        "clean_any_link_rate": 1.0,
+        "clean_controls_total": 6,
+        "clean_pair_false_link_rate": 1.0,
+        "cond_wrong_link_rate": 0.0,
+        "exact_link_accuracy": 0.0,
+        "exact_link_hits": 0,
+        "input_tokens": 0,
+        "link": {
+          "f1": 0.08,
+          "gold": 6,
+          "precision": 0.0417,
+          "pred": 144,
+          "recall": 1.0,
+          "tp": 6
+        },
+        "malformed": 0,
+        "malformed_rate": 0.0,
+        "n": 12,
+        "output_tokens": 0,
+        "restriction": {
+          "f1": 0.2222,
+          "gold": 6,
+          "precision": 0.125,
+          "pred": 48,
+          "recall": 1.0,
+          "tp": 6
+        },
+        "seconds": 0.0,
+        "valid": 12,
+        "wrong_target_hits": 0,
+        "wrong_target_rate": 0.0,
+        "wrong_target_total": 0
+      },
+      "two_stage": {
+        "claim": {
+          "f1": 0.381,
+          "gold": 12,
+          "precision": 0.2667,
+          "pred": 30,
+          "recall": 0.6667,
+          "tp": 8
+        },
+        "clean_any_link_hits": 0,
+        "clean_any_link_rate": 0.0,
+        "clean_controls_total": 6,
+        "clean_pair_false_link_rate": 0.0,
+        "cond_wrong_link_rate": 0.0,
+        "exact_link_accuracy": 0.4167,
+        "exact_link_hits": 5,
+        "input_tokens": 5555,
+        "link": {
+          "f1": 0.0,
+          "gold": 6,
+          "precision": 0.0,
+          "pred": 0,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "malformed": 4,
+        "malformed_rate": 0.3333,
+        "n": 12,
+        "output_tokens": 1412,
+        "restriction": {
+          "f1": 0.0,
+          "gold": 6,
+          "precision": 0.0,
+          "pred": 0,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "seconds": 16.921,
+        "valid": 8,
+        "wrong_target_hits": 0,
+        "wrong_target_rate": 0.0,
+        "wrong_target_total": 0
+      }
+    },
+    "two_claim": {
+      "direct": {
+        "claim": {
+          "f1": 0.9091,
+          "gold": 24,
+          "precision": 1.0,
+          "pred": 20,
+          "recall": 0.8333,
+          "tp": 20
+        },
+        "clean_any_link_hits": 0,
+        "clean_any_link_rate": 0.0,
+        "clean_controls_total": 6,
+        "clean_pair_false_link_rate": 0.0,
+        "cond_wrong_link_rate": 0.5,
+        "exact_link_accuracy": 0.5,
+        "exact_link_hits": 6,
+        "input_tokens": 4169,
+        "link": {
+          "f1": 0.5714,
+          "gold": 6,
+          "precision": 0.5,
+          "pred": 8,
+          "recall": 0.6667,
+          "tp": 4
+        },
+        "malformed": 2,
+        "malformed_rate": 0.1667,
+        "n": 12,
+        "output_tokens": 740,
+        "restriction": {
+          "f1": 0.8,
+          "gold": 6,
+          "precision": 1.0,
+          "pred": 4,
+          "recall": 0.6667,
+          "tp": 4
+        },
+        "seconds": 8.143,
+        "valid": 10,
+        "wrong_target_hits": 4,
+        "wrong_target_rate": 0.6667,
+        "wrong_target_total": 6
+      },
+      "lexical": {
+        "claim": {
+          "f1": 0.9231,
+          "gold": 24,
+          "precision": 0.8571,
+          "pred": 28,
+          "recall": 1.0,
+          "tp": 24
+        },
+        "clean_any_link_hits": 0,
+        "clean_any_link_rate": 0.0,
+        "clean_controls_total": 6,
+        "clean_pair_false_link_rate": 0.0,
+        "cond_wrong_link_rate": 0.1667,
+        "exact_link_accuracy": 0.9167,
+        "exact_link_hits": 11,
+        "input_tokens": 0,
+        "link": {
+          "f1": 0.8333,
+          "gold": 6,
+          "precision": 0.8333,
+          "pred": 6,
+          "recall": 0.8333,
+          "tp": 5
+        },
+        "malformed": 0,
+        "malformed_rate": 0.0,
+        "n": 12,
+        "output_tokens": 0,
+        "restriction": {
+          "f1": 1.0,
+          "gold": 6,
+          "precision": 1.0,
+          "pred": 6,
+          "recall": 1.0,
+          "tp": 6
+        },
+        "seconds": 0.0,
+        "valid": 12,
+        "wrong_target_hits": 1,
+        "wrong_target_rate": 0.1667,
+        "wrong_target_total": 6
+      },
+      "select_all": {
+        "claim": {
+          "f1": 0.4528,
+          "gold": 24,
+          "precision": 0.2927,
+          "pred": 82,
+          "recall": 1.0,
+          "tp": 24
+        },
+        "clean_any_link_hits": 6,
+        "clean_any_link_rate": 1.0,
+        "clean_controls_total": 6,
+        "clean_pair_false_link_rate": 1.0,
+        "cond_wrong_link_rate": 0.8286,
+        "exact_link_accuracy": 0.0,
+        "exact_link_hits": 0,
+        "input_tokens": 0,
+        "link": {
+          "f1": 0.0247,
+          "gold": 6,
+          "precision": 0.0125,
+          "pred": 480,
+          "recall": 1.0,
+          "tp": 6
+        },
+        "malformed": 0,
+        "malformed_rate": 0.0,
+        "n": 12,
+        "output_tokens": 0,
+        "restriction": {
+          "f1": 0.1364,
+          "gold": 6,
+          "precision": 0.0732,
+          "pred": 82,
+          "recall": 1.0,
+          "tp": 6
+        },
+        "seconds": 0.0,
+        "valid": 12,
+        "wrong_target_hits": 6,
+        "wrong_target_rate": 1.0,
+        "wrong_target_total": 6
+      },
+      "two_stage": {
+        "claim": {
+          "f1": 0.6486,
+          "gold": 24,
+          "precision": 0.9231,
+          "pred": 13,
+          "recall": 0.5,
+          "tp": 12
+        },
+        "clean_any_link_hits": 5,
+        "clean_any_link_rate": 0.8333,
+        "clean_controls_total": 6,
+        "clean_pair_false_link_rate": 0.05,
+        "cond_wrong_link_rate": 0.0,
+        "exact_link_accuracy": 0.0,
+        "exact_link_hits": 0,
+        "input_tokens": 6492,
+        "link": {
+          "f1": 0.0,
+          "gold": 6,
+          "precision": 0.0,
+          "pred": 15,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "malformed": 6,
+        "malformed_rate": 0.5,
+        "n": 12,
+        "output_tokens": 1691,
+        "restriction": {
+          "f1": 0.0,
+          "gold": 6,
+          "precision": 0.0,
+          "pred": 28,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "seconds": 20.108,
+        "valid": 6,
+        "wrong_target_hits": 0,
+        "wrong_target_rate": 0.0,
+        "wrong_target_total": 6
+      }
+    }
+  },
+  "rows": [
+    {
+      "arm": "direct",
+      "case": "rl_date_appeal_ctrl",
+      "error": null,
+      "finish": "stop",
+      "input_tokens": 339,
+      "output_tokens": 33,
+      "pred": {
+        "claims": [
+          "b001",
+          "b004"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.531
+    },
+    {
+      "arm": "lexical",
+      "case": "rl_date_appeal_ctrl",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b004"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "select_all",
+      "case": "rl_date_appeal_ctrl",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004",
+          "b005",
+          "b006"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b001",
+            "b004"
+          ],
+          [
+            "b001",
+            "b005"
+          ],
+          [
+            "b001",
+            "b006"
+          ],
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b002",
+            "b003"
+          ],
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b002",
+            "b005"
+          ],
+          [
+            "b002",
+            "b006"
+          ],
+          [
+            "b003",
+            "b001"
+          ],
+          [
+            "b003",
+            "b002"
+          ],
+          [
+            "b003",
+            "b004"
+          ],
+          [
+            "b003",
+            "b005"
+          ],
+          [
+            "b003",
+            "b006"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b004",
+            "b002"
+          ],
+          [
+            "b004",
+            "b003"
+          ],
+          [
+            "b004",
+            "b005"
+          ],
+          [
+            "b004",
+            "b006"
+          ],
+          [
+            "b005",
+            "b001"
+          ],
+          [
+            "b005",
+            "b002"
+          ],
+          [
+            "b005",
+            "b003"
+          ],
+          [
+            "b005",
+            "b004"
+          ],
+          [
+            "b005",
+            "b006"
+          ],
+          [
+            "b006",
+            "b001"
+          ],
+          [
+            "b006",
+            "b002"
+          ],
+          [
+            "b006",
+            "b003"
+          ],
+          [
+            "b006",
+            "b004"
+          ],
+          [
+            "b006",
+            "b005"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b002",
+          "b003",
+          "b004",
+          "b005",
+          "b006"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "two_stage",
+      "case": "rl_date_appeal_ctrl",
+      "error": null,
+      "finish": "stop/stop",
+      "input_tokens": 579,
+      "output_tokens": 165,
+      "pred": {
+        "claims": [
+          "b001",
+          "b004"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b004",
+            "b005"
+          ],
+          [
+            "b004",
+            "b006"
+          ]
+        ],
+        "restrictions": [
+          "b002",
+          "b003",
+          "b005",
+          "b006"
+        ]
+      },
+      "seconds": 1.765
+    },
+    {
+      "arm": "direct",
+      "case": "rl_fee_atm_pos",
+      "error": "ValueError: Link references undeclared span",
+      "finish": "stop",
+      "input_tokens": 350,
+      "output_tokens": 122,
+      "pred": null,
+      "seconds": 1.063
+    },
+    {
+      "arm": "two_stage",
+      "case": "rl_fee_atm_pos",
+      "error": "ValueError: Duplicate span ID in restrictions",
+      "finish": "stop/stop",
+      "input_tokens": 604,
+      "output_tokens": 234,
+      "pred": null,
+      "seconds": 2.531
+    },
+    {
+      "arm": "lexical",
+      "case": "rl_fee_atm_pos",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b002",
+          "b005"
+        ],
+        "links": [
+          [
+            "b005",
+            "b007"
+          ]
+        ],
+        "restrictions": [
+          "b007"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "select_all",
+      "case": "rl_fee_atm_pos",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004",
+          "b005",
+          "b006",
+          "b007"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b001",
+            "b004"
+          ],
+          [
+            "b001",
+            "b005"
+          ],
+          [
+            "b001",
+            "b006"
+          ],
+          [
+            "b001",
+            "b007"
+          ],
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b002",
+            "b003"
+          ],
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b002",
+            "b005"
+          ],
+          [
+            "b002",
+            "b006"
+          ],
+          [
+            "b002",
+            "b007"
+          ],
+          [
+            "b003",
+            "b001"
+          ],
+          [
+            "b003",
+            "b002"
+          ],
+          [
+            "b003",
+            "b004"
+          ],
+          [
+            "b003",
+            "b005"
+          ],
+          [
+            "b003",
+            "b006"
+          ],
+          [
+            "b003",
+            "b007"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b004",
+            "b002"
+          ],
+          [
+            "b004",
+            "b003"
+          ],
+          [
+            "b004",
+            "b005"
+          ],
+          [
+            "b004",
+            "b006"
+          ],
+          [
+            "b004",
+            "b007"
+          ],
+          [
+            "b005",
+            "b001"
+          ],
+          [
+            "b005",
+            "b002"
+          ],
+          [
+            "b005",
+            "b003"
+          ],
+          [
+            "b005",
+            "b004"
+          ],
+          [
+            "b005",
+            "b006"
+          ],
+          [
+            "b005",
+            "b007"
+          ],
+          [
+            "b006",
+            "b001"
+          ],
+          [
+            "b006",
+            "b002"
+          ],
+          [
+            "b006",
+            "b003"
+          ],
+          [
+            "b006",
+            "b004"
+          ],
+          [
+            "b006",
+            "b005"
+          ],
+          [
+            "b006",
+            "b007"
+          ],
+          [
+            "b007",
+            "b001"
+          ],
+          [
+            "b007",
+            "b002"
+          ],
+          [
+            "b007",
+            "b003"
+          ],
+          [
+            "b007",
+            "b004"
+          ],
+          [
+            "b007",
+            "b005"
+          ],
+          [
+            "b007",
+            "b006"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b002",
+          "b003",
+          "b004",
+          "b005",
+          "b006",
+          "b007"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "select_all",
+      "case": "rl_ent_ferry_ctrl",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b001",
+            "b004"
+          ],
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b002",
+            "b003"
+          ],
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b003",
+            "b001"
+          ],
+          [
+            "b003",
+            "b002"
+          ],
+          [
+            "b003",
+            "b004"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b004",
+            "b002"
+          ],
+          [
+            "b004",
+            "b003"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "direct",
+      "case": "rl_ent_ferry_ctrl",
+      "error": null,
+      "finish": "stop",
+      "input_tokens": 281,
+      "output_tokens": 38,
+      "pred": {
+        "claims": [
+          "b002",
+          "b003",
+          "b004"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.516
+    },
+    {
+      "arm": "two_stage",
+      "case": "rl_ent_ferry_ctrl",
+      "error": "ValueError: Stage 2 truncated at token cap",
+      "finish": "stop/length",
+      "input_tokens": 466,
+      "output_tokens": 283,
+      "pred": null,
+      "seconds": 2.703
+    },
+    {
+      "arm": "lexical",
+      "case": "rl_ent_ferry_ctrl",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b002"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "select_all",
+      "case": "rl_ent_credit_ctrl",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004",
+          "b005",
+          "b006",
+          "b007"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b001",
+            "b004"
+          ],
+          [
+            "b001",
+            "b005"
+          ],
+          [
+            "b001",
+            "b006"
+          ],
+          [
+            "b001",
+            "b007"
+          ],
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b002",
+            "b003"
+          ],
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b002",
+            "b005"
+          ],
+          [
+            "b002",
+            "b006"
+          ],
+          [
+            "b002",
+            "b007"
+          ],
+          [
+            "b003",
+            "b001"
+          ],
+          [
+            "b003",
+            "b002"
+          ],
+          [
+            "b003",
+            "b004"
+          ],
+          [
+            "b003",
+            "b005"
+          ],
+          [
+            "b003",
+            "b006"
+          ],
+          [
+            "b003",
+            "b007"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b004",
+            "b002"
+          ],
+          [
+            "b004",
+            "b003"
+          ],
+          [
+            "b004",
+            "b005"
+          ],
+          [
+            "b004",
+            "b006"
+          ],
+          [
+            "b004",
+            "b007"
+          ],
+          [
+            "b005",
+            "b001"
+          ],
+          [
+            "b005",
+            "b002"
+          ],
+          [
+            "b005",
+            "b003"
+          ],
+          [
+            "b005",
+            "b004"
+          ],
+          [
+            "b005",
+            "b006"
+          ],
+          [
+            "b005",
+            "b007"
+          ],
+          [
+            "b006",
+            "b001"
+          ],
+          [
+            "b006",
+            "b002"
+          ],
+          [
+            "b006",
+            "b003"
+          ],
+          [
+            "b006",
+            "b004"
+          ],
+          [
+            "b006",
+            "b005"
+          ],
+          [
+            "b006",
+            "b007"
+          ],
+          [
+            "b007",
+            "b001"
+          ],
+          [
+            "b007",
+            "b002"
+          ],
+          [
+            "b007",
+            "b003"
+          ],
+          [
+            "b007",
+            "b004"
+          ],
+          [
+            "b007",
+            "b005"
+          ],
+          [
+            "b007",
+            "b006"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b002",
+          "b003",
+          "b004",
+          "b005",
+          "b006",
+          "b007"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "lexical",
+      "case": "rl_ent_credit_ctrl",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b002",
+          "b006"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "direct",
+      "case": "rl_ent_credit_ctrl",
+      "error": null,
+      "finish": "stop",
+      "input_tokens": 356,
+      "output_tokens": 33,
+      "pred": {
+        "claims": [
+          "b002",
+          "b006"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.516
+    },
+    {
+      "arm": "two_stage",
+      "case": "rl_ent_credit_ctrl",
+      "error": "ValueError: Duplicate span ID in claims",
+      "finish": "stop",
+      "input_tokens": 279,
+      "output_tokens": 32,
+      "pred": null,
+      "seconds": 0.562
+    },
+    {
+      "arm": "lexical",
+      "case": "rl_date_div_pos",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001"
+        ],
+        "links": [
+          [
+            "b001",
+            "b003"
+          ]
+        ],
+        "restrictions": [
+          "b003"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "direct",
+      "case": "rl_date_div_pos",
+      "error": "ValueError: Span selected as both claim and restriction",
+      "finish": "stop",
+      "input_tokens": 287,
+      "output_tokens": 40,
+      "pred": null,
+      "seconds": 0.531
+    },
+    {
+      "arm": "select_all",
+      "case": "rl_date_div_pos",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b001",
+            "b004"
+          ],
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b002",
+            "b003"
+          ],
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b003",
+            "b001"
+          ],
+          [
+            "b003",
+            "b002"
+          ],
+          [
+            "b003",
+            "b004"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b004",
+            "b002"
+          ],
+          [
+            "b004",
+            "b003"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "two_stage",
+      "case": "rl_date_div_pos",
+      "error": null,
+      "finish": "stop/stop",
+      "input_tokens": 481,
+      "output_tokens": 49,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.953
+    },
+    {
+      "arm": "lexical",
+      "case": "rl_date_div_ctrl",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "two_stage",
+      "case": "rl_date_div_ctrl",
+      "error": null,
+      "finish": "stop/stop",
+      "input_tokens": 461,
+      "output_tokens": 49,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.907
+    },
+    {
+      "arm": "direct",
+      "case": "rl_date_div_ctrl",
+      "error": null,
+      "finish": "stop",
+      "input_tokens": 277,
+      "output_tokens": 33,
+      "pred": {
+        "claims": [
+          "b001",
+          "b003"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.453
+    },
+    {
+      "arm": "select_all",
+      "case": "rl_date_div_ctrl",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b001",
+            "b004"
+          ],
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b002",
+            "b003"
+          ],
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b003",
+            "b001"
+          ],
+          [
+            "b003",
+            "b002"
+          ],
+          [
+            "b003",
+            "b004"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b004",
+            "b002"
+          ],
+          [
+            "b004",
+            "b003"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "direct",
+      "case": "rl_date_grant_pos",
+      "error": "ValueError: Span selected as both claim and restriction",
+      "finish": "stop",
+      "input_tokens": 352,
+      "output_tokens": 92,
+      "pred": null,
+      "seconds": 0.859
+    },
+    {
+      "arm": "two_stage",
+      "case": "rl_date_grant_pos",
+      "error": "ValueError: Duplicate span ID in restrictions",
+      "finish": "stop/stop",
+      "input_tokens": 608,
+      "output_tokens": 164,
+      "pred": null,
+      "seconds": 1.891
+    },
+    {
+      "arm": "lexical",
+      "case": "rl_date_grant_pos",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b002",
+          "b003",
+          "b006"
+        ],
+        "links": [
+          [
+            "b003",
+            "b004"
+          ]
+        ],
+        "restrictions": [
+          "b004"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "select_all",
+      "case": "rl_date_grant_pos",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004",
+          "b005",
+          "b006",
+          "b007"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b001",
+            "b004"
+          ],
+          [
+            "b001",
+            "b005"
+          ],
+          [
+            "b001",
+            "b006"
+          ],
+          [
+            "b001",
+            "b007"
+          ],
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b002",
+            "b003"
+          ],
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b002",
+            "b005"
+          ],
+          [
+            "b002",
+            "b006"
+          ],
+          [
+            "b002",
+            "b007"
+          ],
+          [
+            "b003",
+            "b001"
+          ],
+          [
+            "b003",
+            "b002"
+          ],
+          [
+            "b003",
+            "b004"
+          ],
+          [
+            "b003",
+            "b005"
+          ],
+          [
+            "b003",
+            "b006"
+          ],
+          [
+            "b003",
+            "b007"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b004",
+            "b002"
+          ],
+          [
+            "b004",
+            "b003"
+          ],
+          [
+            "b004",
+            "b005"
+          ],
+          [
+            "b004",
+            "b006"
+          ],
+          [
+            "b004",
+            "b007"
+          ],
+          [
+            "b005",
+            "b001"
+          ],
+          [
+            "b005",
+            "b002"
+          ],
+          [
+            "b005",
+            "b003"
+          ],
+          [
+            "b005",
+            "b004"
+          ],
+          [
+            "b005",
+            "b006"
+          ],
+          [
+            "b005",
+            "b007"
+          ],
+          [
+            "b006",
+            "b001"
+          ],
+          [
+            "b006",
+            "b002"
+          ],
+          [
+            "b006",
+            "b003"
+          ],
+          [
+            "b006",
+            "b004"
+          ],
+          [
+            "b006",
+            "b005"
+          ],
+          [
+            "b006",
+            "b007"
+          ],
+          [
+            "b007",
+            "b001"
+          ],
+          [
+            "b007",
+            "b002"
+          ],
+          [
+            "b007",
+            "b003"
+          ],
+          [
+            "b007",
+            "b004"
+          ],
+          [
+            "b007",
+            "b005"
+          ],
+          [
+            "b007",
+            "b006"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b002",
+          "b003",
+          "b004",
+          "b005",
+          "b006",
+          "b007"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "select_all",
+      "case": "rl_fee_wire_pos",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b001",
+            "b004"
+          ],
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b002",
+            "b003"
+          ],
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b003",
+            "b001"
+          ],
+          [
+            "b003",
+            "b002"
+          ],
+          [
+            "b003",
+            "b004"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b004",
+            "b002"
+          ],
+          [
+            "b004",
+            "b003"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "lexical",
+      "case": "rl_fee_wire_pos",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b002"
+        ],
+        "links": [
+          [
+            "b002",
+            "b004"
+          ]
+        ],
+        "restrictions": [
+          "b004"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "direct",
+      "case": "rl_fee_wire_pos",
+      "error": "ValueError: Span selected as both claim and restriction",
+      "finish": "stop",
+      "input_tokens": 277,
+      "output_tokens": 82,
+      "pred": null,
+      "seconds": 0.75
+    },
+    {
+      "arm": "two_stage",
+      "case": "rl_fee_wire_pos",
+      "error": null,
+      "finish": "stop/stop",
+      "input_tokens": 461,
+      "output_tokens": 49,
+      "pred": {
+        "claims": [
+          "b002",
+          "b004",
+          "b001",
+          "b003"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.844
+    },
+    {
+      "arm": "two_stage",
+      "case": "rl_fee_atm_ctrl",
+      "error": null,
+      "finish": "stop/stop",
+      "input_tokens": 599,
+      "output_tokens": 118,
+      "pred": {
+        "claims": [
+          "b002",
+          "b005"
+        ],
+        "links": [
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b005",
+            "b003"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b003",
+          "b004",
+          "b006",
+          "b007"
+        ]
+      },
+      "seconds": 1.546
+    },
+    {
+      "arm": "select_all",
+      "case": "rl_fee_atm_ctrl",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004",
+          "b005",
+          "b006",
+          "b007"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b001",
+            "b004"
+          ],
+          [
+            "b001",
+            "b005"
+          ],
+          [
+            "b001",
+            "b006"
+          ],
+          [
+            "b001",
+            "b007"
+          ],
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b002",
+            "b003"
+          ],
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b002",
+            "b005"
+          ],
+          [
+            "b002",
+            "b006"
+          ],
+          [
+            "b002",
+            "b007"
+          ],
+          [
+            "b003",
+            "b001"
+          ],
+          [
+            "b003",
+            "b002"
+          ],
+          [
+            "b003",
+            "b004"
+          ],
+          [
+            "b003",
+            "b005"
+          ],
+          [
+            "b003",
+            "b006"
+          ],
+          [
+            "b003",
+            "b007"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b004",
+            "b002"
+          ],
+          [
+            "b004",
+            "b003"
+          ],
+          [
+            "b004",
+            "b005"
+          ],
+          [
+            "b004",
+            "b006"
+          ],
+          [
+            "b004",
+            "b007"
+          ],
+          [
+            "b005",
+            "b001"
+          ],
+          [
+            "b005",
+            "b002"
+          ],
+          [
+            "b005",
+            "b003"
+          ],
+          [
+            "b005",
+            "b004"
+          ],
+          [
+            "b005",
+            "b006"
+          ],
+          [
+            "b005",
+            "b007"
+          ],
+          [
+            "b006",
+            "b001"
+          ],
+          [
+            "b006",
+            "b002"
+          ],
+          [
+            "b006",
+            "b003"
+          ],
+          [
+            "b006",
+            "b004"
+          ],
+          [
+            "b006",
+            "b005"
+          ],
+          [
+            "b006",
+            "b007"
+          ],
+          [
+            "b007",
+            "b001"
+          ],
+          [
+            "b007",
+            "b002"
+          ],
+          [
+            "b007",
+            "b003"
+          ],
+          [
+            "b007",
+            "b004"
+          ],
+          [
+            "b007",
+            "b005"
+          ],
+          [
+            "b007",
+            "b006"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b002",
+          "b003",
+          "b004",
+          "b005",
+          "b006",
+          "b007"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "lexical",
+      "case": "rl_fee_atm_ctrl",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b002",
+          "b005"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "direct",
+      "case": "rl_fee_atm_ctrl",
+      "error": null,
+      "finish": "stop",
+      "input_tokens": 349,
+      "output_tokens": 33,
+      "pred": {
+        "claims": [
+          "b002",
+          "b005"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.516
+    },
+    {
+      "arm": "lexical",
+      "case": "rl_ent_archive_ctrl",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "direct",
+      "case": "rl_ent_archive_ctrl",
+      "error": null,
+      "finish": "stop",
+      "input_tokens": 275,
+      "output_tokens": 28,
+      "pred": {
+        "claims": [
+          "b001"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.453
+    },
+    {
+      "arm": "select_all",
+      "case": "rl_ent_archive_ctrl",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b001",
+            "b004"
+          ],
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b002",
+            "b003"
+          ],
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b003",
+            "b001"
+          ],
+          [
+            "b003",
+            "b002"
+          ],
+          [
+            "b003",
+            "b004"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b004",
+            "b002"
+          ],
+          [
+            "b004",
+            "b003"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "two_stage",
+      "case": "rl_ent_archive_ctrl",
+      "error": null,
+      "finish": "stop/stop",
+      "input_tokens": 457,
+      "output_tokens": 49,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.938
+    },
+    {
+      "arm": "select_all",
+      "case": "rl_fee_custody_pos",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b001",
+            "b004"
+          ],
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b002",
+            "b003"
+          ],
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b003",
+            "b001"
+          ],
+          [
+            "b003",
+            "b002"
+          ],
+          [
+            "b003",
+            "b004"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b004",
+            "b002"
+          ],
+          [
+            "b004",
+            "b003"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "direct",
+      "case": "rl_fee_custody_pos",
+      "error": "ValueError: Span selected as both claim and restriction",
+      "finish": "stop",
+      "input_tokens": 279,
+      "output_tokens": 82,
+      "pred": null,
+      "seconds": 0.734
+    },
+    {
+      "arm": "two_stage",
+      "case": "rl_fee_custody_pos",
+      "error": "ValueError: Stage 2 truncated at token cap",
+      "finish": "stop/length",
+      "input_tokens": 462,
+      "output_tokens": 283,
+      "pred": null,
+      "seconds": 2.531
+    },
+    {
+      "arm": "lexical",
+      "case": "rl_fee_custody_pos",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001"
+        ],
+        "links": [
+          [
+            "b001",
+            "b003"
+          ]
+        ],
+        "restrictions": [
+          "b003"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "lexical",
+      "case": "rl_fee_custody_ctrl",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "select_all",
+      "case": "rl_fee_custody_ctrl",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b001",
+            "b004"
+          ],
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b002",
+            "b003"
+          ],
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b003",
+            "b001"
+          ],
+          [
+            "b003",
+            "b002"
+          ],
+          [
+            "b003",
+            "b004"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b004",
+            "b002"
+          ],
+          [
+            "b004",
+            "b003"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "two_stage",
+      "case": "rl_fee_custody_ctrl",
+      "error": null,
+      "finish": "stop/stop",
+      "input_tokens": 457,
+      "output_tokens": 49,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.907
+    },
+    {
+      "arm": "direct",
+      "case": "rl_fee_custody_ctrl",
+      "error": null,
+      "finish": "stop",
+      "input_tokens": 275,
+      "output_tokens": 28,
+      "pred": {
+        "claims": [
+          "b001"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.421
+    },
+    {
+      "arm": "lexical",
+      "case": "rl_fee_fx_pos",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b006"
+        ],
+        "links": [
+          [
+            "b002",
+            "b004"
+          ]
+        ],
+        "restrictions": [
+          "b004"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "direct",
+      "case": "rl_fee_fx_pos",
+      "error": null,
+      "finish": "stop",
+      "input_tokens": 344,
+      "output_tokens": 82,
+      "pred": {
+        "claims": [
+          "b002",
+          "b006"
+        ],
+        "links": [
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b006",
+            "b004"
+          ]
+        ],
+        "restrictions": [
+          "b004"
+        ]
+      },
+      "seconds": 0.782
+    },
+    {
+      "arm": "select_all",
+      "case": "rl_fee_fx_pos",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004",
+          "b005",
+          "b006",
+          "b007"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b001",
+            "b004"
+          ],
+          [
+            "b001",
+            "b005"
+          ],
+          [
+            "b001",
+            "b006"
+          ],
+          [
+            "b001",
+            "b007"
+          ],
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b002",
+            "b003"
+          ],
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b002",
+            "b005"
+          ],
+          [
+            "b002",
+            "b006"
+          ],
+          [
+            "b002",
+            "b007"
+          ],
+          [
+            "b003",
+            "b001"
+          ],
+          [
+            "b003",
+            "b002"
+          ],
+          [
+            "b003",
+            "b004"
+          ],
+          [
+            "b003",
+            "b005"
+          ],
+          [
+            "b003",
+            "b006"
+          ],
+          [
+            "b003",
+            "b007"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b004",
+            "b002"
+          ],
+          [
+            "b004",
+            "b003"
+          ],
+          [
+            "b004",
+            "b005"
+          ],
+          [
+            "b004",
+            "b006"
+          ],
+          [
+            "b004",
+            "b007"
+          ],
+          [
+            "b005",
+            "b001"
+          ],
+          [
+            "b005",
+            "b002"
+          ],
+          [
+            "b005",
+            "b003"
+          ],
+          [
+            "b005",
+            "b004"
+          ],
+          [
+            "b005",
+            "b006"
+          ],
+          [
+            "b005",
+            "b007"
+          ],
+          [
+            "b006",
+            "b001"
+          ],
+          [
+            "b006",
+            "b002"
+          ],
+          [
+            "b006",
+            "b003"
+          ],
+          [
+            "b006",
+            "b004"
+          ],
+          [
+            "b006",
+            "b005"
+          ],
+          [
+            "b006",
+            "b007"
+          ],
+          [
+            "b007",
+            "b001"
+          ],
+          [
+            "b007",
+            "b002"
+          ],
+          [
+            "b007",
+            "b003"
+          ],
+          [
+            "b007",
+            "b004"
+          ],
+          [
+            "b007",
+            "b005"
+          ],
+          [
+            "b007",
+            "b006"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b002",
+          "b003",
+          "b004",
+          "b005",
+          "b006",
+          "b007"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "two_stage",
+      "case": "rl_fee_fx_pos",
+      "error": null,
+      "finish": "stop/stop",
+      "input_tokens": 592,
+      "output_tokens": 146,
+      "pred": {
+        "claims": [
+          "b002",
+          "b004",
+          "b006"
+        ],
+        "links": [
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b006",
+            "b001"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b003",
+          "b005",
+          "b007"
+        ]
+      },
+      "seconds": 1.734
+    },
+    {
+      "arm": "two_stage",
+      "case": "rl_ent_leave_ctrl",
+      "error": null,
+      "finish": "stop/stop",
+      "input_tokens": 585,
+      "output_tokens": 120,
+      "pred": {
+        "claims": [
+          "b002",
+          "b005"
+        ],
+        "links": [
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b005",
+            "b004"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b003",
+          "b004",
+          "b006",
+          "b007"
+        ]
+      },
+      "seconds": 1.547
+    },
+    {
+      "arm": "direct",
+      "case": "rl_ent_leave_ctrl",
+      "error": null,
+      "finish": "stop",
+      "input_tokens": 342,
+      "output_tokens": 33,
+      "pred": {
+        "claims": [
+          "b002",
+          "b005"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.516
+    },
+    {
+      "arm": "lexical",
+      "case": "rl_ent_leave_ctrl",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b002",
+          "b005"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "select_all",
+      "case": "rl_ent_leave_ctrl",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004",
+          "b005",
+          "b006",
+          "b007"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b001",
+            "b004"
+          ],
+          [
+            "b001",
+            "b005"
+          ],
+          [
+            "b001",
+            "b006"
+          ],
+          [
+            "b001",
+            "b007"
+          ],
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b002",
+            "b003"
+          ],
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b002",
+            "b005"
+          ],
+          [
+            "b002",
+            "b006"
+          ],
+          [
+            "b002",
+            "b007"
+          ],
+          [
+            "b003",
+            "b001"
+          ],
+          [
+            "b003",
+            "b002"
+          ],
+          [
+            "b003",
+            "b004"
+          ],
+          [
+            "b003",
+            "b005"
+          ],
+          [
+            "b003",
+            "b006"
+          ],
+          [
+            "b003",
+            "b007"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b004",
+            "b002"
+          ],
+          [
+            "b004",
+            "b003"
+          ],
+          [
+            "b004",
+            "b005"
+          ],
+          [
+            "b004",
+            "b006"
+          ],
+          [
+            "b004",
+            "b007"
+          ],
+          [
+            "b005",
+            "b001"
+          ],
+          [
+            "b005",
+            "b002"
+          ],
+          [
+            "b005",
+            "b003"
+          ],
+          [
+            "b005",
+            "b004"
+          ],
+          [
+            "b005",
+            "b006"
+          ],
+          [
+            "b005",
+            "b007"
+          ],
+          [
+            "b006",
+            "b001"
+          ],
+          [
+            "b006",
+            "b002"
+          ],
+          [
+            "b006",
+            "b003"
+          ],
+          [
+            "b006",
+            "b004"
+          ],
+          [
+            "b006",
+            "b005"
+          ],
+          [
+            "b006",
+            "b007"
+          ],
+          [
+            "b007",
+            "b001"
+          ],
+          [
+            "b007",
+            "b002"
+          ],
+          [
+            "b007",
+            "b003"
+          ],
+          [
+            "b007",
+            "b004"
+          ],
+          [
+            "b007",
+            "b005"
+          ],
+          [
+            "b007",
+            "b006"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b002",
+          "b003",
+          "b004",
+          "b005",
+          "b006",
+          "b007"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "two_stage",
+      "case": "rl_date_filing_pos",
+      "error": null,
+      "finish": "stop/stop",
+      "input_tokens": 462,
+      "output_tokens": 45,
+      "pred": {
+        "claims": [
+          "b002",
+          "b003",
+          "b004"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.89
+    },
+    {
+      "arm": "direct",
+      "case": "rl_date_filing_pos",
+      "error": null,
+      "finish": "stop",
+      "input_tokens": 279,
+      "output_tokens": 40,
+      "pred": {
+        "claims": [
+          "b002",
+          "b003"
+        ],
+        "links": [],
+        "restrictions": [
+          "b004"
+        ]
+      },
+      "seconds": 0.485
+    },
+    {
+      "arm": "select_all",
+      "case": "rl_date_filing_pos",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b001",
+            "b004"
+          ],
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b002",
+            "b003"
+          ],
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b003",
+            "b001"
+          ],
+          [
+            "b003",
+            "b002"
+          ],
+          [
+            "b003",
+            "b004"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b004",
+            "b002"
+          ],
+          [
+            "b004",
+            "b003"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "lexical",
+      "case": "rl_date_filing_pos",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b002"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "select_all",
+      "case": "rl_date_filing_ctrl",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b001",
+            "b004"
+          ],
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b002",
+            "b003"
+          ],
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b003",
+            "b001"
+          ],
+          [
+            "b003",
+            "b002"
+          ],
+          [
+            "b003",
+            "b004"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b004",
+            "b002"
+          ],
+          [
+            "b004",
+            "b003"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "two_stage",
+      "case": "rl_date_filing_ctrl",
+      "error": null,
+      "finish": "stop/stop",
+      "input_tokens": 452,
+      "output_tokens": 44,
+      "pred": {
+        "claims": [
+          "b002",
+          "b003",
+          "b004"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.843
+    },
+    {
+      "arm": "direct",
+      "case": "rl_date_filing_ctrl",
+      "error": null,
+      "finish": "stop",
+      "input_tokens": 274,
+      "output_tokens": 28,
+      "pred": {
+        "claims": [
+          "b002"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.422
+    },
+    {
+      "arm": "lexical",
+      "case": "rl_date_filing_ctrl",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b002"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "direct",
+      "case": "rl_ent_archive_pos",
+      "error": "ValueError: Span selected as both claim and restriction",
+      "finish": "stop",
+      "input_tokens": 283,
+      "output_tokens": 40,
+      "pred": null,
+      "seconds": 0.485
+    },
+    {
+      "arm": "two_stage",
+      "case": "rl_ent_archive_pos",
+      "error": "ValueError: Stage 2 truncated at token cap",
+      "finish": "stop/length",
+      "input_tokens": 470,
+      "output_tokens": 282,
+      "pred": null,
+      "seconds": 2.515
+    },
+    {
+      "arm": "lexical",
+      "case": "rl_ent_archive_pos",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001"
+        ],
+        "links": [
+          [
+            "b001",
+            "b003"
+          ]
+        ],
+        "restrictions": [
+          "b003"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "select_all",
+      "case": "rl_ent_archive_pos",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b001",
+            "b004"
+          ],
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b002",
+            "b003"
+          ],
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b003",
+            "b001"
+          ],
+          [
+            "b003",
+            "b002"
+          ],
+          [
+            "b003",
+            "b004"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b004",
+            "b002"
+          ],
+          [
+            "b004",
+            "b003"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "two_stage",
+      "case": "rl_ent_leave_pos",
+      "error": "ValueError: Stage 2 truncated at token cap",
+      "finish": "stop/length",
+      "input_tokens": 592,
+      "output_tokens": 283,
+      "pred": null,
+      "seconds": 2.906
+    },
+    {
+      "arm": "lexical",
+      "case": "rl_ent_leave_pos",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b002",
+          "b005"
+        ],
+        "links": [
+          [
+            "b005",
+            "b007"
+          ]
+        ],
+        "restrictions": [
+          "b007"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "direct",
+      "case": "rl_ent_leave_pos",
+      "error": null,
+      "finish": "stop",
+      "input_tokens": 344,
+      "output_tokens": 82,
+      "pred": {
+        "claims": [
+          "b002",
+          "b005"
+        ],
+        "links": [
+          [
+            "b002",
+            "b007"
+          ],
+          [
+            "b005",
+            "b007"
+          ]
+        ],
+        "restrictions": [
+          "b007"
+        ]
+      },
+      "seconds": 0.782
+    },
+    {
+      "arm": "select_all",
+      "case": "rl_ent_leave_pos",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004",
+          "b005",
+          "b006",
+          "b007"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b001",
+            "b004"
+          ],
+          [
+            "b001",
+            "b005"
+          ],
+          [
+            "b001",
+            "b006"
+          ],
+          [
+            "b001",
+            "b007"
+          ],
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b002",
+            "b003"
+          ],
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b002",
+            "b005"
+          ],
+          [
+            "b002",
+            "b006"
+          ],
+          [
+            "b002",
+            "b007"
+          ],
+          [
+            "b003",
+            "b001"
+          ],
+          [
+            "b003",
+            "b002"
+          ],
+          [
+            "b003",
+            "b004"
+          ],
+          [
+            "b003",
+            "b005"
+          ],
+          [
+            "b003",
+            "b006"
+          ],
+          [
+            "b003",
+            "b007"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b004",
+            "b002"
+          ],
+          [
+            "b004",
+            "b003"
+          ],
+          [
+            "b004",
+            "b005"
+          ],
+          [
+            "b004",
+            "b006"
+          ],
+          [
+            "b004",
+            "b007"
+          ],
+          [
+            "b005",
+            "b001"
+          ],
+          [
+            "b005",
+            "b002"
+          ],
+          [
+            "b005",
+            "b003"
+          ],
+          [
+            "b005",
+            "b004"
+          ],
+          [
+            "b005",
+            "b006"
+          ],
+          [
+            "b005",
+            "b007"
+          ],
+          [
+            "b006",
+            "b001"
+          ],
+          [
+            "b006",
+            "b002"
+          ],
+          [
+            "b006",
+            "b003"
+          ],
+          [
+            "b006",
+            "b004"
+          ],
+          [
+            "b006",
+            "b005"
+          ],
+          [
+            "b006",
+            "b007"
+          ],
+          [
+            "b007",
+            "b001"
+          ],
+          [
+            "b007",
+            "b002"
+          ],
+          [
+            "b007",
+            "b003"
+          ],
+          [
+            "b007",
+            "b004"
+          ],
+          [
+            "b007",
+            "b005"
+          ],
+          [
+            "b007",
+            "b006"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b002",
+          "b003",
+          "b004",
+          "b005",
+          "b006",
+          "b007"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "lexical",
+      "case": "rl_fee_fx_ctrl",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b006"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "direct",
+      "case": "rl_fee_fx_ctrl",
+      "error": null,
+      "finish": "stop",
+      "input_tokens": 338,
+      "output_tokens": 33,
+      "pred": {
+        "claims": [
+          "b002",
+          "b006"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.5
+    },
+    {
+      "arm": "two_stage",
+      "case": "rl_fee_fx_ctrl",
+      "error": null,
+      "finish": "stop/stop",
+      "input_tokens": 577,
+      "output_tokens": 117,
+      "pred": {
+        "claims": [
+          "b002",
+          "b006"
+        ],
+        "links": [
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b006",
+            "b005"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b003",
+          "b004",
+          "b005",
+          "b007"
+        ]
+      },
+      "seconds": 1.5
+    },
+    {
+      "arm": "select_all",
+      "case": "rl_fee_fx_ctrl",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004",
+          "b005",
+          "b006",
+          "b007"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b001",
+            "b004"
+          ],
+          [
+            "b001",
+            "b005"
+          ],
+          [
+            "b001",
+            "b006"
+          ],
+          [
+            "b001",
+            "b007"
+          ],
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b002",
+            "b003"
+          ],
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b002",
+            "b005"
+          ],
+          [
+            "b002",
+            "b006"
+          ],
+          [
+            "b002",
+            "b007"
+          ],
+          [
+            "b003",
+            "b001"
+          ],
+          [
+            "b003",
+            "b002"
+          ],
+          [
+            "b003",
+            "b004"
+          ],
+          [
+            "b003",
+            "b005"
+          ],
+          [
+            "b003",
+            "b006"
+          ],
+          [
+            "b003",
+            "b007"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b004",
+            "b002"
+          ],
+          [
+            "b004",
+            "b003"
+          ],
+          [
+            "b004",
+            "b005"
+          ],
+          [
+            "b004",
+            "b006"
+          ],
+          [
+            "b004",
+            "b007"
+          ],
+          [
+            "b005",
+            "b001"
+          ],
+          [
+            "b005",
+            "b002"
+          ],
+          [
+            "b005",
+            "b003"
+          ],
+          [
+            "b005",
+            "b004"
+          ],
+          [
+            "b005",
+            "b006"
+          ],
+          [
+            "b005",
+            "b007"
+          ],
+          [
+            "b006",
+            "b001"
+          ],
+          [
+            "b006",
+            "b002"
+          ],
+          [
+            "b006",
+            "b003"
+          ],
+          [
+            "b006",
+            "b004"
+          ],
+          [
+            "b006",
+            "b005"
+          ],
+          [
+            "b006",
+            "b007"
+          ],
+          [
+            "b007",
+            "b001"
+          ],
+          [
+            "b007",
+            "b002"
+          ],
+          [
+            "b007",
+            "b003"
+          ],
+          [
+            "b007",
+            "b004"
+          ],
+          [
+            "b007",
+            "b005"
+          ],
+          [
+            "b007",
+            "b006"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b002",
+          "b003",
+          "b004",
+          "b005",
+          "b006",
+          "b007"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "direct",
+      "case": "rl_date_appeal_pos",
+      "error": null,
+      "finish": "stop",
+      "input_tokens": 347,
+      "output_tokens": 82,
+      "pred": {
+        "claims": [
+          "b001",
+          "b004"
+        ],
+        "links": [
+          [
+            "b001",
+            "b006"
+          ],
+          [
+            "b004",
+            "b006"
+          ]
+        ],
+        "restrictions": [
+          "b006"
+        ]
+      },
+      "seconds": 0.781
+    },
+    {
+      "arm": "lexical",
+      "case": "rl_date_appeal_pos",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b004"
+        ],
+        "links": [
+          [
+            "b004",
+            "b006"
+          ]
+        ],
+        "restrictions": [
+          "b006"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "two_stage",
+      "case": "rl_date_appeal_pos",
+      "error": "ValueError: Duplicate span ID in restrictions",
+      "finish": "stop/stop",
+      "input_tokens": 598,
+      "output_tokens": 164,
+      "pred": null,
+      "seconds": 1.969
+    },
+    {
+      "arm": "select_all",
+      "case": "rl_date_appeal_pos",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004",
+          "b005",
+          "b006"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b001",
+            "b004"
+          ],
+          [
+            "b001",
+            "b005"
+          ],
+          [
+            "b001",
+            "b006"
+          ],
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b002",
+            "b003"
+          ],
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b002",
+            "b005"
+          ],
+          [
+            "b002",
+            "b006"
+          ],
+          [
+            "b003",
+            "b001"
+          ],
+          [
+            "b003",
+            "b002"
+          ],
+          [
+            "b003",
+            "b004"
+          ],
+          [
+            "b003",
+            "b005"
+          ],
+          [
+            "b003",
+            "b006"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b004",
+            "b002"
+          ],
+          [
+            "b004",
+            "b003"
+          ],
+          [
+            "b004",
+            "b005"
+          ],
+          [
+            "b004",
+            "b006"
+          ],
+          [
+            "b005",
+            "b001"
+          ],
+          [
+            "b005",
+            "b002"
+          ],
+          [
+            "b005",
+            "b003"
+          ],
+          [
+            "b005",
+            "b004"
+          ],
+          [
+            "b005",
+            "b006"
+          ],
+          [
+            "b006",
+            "b001"
+          ],
+          [
+            "b006",
+            "b002"
+          ],
+          [
+            "b006",
+            "b003"
+          ],
+          [
+            "b006",
+            "b004"
+          ],
+          [
+            "b006",
+            "b005"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b002",
+          "b003",
+          "b004",
+          "b005",
+          "b006"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "select_all",
+      "case": "rl_ent_ferry_pos",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b001",
+            "b004"
+          ],
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b002",
+            "b003"
+          ],
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b003",
+            "b001"
+          ],
+          [
+            "b003",
+            "b002"
+          ],
+          [
+            "b003",
+            "b004"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b004",
+            "b002"
+          ],
+          [
+            "b004",
+            "b003"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "lexical",
+      "case": "rl_ent_ferry_pos",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b002"
+        ],
+        "links": [
+          [
+            "b002",
+            "b004"
+          ]
+        ],
+        "restrictions": [
+          "b004"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "direct",
+      "case": "rl_ent_ferry_pos",
+      "error": "ValueError: Span selected as both claim and restriction",
+      "finish": "stop",
+      "input_tokens": 285,
+      "output_tokens": 40,
+      "pred": null,
+      "seconds": 0.547
+    },
+    {
+      "arm": "two_stage",
+      "case": "rl_ent_ferry_pos",
+      "error": "ValueError: Duplicate span ID in restrictions",
+      "finish": "stop/stop",
+      "input_tokens": 471,
+      "output_tokens": 181,
+      "pred": null,
+      "seconds": 2.015
+    },
+    {
+      "arm": "select_all",
+      "case": "rl_date_grant_ctrl",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004",
+          "b005",
+          "b006",
+          "b007"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b001",
+            "b004"
+          ],
+          [
+            "b001",
+            "b005"
+          ],
+          [
+            "b001",
+            "b006"
+          ],
+          [
+            "b001",
+            "b007"
+          ],
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b002",
+            "b003"
+          ],
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b002",
+            "b005"
+          ],
+          [
+            "b002",
+            "b006"
+          ],
+          [
+            "b002",
+            "b007"
+          ],
+          [
+            "b003",
+            "b001"
+          ],
+          [
+            "b003",
+            "b002"
+          ],
+          [
+            "b003",
+            "b004"
+          ],
+          [
+            "b003",
+            "b005"
+          ],
+          [
+            "b003",
+            "b006"
+          ],
+          [
+            "b003",
+            "b007"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b004",
+            "b002"
+          ],
+          [
+            "b004",
+            "b003"
+          ],
+          [
+            "b004",
+            "b005"
+          ],
+          [
+            "b004",
+            "b006"
+          ],
+          [
+            "b004",
+            "b007"
+          ],
+          [
+            "b005",
+            "b001"
+          ],
+          [
+            "b005",
+            "b002"
+          ],
+          [
+            "b005",
+            "b003"
+          ],
+          [
+            "b005",
+            "b004"
+          ],
+          [
+            "b005",
+            "b006"
+          ],
+          [
+            "b005",
+            "b007"
+          ],
+          [
+            "b006",
+            "b001"
+          ],
+          [
+            "b006",
+            "b002"
+          ],
+          [
+            "b006",
+            "b003"
+          ],
+          [
+            "b006",
+            "b004"
+          ],
+          [
+            "b006",
+            "b005"
+          ],
+          [
+            "b006",
+            "b007"
+          ],
+          [
+            "b007",
+            "b001"
+          ],
+          [
+            "b007",
+            "b002"
+          ],
+          [
+            "b007",
+            "b003"
+          ],
+          [
+            "b007",
+            "b004"
+          ],
+          [
+            "b007",
+            "b005"
+          ],
+          [
+            "b007",
+            "b006"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b002",
+          "b003",
+          "b004",
+          "b005",
+          "b006",
+          "b007"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "two_stage",
+      "case": "rl_date_grant_ctrl",
+      "error": null,
+      "finish": "stop/stop",
+      "input_tokens": 595,
+      "output_tokens": 116,
+      "pred": {
+        "claims": [
+          "b002",
+          "b006"
+        ],
+        "links": [
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b006",
+            "b005"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b003",
+          "b004",
+          "b005",
+          "b007"
+        ]
+      },
+      "seconds": 1.61
+    },
+    {
+      "arm": "direct",
+      "case": "rl_date_grant_ctrl",
+      "error": null,
+      "finish": "stop",
+      "input_tokens": 347,
+      "output_tokens": 33,
+      "pred": {
+        "claims": [
+          "b002",
+          "b006"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.515
+    },
+    {
+      "arm": "lexical",
+      "case": "rl_date_grant_ctrl",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b002",
+          "b003",
+          "b006"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "select_all",
+      "case": "rl_fee_wire_ctrl",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b001",
+            "b004"
+          ],
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b002",
+            "b003"
+          ],
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b003",
+            "b001"
+          ],
+          [
+            "b003",
+            "b002"
+          ],
+          [
+            "b003",
+            "b004"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b004",
+            "b002"
+          ],
+          [
+            "b004",
+            "b003"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b002",
+          "b003",
+          "b004"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "direct",
+      "case": "rl_fee_wire_ctrl",
+      "error": null,
+      "finish": "stop",
+      "input_tokens": 274,
+      "output_tokens": 43,
+      "pred": {
+        "claims": [
+          "b002",
+          "b001",
+          "b003",
+          "b004"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.531
+    },
+    {
+      "arm": "two_stage",
+      "case": "rl_fee_wire_ctrl",
+      "error": null,
+      "finish": "stop/stop",
+      "input_tokens": 455,
+      "output_tokens": 49,
+      "pred": {
+        "claims": [
+          "b002",
+          "b001",
+          "b003",
+          "b004"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.875
+    },
+    {
+      "arm": "lexical",
+      "case": "rl_fee_wire_ctrl",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b002"
+        ],
+        "links": [],
+        "restrictions": []
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "direct",
+      "case": "rl_ent_credit_pos",
+      "error": null,
+      "finish": "stop",
+      "input_tokens": 361,
+      "output_tokens": 82,
+      "pred": {
+        "claims": [
+          "b002",
+          "b006"
+        ],
+        "links": [
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b006",
+            "b004"
+          ]
+        ],
+        "restrictions": [
+          "b004"
+        ]
+      },
+      "seconds": 0.782
+    },
+    {
+      "arm": "lexical",
+      "case": "rl_ent_credit_pos",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b002",
+          "b006"
+        ],
+        "links": [
+          [
+            "b002",
+            "b004"
+          ]
+        ],
+        "restrictions": [
+          "b004"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "select_all",
+      "case": "rl_ent_credit_pos",
+      "error": null,
+      "finish": null,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "pred": {
+        "claims": [
+          "b001",
+          "b002",
+          "b003",
+          "b004",
+          "b005",
+          "b006",
+          "b007"
+        ],
+        "links": [
+          [
+            "b001",
+            "b002"
+          ],
+          [
+            "b001",
+            "b003"
+          ],
+          [
+            "b001",
+            "b004"
+          ],
+          [
+            "b001",
+            "b005"
+          ],
+          [
+            "b001",
+            "b006"
+          ],
+          [
+            "b001",
+            "b007"
+          ],
+          [
+            "b002",
+            "b001"
+          ],
+          [
+            "b002",
+            "b003"
+          ],
+          [
+            "b002",
+            "b004"
+          ],
+          [
+            "b002",
+            "b005"
+          ],
+          [
+            "b002",
+            "b006"
+          ],
+          [
+            "b002",
+            "b007"
+          ],
+          [
+            "b003",
+            "b001"
+          ],
+          [
+            "b003",
+            "b002"
+          ],
+          [
+            "b003",
+            "b004"
+          ],
+          [
+            "b003",
+            "b005"
+          ],
+          [
+            "b003",
+            "b006"
+          ],
+          [
+            "b003",
+            "b007"
+          ],
+          [
+            "b004",
+            "b001"
+          ],
+          [
+            "b004",
+            "b002"
+          ],
+          [
+            "b004",
+            "b003"
+          ],
+          [
+            "b004",
+            "b005"
+          ],
+          [
+            "b004",
+            "b006"
+          ],
+          [
+            "b004",
+            "b007"
+          ],
+          [
+            "b005",
+            "b001"
+          ],
+          [
+            "b005",
+            "b002"
+          ],
+          [
+            "b005",
+            "b003"
+          ],
+          [
+            "b005",
+            "b004"
+          ],
+          [
+            "b005",
+            "b006"
+          ],
+          [
+            "b005",
+            "b007"
+          ],
+          [
+            "b006",
+            "b001"
+          ],
+          [
+            "b006",
+            "b002"
+          ],
+          [
+            "b006",
+            "b003"
+          ],
+          [
+            "b006",
+            "b004"
+          ],
+          [
+            "b006",
+            "b005"
+          ],
+          [
+            "b006",
+            "b007"
+          ],
+          [
+            "b007",
+            "b001"
+          ],
+          [
+            "b007",
+            "b002"
+          ],
+          [
+            "b007",
+            "b003"
+          ],
+          [
+            "b007",
+            "b004"
+          ],
+          [
+            "b007",
+            "b005"
+          ],
+          [
+            "b007",
+            "b006"
+          ]
+        ],
+        "restrictions": [
+          "b001",
+          "b002",
+          "b003",
+          "b004",
+          "b005",
+          "b006",
+          "b007"
+        ]
+      },
+      "seconds": 0.0
+    },
+    {
+      "arm": "two_stage",
+      "case": "rl_ent_credit_pos",
+      "error": "ValueError: Duplicate span ID in claims",
+      "finish": "stop",
+      "input_tokens": 284,
+      "output_tokens": 32,
+      "pred": null,
+      "seconds": 0.547
+    }
+  ],
+  "scope": "Fresh authored matched notices across fees, dates, and entitlements; not field issuer validation or answer quality."
+}
