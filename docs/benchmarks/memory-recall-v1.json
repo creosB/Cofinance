@@ -1,0 +1,1422 @@
+{
+  "arms": {
+    "hybrid_fts5_hymemory": {
+      "cross_session_leaks": 0,
+      "errors": 0,
+      "lexical": {
+        "mrr": 1.0,
+        "n": 10,
+        "recall_at_1": 1.0,
+        "recall_at_2": 1.0
+      },
+      "n_total": 30,
+      "negative": {
+        "clean_abstention_rate": 1.0,
+        "false_hit_count": 0,
+        "false_hit_rate": 0.0,
+        "n": 5
+      },
+      "p50_ms": 118.48,
+      "p95_ms": 146.89,
+      "paraphrase": {
+        "mrr": 0.7333,
+        "n": 15,
+        "recall_at_1": 0.7333,
+        "recall_at_2": 0.7333
+      },
+      "positive": {
+        "mrr": 0.84,
+        "n": 25,
+        "recall_at_1": 0.84,
+        "recall_at_2": 0.84
+      }
+    },
+    "keyword_fts5": {
+      "cross_session_leaks": 0,
+      "errors": 0,
+      "lexical": {
+        "mrr": 1.0,
+        "n": 10,
+        "recall_at_1": 1.0,
+        "recall_at_2": 1.0
+      },
+      "n_total": 30,
+      "negative": {
+        "clean_abstention_rate": 1.0,
+        "false_hit_count": 0,
+        "false_hit_rate": 0.0,
+        "n": 5
+      },
+      "p50_ms": 2.17,
+      "p95_ms": 2.94,
+      "paraphrase": {
+        "mrr": 0.0,
+        "n": 15,
+        "recall_at_1": 0.0,
+        "recall_at_2": 0.0
+      },
+      "positive": {
+        "mrr": 0.4,
+        "n": 25,
+        "recall_at_1": 0.4,
+        "recall_at_2": 0.4
+      }
+    }
+  },
+  "cases_path": "qualify/memory_benchmark_cases.json",
+  "cases_sha256": "9fb025dccda61faefa6e5929f7486efae351874f2ec1b7496b00e712d7a63abe",
+  "forget_checks": {
+    "leaks": 0,
+    "rows": [
+      {
+        "forget_run_id": "s1_r01",
+        "hybrid_leaked": false,
+        "keyword_leaked": false,
+        "session_id": "s1"
+      },
+      {
+        "forget_run_id": "s4_r03",
+        "hybrid_leaked": false,
+        "keyword_leaked": false,
+        "session_id": "s4"
+      }
+    ],
+    "total": 2
+  },
+  "format": "cofinance-memory-benchmark/1",
+  "ingest_s": 18.41,
+  "limits": [
+    "30 authored, subagent-reviewed follow-ups across 6 illustrative sessions, not live Baris chat_v2.db history (which remains 0/30)",
+    "Paraphrase queries were intentionally designed to avoid lexical overlap with stored turns, highlighting semantic retrieval upside",
+    "Measures recall accuracy and latency in isolation, not downstream narrator answer quality"
+  ],
+  "paired_hybrid_minus_keyword": {
+    "mrr": {
+      "ci95": [
+        0.24,
+        0.64
+      ],
+      "diff": 0.44
+    },
+    "recall_at_1": {
+      "ci95": [
+        0.24,
+        0.64
+      ],
+      "diff": 0.44
+    },
+    "recall_at_2": {
+      "ci95": [
+        0.24,
+        0.64
+      ],
+      "diff": 0.44
+    }
+  },
+  "protocol_sha256": "f45da61b4307123859be23d5fcc5eea2974eb6e213ab40d4df93e88fc51ab2de",
+  "rows": {
+    "hybrid_fts5_hymemory": [
+      {
+        "category": "lexical",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s1_r01"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f01",
+        "ms": 157.73,
+        "returned_run_ids": [
+          "s1_r01",
+          "s1_r05"
+        ],
+        "rr": 1.0,
+        "session_id": "s1",
+        "sources": [
+          [
+            "keyword",
+            "semantic"
+          ],
+          [
+            "keyword",
+            "semantic"
+          ]
+        ]
+      },
+      {
+        "category": "lexical",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s1_r03"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f02",
+        "ms": 105.39,
+        "returned_run_ids": [
+          "s1_r03",
+          "s1_r04"
+        ],
+        "rr": 1.0,
+        "session_id": "s1",
+        "sources": [
+          [
+            "keyword",
+            "semantic"
+          ],
+          [
+            "keyword",
+            "semantic"
+          ]
+        ]
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s1_r02"
+        ],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f03",
+        "ms": 121.47,
+        "returned_run_ids": [
+          "s1_r04",
+          "s1_r03"
+        ],
+        "rr": 0.0,
+        "session_id": "s1",
+        "sources": [
+          [
+            "keyword",
+            "semantic"
+          ],
+          [
+            "keyword",
+            "semantic"
+          ]
+        ]
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s1_r04"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f04",
+        "ms": 114.89,
+        "returned_run_ids": [
+          "s1_r04"
+        ],
+        "rr": 1.0,
+        "session_id": "s1",
+        "sources": [
+          [
+            "semantic"
+          ]
+        ]
+      },
+      {
+        "category": "negative",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f05",
+        "ms": 88.81,
+        "returned_run_ids": [],
+        "rr": 0.0,
+        "session_id": "s1",
+        "sources": []
+      },
+      {
+        "category": "lexical",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s2_r02"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f06",
+        "ms": 120.86,
+        "returned_run_ids": [
+          "s2_r02",
+          "s2_r01"
+        ],
+        "rr": 1.0,
+        "session_id": "s2",
+        "sources": [
+          [
+            "keyword",
+            "semantic"
+          ],
+          [
+            "keyword",
+            "semantic"
+          ]
+        ]
+      },
+      {
+        "category": "lexical",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s2_r05"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f07",
+        "ms": 119.42,
+        "returned_run_ids": [
+          "s2_r05",
+          "s2_r01"
+        ],
+        "rr": 1.0,
+        "session_id": "s2",
+        "sources": [
+          [
+            "keyword",
+            "semantic"
+          ],
+          [
+            "keyword",
+            "semantic"
+          ]
+        ]
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s2_r01"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f08",
+        "ms": 107.18,
+        "returned_run_ids": [
+          "s2_r01"
+        ],
+        "rr": 1.0,
+        "session_id": "s2",
+        "sources": [
+          [
+            "semantic"
+          ]
+        ]
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s2_r03"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f09",
+        "ms": 123.37,
+        "returned_run_ids": [
+          "s2_r03"
+        ],
+        "rr": 1.0,
+        "session_id": "s2",
+        "sources": [
+          [
+            "semantic"
+          ]
+        ]
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s2_r04"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f10",
+        "ms": 117.55,
+        "returned_run_ids": [
+          "s2_r04",
+          "s2_r03"
+        ],
+        "rr": 1.0,
+        "session_id": "s2",
+        "sources": [
+          [
+            "semantic"
+          ],
+          [
+            "keyword"
+          ]
+        ]
+      },
+      {
+        "category": "lexical",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s3_r01"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f11",
+        "ms": 128.71,
+        "returned_run_ids": [
+          "s3_r01",
+          "s3_r02"
+        ],
+        "rr": 1.0,
+        "session_id": "s3",
+        "sources": [
+          [
+            "keyword",
+            "semantic"
+          ],
+          [
+            "keyword",
+            "semantic"
+          ]
+        ]
+      },
+      {
+        "category": "lexical",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s3_r03"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f12",
+        "ms": 170.98,
+        "returned_run_ids": [
+          "s3_r03"
+        ],
+        "rr": 1.0,
+        "session_id": "s3",
+        "sources": [
+          [
+            "keyword",
+            "semantic"
+          ]
+        ]
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s3_r02"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f13",
+        "ms": 129.33,
+        "returned_run_ids": [
+          "s3_r02",
+          "s3_r03"
+        ],
+        "rr": 1.0,
+        "session_id": "s3",
+        "sources": [
+          [
+            "semantic"
+          ],
+          [
+            "semantic"
+          ]
+        ]
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s3_r04"
+        ],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f14",
+        "ms": 133.65,
+        "returned_run_ids": [],
+        "rr": 0.0,
+        "session_id": "s3",
+        "sources": []
+      },
+      {
+        "category": "negative",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f15",
+        "ms": 113.86,
+        "returned_run_ids": [],
+        "rr": 0.0,
+        "session_id": "s3",
+        "sources": []
+      },
+      {
+        "category": "lexical",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s4_r01"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f16",
+        "ms": 124.94,
+        "returned_run_ids": [
+          "s4_r01",
+          "s4_r05"
+        ],
+        "rr": 1.0,
+        "session_id": "s4",
+        "sources": [
+          [
+            "keyword",
+            "semantic"
+          ],
+          [
+            "keyword",
+            "semantic"
+          ]
+        ]
+      },
+      {
+        "category": "lexical",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s4_r04"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f17",
+        "ms": 103.55,
+        "returned_run_ids": [
+          "s4_r04",
+          "s4_r05"
+        ],
+        "rr": 1.0,
+        "session_id": "s4",
+        "sources": [
+          [
+            "keyword",
+            "semantic"
+          ],
+          [
+            "keyword",
+            "semantic"
+          ]
+        ]
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s4_r02"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f18",
+        "ms": 108.71,
+        "returned_run_ids": [
+          "s4_r02",
+          "s4_r01"
+        ],
+        "rr": 1.0,
+        "session_id": "s4",
+        "sources": [
+          [
+            "semantic"
+          ],
+          [
+            "keyword"
+          ]
+        ]
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s4_r03"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f19",
+        "ms": 100.13,
+        "returned_run_ids": [
+          "s4_r03"
+        ],
+        "rr": 1.0,
+        "session_id": "s4",
+        "sources": [
+          [
+            "semantic"
+          ]
+        ]
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s4_r05"
+        ],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f20",
+        "ms": 121.43,
+        "returned_run_ids": [
+          "s4_r01"
+        ],
+        "rr": 0.0,
+        "session_id": "s4",
+        "sources": [
+          [
+            "keyword"
+          ]
+        ]
+      },
+      {
+        "category": "lexical",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s5_r04"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f21",
+        "ms": 114.89,
+        "returned_run_ids": [
+          "s5_r04",
+          "s5_r01"
+        ],
+        "rr": 1.0,
+        "session_id": "s5",
+        "sources": [
+          [
+            "keyword",
+            "semantic"
+          ],
+          [
+            "keyword",
+            "semantic"
+          ]
+        ]
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s5_r01"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f22",
+        "ms": 129.43,
+        "returned_run_ids": [
+          "s5_r01",
+          "s5_r04"
+        ],
+        "rr": 1.0,
+        "session_id": "s5",
+        "sources": [
+          [
+            "semantic"
+          ],
+          [
+            "semantic"
+          ]
+        ]
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s5_r02"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f23",
+        "ms": 120.15,
+        "returned_run_ids": [
+          "s5_r02"
+        ],
+        "rr": 1.0,
+        "session_id": "s5",
+        "sources": [
+          [
+            "semantic"
+          ]
+        ]
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s5_r03"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f24",
+        "ms": 133.35,
+        "returned_run_ids": [
+          "s5_r03"
+        ],
+        "rr": 1.0,
+        "session_id": "s5",
+        "sources": [
+          [
+            "semantic"
+          ]
+        ]
+      },
+      {
+        "category": "negative",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f25",
+        "ms": 98.52,
+        "returned_run_ids": [],
+        "rr": 0.0,
+        "session_id": "s5",
+        "sources": []
+      },
+      {
+        "category": "lexical",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s6_r02"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f26",
+        "ms": 98.37,
+        "returned_run_ids": [
+          "s6_r02",
+          "s6_r04"
+        ],
+        "rr": 1.0,
+        "session_id": "s6",
+        "sources": [
+          [
+            "keyword",
+            "semantic"
+          ],
+          [
+            "keyword",
+            "semantic"
+          ]
+        ]
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s6_r01"
+        ],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f27",
+        "ms": 110.49,
+        "returned_run_ids": [],
+        "rr": 0.0,
+        "session_id": "s6",
+        "sources": []
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s6_r03"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f28",
+        "ms": 132.31,
+        "returned_run_ids": [
+          "s6_r03",
+          "s6_r04"
+        ],
+        "rr": 1.0,
+        "session_id": "s6",
+        "sources": [
+          [
+            "semantic"
+          ],
+          [
+            "semantic"
+          ]
+        ]
+      },
+      {
+        "category": "negative",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f29",
+        "ms": 97.73,
+        "returned_run_ids": [],
+        "rr": 0.0,
+        "session_id": "s6",
+        "sources": []
+      },
+      {
+        "category": "negative",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f30",
+        "ms": 108.99,
+        "returned_run_ids": [],
+        "rr": 0.0,
+        "session_id": "s6",
+        "sources": []
+      }
+    ],
+    "keyword_fts5": [
+      {
+        "category": "lexical",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s1_r01"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f01",
+        "ms": 2.98,
+        "returned_run_ids": [
+          "s1_r01",
+          "s1_r05"
+        ],
+        "rr": 1.0,
+        "session_id": "s1",
+        "sources": [
+          [],
+          []
+        ]
+      },
+      {
+        "category": "lexical",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s1_r03"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f02",
+        "ms": 1.95,
+        "returned_run_ids": [
+          "s1_r03",
+          "s1_r04"
+        ],
+        "rr": 1.0,
+        "session_id": "s1",
+        "sources": [
+          [],
+          []
+        ]
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s1_r02"
+        ],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f03",
+        "ms": 2.51,
+        "returned_run_ids": [
+          "s1_r03",
+          "s1_r04"
+        ],
+        "rr": 0.0,
+        "session_id": "s1",
+        "sources": [
+          [],
+          []
+        ]
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s1_r04"
+        ],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f04",
+        "ms": 2.17,
+        "returned_run_ids": [],
+        "rr": 0.0,
+        "session_id": "s1",
+        "sources": []
+      },
+      {
+        "category": "negative",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f05",
+        "ms": 1.75,
+        "returned_run_ids": [],
+        "rr": 0.0,
+        "session_id": "s1",
+        "sources": []
+      },
+      {
+        "category": "lexical",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s2_r02"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f06",
+        "ms": 1.77,
+        "returned_run_ids": [
+          "s2_r02",
+          "s2_r01"
+        ],
+        "rr": 1.0,
+        "session_id": "s2",
+        "sources": [
+          [],
+          []
+        ]
+      },
+      {
+        "category": "lexical",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s2_r05"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f07",
+        "ms": 2.09,
+        "returned_run_ids": [
+          "s2_r05",
+          "s2_r01"
+        ],
+        "rr": 1.0,
+        "session_id": "s2",
+        "sources": [
+          [],
+          []
+        ]
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s2_r01"
+        ],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f08",
+        "ms": 1.73,
+        "returned_run_ids": [],
+        "rr": 0.0,
+        "session_id": "s2",
+        "sources": []
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s2_r03"
+        ],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f09",
+        "ms": 1.9,
+        "returned_run_ids": [],
+        "rr": 0.0,
+        "session_id": "s2",
+        "sources": []
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s2_r04"
+        ],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f10",
+        "ms": 1.91,
+        "returned_run_ids": [
+          "s2_r03"
+        ],
+        "rr": 0.0,
+        "session_id": "s2",
+        "sources": [
+          []
+        ]
+      },
+      {
+        "category": "lexical",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s3_r01"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f11",
+        "ms": 2.15,
+        "returned_run_ids": [
+          "s3_r01",
+          "s3_r02"
+        ],
+        "rr": 1.0,
+        "session_id": "s3",
+        "sources": [
+          [],
+          []
+        ]
+      },
+      {
+        "category": "lexical",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s3_r03"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f12",
+        "ms": 2.65,
+        "returned_run_ids": [
+          "s3_r03"
+        ],
+        "rr": 1.0,
+        "session_id": "s3",
+        "sources": [
+          []
+        ]
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s3_r02"
+        ],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f13",
+        "ms": 2.26,
+        "returned_run_ids": [],
+        "rr": 0.0,
+        "session_id": "s3",
+        "sources": []
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s3_r04"
+        ],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f14",
+        "ms": 2.9,
+        "returned_run_ids": [],
+        "rr": 0.0,
+        "session_id": "s3",
+        "sources": []
+      },
+      {
+        "category": "negative",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f15",
+        "ms": 2.69,
+        "returned_run_ids": [],
+        "rr": 0.0,
+        "session_id": "s3",
+        "sources": []
+      },
+      {
+        "category": "lexical",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s4_r01"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f16",
+        "ms": 2.64,
+        "returned_run_ids": [
+          "s4_r01",
+          "s4_r05"
+        ],
+        "rr": 1.0,
+        "session_id": "s4",
+        "sources": [
+          [],
+          []
+        ]
+      },
+      {
+        "category": "lexical",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s4_r04"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f17",
+        "ms": 2.37,
+        "returned_run_ids": [
+          "s4_r04",
+          "s4_r03"
+        ],
+        "rr": 1.0,
+        "session_id": "s4",
+        "sources": [
+          [],
+          []
+        ]
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s4_r02"
+        ],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f18",
+        "ms": 3.24,
+        "returned_run_ids": [
+          "s4_r01"
+        ],
+        "rr": 0.0,
+        "session_id": "s4",
+        "sources": [
+          []
+        ]
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s4_r03"
+        ],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f19",
+        "ms": 2.25,
+        "returned_run_ids": [],
+        "rr": 0.0,
+        "session_id": "s4",
+        "sources": []
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s4_r05"
+        ],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f20",
+        "ms": 2.68,
+        "returned_run_ids": [
+          "s4_r01"
+        ],
+        "rr": 0.0,
+        "session_id": "s4",
+        "sources": [
+          []
+        ]
+      },
+      {
+        "category": "lexical",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s5_r04"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f21",
+        "ms": 2.76,
+        "returned_run_ids": [
+          "s5_r04",
+          "s5_r01"
+        ],
+        "rr": 1.0,
+        "session_id": "s5",
+        "sources": [
+          [],
+          []
+        ]
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s5_r01"
+        ],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f22",
+        "ms": 2.06,
+        "returned_run_ids": [],
+        "rr": 0.0,
+        "session_id": "s5",
+        "sources": []
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s5_r02"
+        ],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f23",
+        "ms": 1.78,
+        "returned_run_ids": [],
+        "rr": 0.0,
+        "session_id": "s5",
+        "sources": []
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s5_r03"
+        ],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f24",
+        "ms": 1.64,
+        "returned_run_ids": [],
+        "rr": 0.0,
+        "session_id": "s5",
+        "sources": []
+      },
+      {
+        "category": "negative",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f25",
+        "ms": 2.54,
+        "returned_run_ids": [],
+        "rr": 0.0,
+        "session_id": "s5",
+        "sources": []
+      },
+      {
+        "category": "lexical",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s6_r02"
+        ],
+        "hit_at_1": true,
+        "hit_at_2": true,
+        "id": "f26",
+        "ms": 2.16,
+        "returned_run_ids": [
+          "s6_r02",
+          "s6_r04"
+        ],
+        "rr": 1.0,
+        "session_id": "s6",
+        "sources": [
+          [],
+          []
+        ]
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s6_r01"
+        ],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f27",
+        "ms": 2.26,
+        "returned_run_ids": [],
+        "rr": 0.0,
+        "session_id": "s6",
+        "sources": []
+      },
+      {
+        "category": "paraphrase",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [
+          "s6_r03"
+        ],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f28",
+        "ms": 1.82,
+        "returned_run_ids": [],
+        "rr": 0.0,
+        "session_id": "s6",
+        "sources": []
+      },
+      {
+        "category": "negative",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f29",
+        "ms": 1.8,
+        "returned_run_ids": [],
+        "rr": 0.0,
+        "session_id": "s6",
+        "sources": []
+      },
+      {
+        "category": "negative",
+        "cross_session_leaks": 0,
+        "error": null,
+        "expected_run_ids": [],
+        "hit_at_1": false,
+        "hit_at_2": false,
+        "id": "f30",
+        "ms": 2.18,
+        "returned_run_ids": [],
+        "rr": 0.0,
+        "session_id": "s6",
+        "sources": []
+      }
+    ]
+  },
+  "semantic_backend": "Hy-Memory lite (Qwen3-Embedding-0.6B, local)",
+  "splits": {
+    "hybrid_fts5_hymemory": {
+      "first_half": {
+        "negative": {
+          "clean_abstention_rate": 1.0,
+          "false_hit_count": 0,
+          "false_hit_rate": 0.0,
+          "n": 2
+        },
+        "positive": {
+          "mrr": 0.8462,
+          "n": 13,
+          "recall_at_1": 0.8462,
+          "recall_at_2": 0.8462
+        }
+      },
+      "second_half": {
+        "negative": {
+          "clean_abstention_rate": 1.0,
+          "false_hit_count": 0,
+          "false_hit_rate": 0.0,
+          "n": 3
+        },
+        "positive": {
+          "mrr": 0.8333,
+          "n": 12,
+          "recall_at_1": 0.8333,
+          "recall_at_2": 0.8333
+        }
+      }
+    },
+    "keyword_fts5": {
+      "first_half": {
+        "negative": {
+          "clean_abstention_rate": 1.0,
+          "false_hit_count": 0,
+          "false_hit_rate": 0.0,
+          "n": 2
+        },
+        "positive": {
+          "mrr": 0.4615,
+          "n": 13,
+          "recall_at_1": 0.4615,
+          "recall_at_2": 0.4615
+        }
+      },
+      "second_half": {
+        "negative": {
+          "clean_abstention_rate": 1.0,
+          "false_hit_count": 0,
+          "false_hit_rate": 0.0,
+          "n": 3
+        },
+        "positive": {
+          "mrr": 0.3333,
+          "n": 12,
+          "recall_at_1": 0.3333,
+          "recall_at_2": 0.3333
+        }
+      }
+    }
+  },
+  "warning": "Experimental one-look memory benchmark on 30 authored, subagent-reviewed follow-ups (not live user chats)."
+}
