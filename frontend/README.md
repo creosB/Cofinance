@@ -30,7 +30,7 @@ python -S -E -B -m ui.workbench --port 8876
 - Memory (Conversation options): what the conversation can recall. Remember a short note, forget
   one item, or forget the whole conversation; *Forget from memory* sits under each answer. Forgetting stops recall
   only: the answer stays in the history. Notes are context for the narrator, never evidence.
-- Attachments: text PDFs with page citations; no OCR. Optional qualified Deep think applies to the final narrator only.
+- Attachments: text PDFs with source-grouped page citations; no OCR. Optional qualified Deep think applies to the final narrator only.
 - Research: recorded synthesis, specialist reports, and gate decisions.
 - Execution: switch between Run map and Step list. Select a node or observation
   to inspect input, emitted labels or text, number validation, and accepted output.
@@ -67,9 +67,13 @@ Passing the synthetic smoke suite does not establish financial accuracy. Failed 
 qualification cannot enable the picker. Tool-only reporting does not count as model inference.
 No hosted-model fallback, arbitrary model URLs, arbitrary shell commands, or model tool authority.
 
-GLiNER runs from its pinned existing local cache in a bounded subprocess. Startup and
-inference can be cancelled without importing the ML stack into the HTTP server. A restart
-marks incomplete chat jobs interrupted rather than silently replaying user requests.
+GLiNER runs from its pinned existing local cache in a bounded subprocess, using a SHA-256
+verified, parity-gated ONNX FP32 encoder cache (`COFINANCE_ROUTER_ONNX=auto|off|required`)
+with automatic PyTorch fallback, and fail-closed batched headline RPCs for Clock 1. Startup
+and inference can be cancelled without importing the ML stack into the HTTP server. Live
+`/api/events` SSE streams wake via `threading.Condition` on store, model, news, and close
+mutations rather than polling every 500 ms. A restart marks incomplete chat jobs interrupted
+rather than silently replaying user requests.
 
 Market tools fetch real provider data. Failures stay unavailable. A 52-week high is never
 called an all-time high, and missing sentiment does not become a default neutral score.
@@ -105,8 +109,9 @@ Action retries reuse request identity to avoid duplicate research submissions.
 
 Evidence is rendered as text, never trusted HTML. External evidence links permit only
 credential-free HTTP(S) and never open automatically. Traces are bounded and redact key
-fields and tagged thinking; this is not comprehensive data-loss prevention. Numeric
-matching is not complete factual verification: units and the claim itself still matter.
+fields and tagged thinking; this is not comprehensive data-loss prevention. Deterministic
+numeric and claim-provenance checks catch ungrounded numbers and explicit asset, metric,
+or unit misbindings, but are not complete factual verification.
 
 CSP permits self scripts, not inline scripts or eval; inline styles are allowed for Radix
 positioning and nesting. Built assets are restricted to bounded files under `dist/assets`.
@@ -136,8 +141,11 @@ Browser regressions use installed Chrome/Playwright without browser downloads:
 
 ```text
 set COFINANCE_BROWSER_TESTS=1
-python -B -m unittest tests.test_dashboard tests.test_run_map_browser
+python -B -m unittest tests.test_dashboard tests.test_chat_shell_browser tests.test_run_map_browser
 ```
+
+Run `python dev.py preflight` before launching to verify SQLite integrity, frozen qualification
+hashes, caches, and port availability (see [docs/OPERATIONS.md](../docs/OPERATIONS.md)).
 
 Real local-model runs are separate from fixture tests and cannot be replaced by them.
 Keep measured reports and traces private in ignored local directories.

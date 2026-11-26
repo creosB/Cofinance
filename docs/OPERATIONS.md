@@ -1,5 +1,7 @@
 # Cofinance Local Operations: Fresh Install, Preflight, Backup and Recovery
 
+[Start here](../README.md) | [How it works](METHOD.md) | [Experiment index](SCORECARD.md) | [Dashboard setup](../frontend/README.md)
+
 This guide covers reproducible local checks and state recovery without touching external hosts or hosted models. All state lives under ignored `data/`.
 
 ## Preflight checklist
@@ -64,12 +66,14 @@ To restore into `data/`:
 All verification harnesses run manually, offline, and read-only on saved state (no scheduler):
 
 ```text
+python -B -m qualify.parity_oracle self-check
 python dev.py outer-loop --fail-on-mismatch
 python dev.py memory-eval
 python dev.py spotcheck prepare
 python dev.py spotcheck score
 ```
 
+- `parity_oracle self-check`: runs the 26-case pairwise inner-loop differential oracle with replayed model outputs, 6 ordered stage checkpoints, and privacy-preserving diff fingerprints.
 - `outer-loop`: replays saved local chat traces via fail-closed `StrictReplayLLM` with a socket network fence and privacy-preserving diff fingerprints.
 - `memory-eval`: checks whether `data/chat_v2.db` has reached 30 real follow-ups (`waiting_for_data` below 30), audits `shadow_keyword` trace agreement, and verifies `LocalKeywordMemory` vs `HybridMemory` synthetic plumbing.
 - `spotcheck`: draws a sealed, stratified 20-row blind CSV (`spotcheck_20_blind.csv`) without model labels for human review, then computes agreement, Cohen's kappa, balanced accuracy, and per-row disagreements once completed.
