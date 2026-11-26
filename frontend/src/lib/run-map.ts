@@ -14,6 +14,24 @@ export function stage(id:string,title:string,owner:string,description:string,spa
  return {id,title,owner,description,state:stateFor(spans,run,absent),detail:detail||(!spans.length?'No matching observation in this trace.':spans.length+' recorded observation'+(spans.length===1?'':'s')),spans,primary:spans.find(s=>s.kind==='agent'||s.kind==='route'||s.kind==='gate')||spans[0]||null}
 }
 export function isNewsRun(run:Run){return run.spans.some(s=>s.name.startsWith('Clock 1')||s.name==='Judge headline'||s.name==='Signal gate: DIGEST'||s.name==='Signal gate: IGNORE')}
+export interface ProvenanceConflict {
+ kind:string;text:string;asset:string;cue:string;unit:string;clause:string;violations:string[];
+ matches:{asset:string;field:string;shown:string;unit:string}[];
+}
+export function parseProvenanceConflicts(raw:unknown):ProvenanceConflict[]{
+ if(!Array.isArray(raw))return []
+ return raw.map(item=>{
+  const c=object(item),claim=object(c.claim)
+  const matches=Array.isArray(c.matches)?c.matches.map(m=>{const o=object(m);return {asset:text(o.asset),field:text(o.field),shown:text(o.shown),unit:text(o.unit)}}).filter(m=>m.asset||m.field||m.shown):[]
+  const violations=Array.isArray(c.violations)?c.violations.filter((v):v is string=>typeof v==='string'):[]
+  return {kind:text(c.kind)||'claim_provenance',text:text(c.text),asset:text(claim.asset),cue:text(claim.cue),unit:text(claim.unit),clause:text(claim.clause),violations,matches}
+ }).filter(c=>c.text||c.violations.length||c.matches.length)
+}
+export function formatProvenanceConflict(c:ProvenanceConflict):string{
+ const claimed=[c.asset,c.cue.replaceAll('_',' '),c.unit].filter(Boolean).join(' ')
+ const detail=c.violations.length?'wrong '+c.violations.join('/'):c.kind.replaceAll('_',' ')
+ return (c.text||'value')+(claimed?' as '+claimed:'')+' ('+detail+')'
+}
 export function interactiveStages(run:Run):MapStage[]{
  const spans=run.spans,route=spans.filter(s=>s.kind==='route'),routeOutput=object(route.find(s=>text(object(s.outputs).intent))?.outputs)
  const routerCalls=spans.filter(s=>s.kind==='model'&&s.actor==='Routing executive')
@@ -21,20 +39,32 @@ export function interactiveStages(run:Run):MapStage[]{
  const delegated=object(dispatch?.outputs).delegated_agents
  const workers=(actor:string)=>spans.filter(s=>s.actor===actor&&s.kind!=='handoff')
  const workerDetail=(actor:string)=>{const nodes=workers(actor),models=nodes.filter(s=>s.kind==='model'),gates=nodes.filter(s=>s.kind==='gate');if(!nodes.length)return Array.isArray(delegated)&&!delegated.includes(actor)?'Python did not dispatch this role for this intent.':'No role activity recorded.';return models.length+' narrator call'+(models.length===1?'':'s')+' / '+nodes.filter(s=>s.kind==='tool').length+' tool calls'+(gates.some(s=>s.status==='fallback')?' / report replaced after validation':'')}
+ const docSpans=workers('Document Reader'),showDocs=docSpans.length>0||(Array.isArray(delegated)&&delegated.includes('Document Reader'))
  const lead=spans.filter(s=>s.actor==='Market Team Lead'&&s.kind==='model')
  const memory=spans.filter(s=>s.actor==='Conversation memory')
  const finalGate=spans.filter(s=>s.name==='Synthesis faithfulness')
+ const gateOut=object(finalGate[0]?.outputs),gateMethod=text(gateOut.method)||text(gateOut.validation_reason)
+ const singlePass=lead.length===0&&gateMethod==='single_pass_data_answer'
+ const pythonNews=lead.length===0&&['python_news_answer','python_digest','no_news'].includes(gateMethod)
+ const leadOwner=lead[0]?.model||(singlePass?'Verified single-pass (Data Analyst)':pythonNews?'Python news synthesis':'Python fallback')
+ const leadDetail=[lead.length?lead.length+' synthesis call'+(lead.length===1?'':'s'):singlePass?'Reused verified Data Analyst report, no second synthesis pass':pythonNews?'Deterministic news answer, no synthesis pass needed':'No synthesis model call recorded',memoryDetail(memory)].filter(Boolean).join(' / ')
+ const leadStage=stage('lead','Team Lead synthesis',leadOwner,'The same selected narrator combines accepted reports in a separate role call, or Python reuses a single verified specialist report directly. Conversation memory is passed as context only; its numbers never pass the guard.',[...lead,...memory],run,leadDetail)
+ if((singlePass||pythonNews)&&leadStage.state==='not_observed')leadStage.state='complete'
  const root=spans.filter(s=>s.kind==='run'),results=root.filter(s=>text(object(s.outputs).answer))
  const modelIds=[...new Set(spans.filter(s=>s.kind==='model'&&s.actor!=='Routing executive').map(s=>s.model).filter(Boolean))]
  const narrator=modelIds.length===1?(modelIds[0].includes('LiquidAI/LFM3')?'LFM3 1.7B / shared narrator':modelIds[0].includes('AtomicChat/LFM3')?'LFM3 1.7B Uncensored (AtomicChat) / shared narrator':modelIds[0]):modelIds.length?'Multiple recorded backends':'No narrator inference observed'
+ const workerStages:MapStage[]=[
+  stage('data','Data Analyst',workers('Data Analyst').some(s=>s.kind==='model')?narrator:'No narrator inference observed','Python fetches market data and chart series first. The narrator receives evidence; a number check accepts it or replaces it.',workers('Data Analyst'),run,workerDetail('Data Analyst'),run.status==='running'?'not_observed':'not_dispatched'),
+  stage('news','News Researcher',workers('News Researcher').some(s=>s.kind==='model')?narrator:'No narrator inference observed','Reads accepted local news, not a fresh web search. A missing store is a coverage gap, never proof of no catalysts.',workers('News Researcher'),run,workerDetail('News Researcher'),run.status==='running'?'not_observed':'not_dispatched'),
+ ]
+ if(showDocs)workerStages.push(stage('document','Document Reader',docSpans.some(s=>s.kind==='model')?narrator:'Python PDF reader','Reads page text from PDFs attached to this conversation. Quoted pages stay linked to their source file.',docSpans,run,workerDetail('Document Reader'),run.status==='running'?'not_observed':'not_dispatched'))
  return [
   stage('request','Your question','User input','A question enters the local job runner. Follow-ups can reuse assets from this conversation only.',route.slice(0,1).length?route.slice(0,1):root,run,text(object(route[0]?.inputs).query)||run.title),
   stage('router','Decision model','GLiNER2.5-Decide','Classifies intent and horizon, then resolves entities. It does not generate the answer or call tools.',[...route,...routerCalls],run,text(routeOutput.intent)?text(routeOutput.intent).replaceAll('_',' ')+' / '+(Array.isArray(routeOutput.tickers)?routeOutput.tickers.join(', '):'No assets'):'Waiting for a recorded route'),
   stage('dispatch','Dispatch policy','Python coordinator','Python maps the classified intent to specialist roles. A model label is not permission to write user data.',handoffs,run,Array.isArray(delegated)?delegated.join(' + ')||'No specialist dispatched':'No dispatch recorded'),
-  stage('data','Data Analyst',workers('Data Analyst').some(s=>s.kind==='model')?narrator:'No narrator inference observed','Python fetches market data and chart series first. The narrator receives evidence; a number check accepts it or replaces it.',workers('Data Analyst'),run,workerDetail('Data Analyst'),run.status==='running'?'not_observed':'not_dispatched'),
-  stage('news','News Researcher',workers('News Researcher').some(s=>s.kind==='model')?narrator:'No narrator inference observed','Reads accepted local news, not a fresh web search. A missing store is a coverage gap, never proof of no catalysts.',workers('News Researcher'),run,workerDetail('News Researcher'),run.status==='running'?'not_observed':'not_dispatched'),
-  stage('lead','Team Lead synthesis',lead[0]?.model||'Python fallback','The same selected narrator combines accepted reports in a separate role call. Conversation memory is passed as context only; its numbers never pass the guard. Python still owns every side effect.',[...lead,...memory],run,[lead.length?lead.length+' synthesis call'+(lead.length===1?'':'s'):'No synthesis model call recorded',memoryDetail(memory)].filter(Boolean).join(' / ')),
-  stage('guard','Accept or replace','Python number guard','Checks generated numbers against evidence. A failed or incomplete narration uses the deterministic specialist output.',finalGate,run,finalGate.length?(object(finalGate[0].outputs).faithful_synthesis===true?'Synthesis passed the recorded number check':'Synthesis rejected; fallback used'):'No final validation recorded'),
+  ...workerStages,
+  leadStage,
+  stage('guard','Accept or replace','Python faithfulness guard','Checks numbers, claim provenance, direction, terms, and risks against evidence. A failed narration uses the deterministic specialist output.',finalGate,run,finalGate.length?(gateOut.faithful_synthesis===true?(singlePass?'Verified single-pass report accepted':pythonNews?'Deterministic news answer accepted':'Synthesis passed the recorded guard checks'):'Synthesis rejected; fallback used'):'No final validation recorded'),
   stage('result','Accepted result','Local conversation','Only the accepted result is saved to this conversation. Tool evidence and execution traces remain inspectable.',results,run,results.length?(run.status==='degraded'?'Saved with a visible fallback':'Recorded final answer'):run.status==='running'?'No final answer yet':'No accepted final answer recorded'),
  ]
 }
@@ -103,11 +133,12 @@ export function numericReview(span:Span,spans:Span[]){
  const direction=Array.isArray(out.direction_conflicts)?out.direction_conflicts.filter((t):t is string=>typeof t==='string'):[]
  const retry=synth&&text(retryInfo.used)?{used:text(retryInfo.used),first:numeric(retryInfo.first_restated),second:numeric(retryInfo.retry_restated),passed:retryInfo.retry_passed_guards===true}:null
  const risks=Array.isArray(out.unsupported_risks)?out.unsupported_risks.filter((t):t is string=>typeof t==='string'):[]
- const guardRetry=object(out.guard_retry),why:Record<string,string>={unsupported_risk:'named a risk outside the Python risk list',unsupported_terms:'used words that are not in the reports',unsupported_numeric_tokens:'used numbers that are not in the reports',direction_conflict:'stated the wrong move since the previous close'}
+ const provenance=parseProvenanceConflicts(out.provenance_conflicts)
+ const guardRetry=object(out.guard_retry),why:Record<string,string>={unsupported_risk:'named a risk outside the Python risk list',unsupported_terms:'used words that are not in the reports',unsupported_numeric_tokens:'used numbers that are not in the reports',direction_conflict:'stated the wrong move since the previous close',claim_provenance:'bound a number to the wrong asset, metric, or unit'}
  const riskLine=text(guardRetry.used)?' Feedback retry: the first draft '+(why[text(guardRetry.reason)]||'failed a guard')+' ('+(Array.isArray(guardRetry.rejected)?guardRetry.rejected.filter((t):t is string=>typeof t==='string').join('; '):'')+'); the retry was told exactly that and was '+(text(guardRetry.used)==='retry'?'accepted.':'also rejected, so the specialist reports were used.'):''
  const retryLine=riskLine+(retry?' Follow-up retry: the first answer repeated '+retry.first+' figures from the earlier answer, the stricter retry repeated '+(retry.second??'none')+(retry.passed?'':' and failed a guard')+'; the '+(retry.used==='retry'?'retry':'first answer')+' was used.':'')
- return {pass,allowed:[...new Set(allowed)],unmatched,terms,direction,retry,candidate,output,accepted,derived:synth&&!recorded,
-  risks,explanation:(pass?'Every output number matched the evidence and every checked name and claim word appears in it. Risks are limited to the Python risk list. Paraphrase and tone are not certified.'+retryLine:risks.length?'Numbers and names matched, but a stated risk is not in the Python risk list built from the facts: '+risks.join('; ')+'.'+retryLine:direction.length?'Numbers matched, but the text states the wrong move since the previous close ('+direction.join(', ')+'). Python computed the direction; the deterministic fallback was used.':candidate?.status==='error'?'The narrator call failed or was cut off. Python used a fallback.':!candidate?'No narrator output was accepted. Evidence was absent or narration was disabled.':!output?'No complete narrator text was accepted.':terms.length?'Numbers matched, but the wording check found terms that are not in the evidence: '+terms.join(', ')+'. Python used the deterministic fallback.':unmatched.length?'Output included numeric tokens outside the recorded evidence allowlist. Dates, labels, and formatting can also trigger this conservative check.':'The recorded guard rejected the candidate. Inspect raw input and output for the exact evidence boundary.')}
+ return {pass,allowed:[...new Set(allowed)],unmatched,terms,direction,provenance,retry,candidate,output,accepted,derived:synth&&!recorded,
+  risks,explanation:(pass?'Every output number matched the evidence and every checked asset, metric, unit, name, and claim word aligned with it. Risks are limited to the Python risk list. Paraphrase and tone are not certified.'+retryLine:provenance.length?'Numbers appeared in the evidence, but claim provenance found mismatched asset, metric, or unit bindings: '+provenance.map(formatProvenanceConflict).join('; ')+'.'+retryLine:risks.length?'Numbers and names matched, but a stated risk is not in the Python risk list built from the facts: '+risks.join('; ')+'.'+retryLine:direction.length?'Numbers matched, but the text states the wrong move since the previous close ('+direction.join(', ')+'). Python computed the direction; the deterministic fallback was used.':candidate?.status==='error'?'The narrator call failed or was cut off. Python used a fallback.':!candidate?'No narrator output was accepted. Evidence was absent or narration was disabled.':!output?'No complete narrator text was accepted.':terms.length?'Numbers matched, but the wording check found terms that are not in the evidence: '+terms.join(', ')+'. Python used the deterministic fallback.':unmatched.length?'Output included numeric tokens outside the recorded evidence allowlist. Dates, labels, and formatting can also trigger this conservative check.':'The recorded guard rejected the candidate. Inspect raw input and output for the exact evidence boundary.')}
 }
 const SCALE:Record<string,number>={thousand:1e3,million:1e6,billion:1e9,trillion:1e12}
 /** Mirrors core/numeric_guard.py: "4.51 trillion" is 4.51e12, so the map never shows a scaled figure as unmatched. */

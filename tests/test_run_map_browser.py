@@ -33,7 +33,11 @@ class TestRunMapBrowser(unittest.TestCase):
         self.thread=threading.Thread(target=self.server.serve_forever,daemon=True);self.thread.start()
         self.page=self.browser.new_page(viewport={'width':1440,'height':1000});self.errors=[]
         self.page.on('pageerror',lambda e:self.errors.append(str(e)))
-        self.page.goto('http://127.0.0.1:'+str(self.server.server_port),wait_until='networkidle')
+        self.page.goto('http://127.0.0.1:'+str(self.server.server_port),wait_until='domcontentloaded')
+        tools = self.page.locator('.workspace-tools')
+        tools.wait_for()
+        if not tools.evaluate('e => e.open'):
+            tools.locator('summary').click()
         self.page.locator('.sidebar nav').get_by_role('button',name='Execution',exact=False).click()
         self.page.wait_for_selector('[data-map-stage="router"]')
     def tearDown(self):
@@ -94,5 +98,74 @@ class TestRunMapBrowser(unittest.TestCase):
         for width in (320,390,768,1440):
             self.page.set_viewport_size({'width':width,'height':900})
             self.assertTrue(self.page.evaluate('document.documentElement.scrollWidth<=innerWidth'),width)
+
+    def test_single_pass_guard_telemetry_provenance_and_document_reader_mobile(self):
+        import json, uuid
+        def sid(): return uuid.uuid4().hex
+        sp_trace = {
+            'id': sid(), 'format': 'cofinance-trace/1', 'title': 'Single-pass PDF fixture',
+            'mode': 'fixture', 'status': 'complete', 'started_at': '2026-11-27T00:00:00Z',
+            'duration_ms': 420.0, 'revision': 1, 'dropped_spans': 0, 'storage_errors': 0,
+            'guard_telemetry': {
+                'version': 1, 'narrated_checks': 1, 'first_pass_accepted': 1, 'first_pass_acceptance_rate': 1.0,
+                'guard_retries': 0, 'guard_retry_recovered': 0, 'follow_up_retries': 0, 'fallbacks': 0,
+                'total_narrator_passes': 1, 'wasted_passes': 0, 'total_narrator_ms': 280.0, 'wasted_ms': 0.0,
+                'wasted_ms_complete': True, 'bypass_methods': {'single_pass_data_answer': 1}, 'failure_reasons': {}, 'complete': True,
+            },
+            'spans': [
+                {'id': sid(), 'parent_id': None, 'name': 'Interactive research', 'kind': 'run', 'actor': 'Market Team Lead', 'model': '', 'status': 'complete', 'start_ms': 0, 'duration_ms': 420.0, 'inputs': {}, 'outputs': {'answer': 'NVDA trades at 138.50 USD.'}},
+                {'id': sid(), 'parent_id': None, 'name': 'Executive Route', 'kind': 'handoff', 'actor': 'Routing executive', 'model': '', 'status': 'complete', 'start_ms': 10, 'duration_ms': 5.0, 'inputs': {}, 'outputs': {'delegated_agents': ['Data Analyst', 'Document Reader']}},
+                {'id': sid(), 'parent_id': None, 'name': 'Data Analyst', 'kind': 'agent', 'actor': 'Data Analyst', 'model': '', 'status': 'complete', 'start_ms': 20, 'duration_ms': 300.0, 'inputs': {}, 'outputs': {'summary': 'NVDA trades at 138.50 USD.', 'allowed_numbers': [138.5]}},
+                {'id': sid(), 'parent_id': None, 'name': 'Document Reader', 'kind': 'agent', 'actor': 'Document Reader', 'model': '', 'status': 'complete', 'start_ms': 25, 'duration_ms': 15.0, 'inputs': {}, 'outputs': {'summary': 'Circular_47.pdf p.1'}},
+                {'id': sid(), 'parent_id': None, 'name': 'Synthesis faithfulness', 'kind': 'gate', 'actor': 'Market Team Lead', 'model': '', 'status': 'complete', 'start_ms': 330, 'duration_ms': 2.0, 'inputs': {}, 'outputs': {'faithful_synthesis': True, 'method': 'single_pass_data_answer', 'allowed_numbers': [138.5], 'unsupported_risks': []}},
+            ],
+        }
+        prov_model_id = sid()
+        prov_trace = {
+            'id': sid(), 'format': 'cofinance-trace/1', 'title': 'Provenance conflict fixture',
+            'mode': 'fixture', 'status': 'degraded', 'started_at': '2026-11-27T00:01:00Z',
+            'duration_ms': 610.0, 'revision': 1, 'dropped_spans': 0, 'storage_errors': 0,
+            'guard_telemetry': {
+                'version': 1, 'narrated_checks': 1, 'first_pass_accepted': 0, 'first_pass_acceptance_rate': 0.0,
+                'guard_retries': 1, 'guard_retry_recovered': 0, 'follow_up_retries': 0, 'fallbacks': 1,
+                'total_narrator_passes': 2, 'wasted_passes': 2, 'total_narrator_ms': 500.0, 'wasted_ms': 500.0,
+                'wasted_ms_complete': True, 'bypass_methods': {}, 'failure_reasons': {'claim_provenance': 1}, 'complete': True,
+            },
+            'spans': [
+                {'id': sid(), 'parent_id': None, 'name': 'Interactive research', 'kind': 'run', 'actor': 'Market Team Lead', 'model': '', 'status': 'complete', 'start_ms': 0, 'duration_ms': 610.0, 'inputs': {}, 'outputs': {'answer': 'NVDA trades at 138.50 USD.'}},
+                {'id': prov_model_id, 'parent_id': None, 'name': 'Narrate evidence', 'kind': 'model', 'actor': 'Market Team Lead', 'model': 'AtomicChat/LFM3', 'status': 'complete', 'start_ms': 100, 'duration_ms': 250.0, 'inputs': {}, 'outputs': 'AAPL trades at 138.5%.'},
+                {'id': sid(), 'parent_id': None, 'name': 'Synthesis faithfulness', 'kind': 'gate', 'actor': 'Market Team Lead', 'model': '', 'status': 'fallback', 'start_ms': 360, 'duration_ms': 3.0, 'inputs': {}, 'outputs': {
+                    'faithful_synthesis': False, 'allowed_numbers': [138.5], 'rejected_numbers': [], 'validation_reason': 'claim_provenance',
+                    'provenance_conflicts': [{'kind': 'asset_misattribution', 'text': '138.5%', 'claim': {'asset': 'AAPL', 'fields': ['price'], 'unit': 'percent', 'cue': 'price', 'clause': 'AAPL trades at 138.5%.'}, 'matches': [{'asset': 'NVDA', 'field': 'price', 'shown': '138.50', 'unit': 'currency'}], 'violations': ['asset', 'unit']}],
+                    'guard_retry': {'reason': 'claim_provenance', 'rejected': ['138.5% (AAPL price percent)'], 'retry_passed_guards': False, 'used': 'fallback'},
+                }},
+            ],
+        }
+        (self.traces / f"{sp_trace['id']}.json").write_text(json.dumps(sp_trace), encoding='utf-8')
+        (self.traces / f"{prov_trace['id']}.json").write_text(json.dumps(prov_trace), encoding='utf-8')
+        self.page.get_by_role('button', name='Refresh local data').click()
+        self.page.wait_for_timeout(400)
+        self.page.locator('.run-entry').filter(has_text='Single-pass PDF fixture').click()
+        self.page.locator('.sidebar nav').get_by_role('button', name='Execution', exact=False).click()
+        self.assertIn('Verified single-pass', self.page.locator('[data-map-stage="lead"]').inner_text())
+        self.assertNotIn('Python fallback', self.page.locator('[data-map-stage="lead"]').inner_text())
+        self.assertEqual(self.page.locator('[data-map-stage="document"]').count(), 1)
+        self.assertEqual(self.page.locator('.map-worker-row').get_attribute('data-worker-count'), '3')
+        self.assertIn('1/1', self.page.locator('[data-guard-stat="pass1"]').inner_text())
+        self.assertIn('Single-pass', self.page.locator('[data-guard-stat="single-pass"]').inner_text())
+        for width in (320, 390, 768, 1440):
+            self.page.set_viewport_size({'width': width, 'height': 900})
+            self.assertTrue(self.page.evaluate('document.documentElement.scrollWidth<=innerWidth'), width)
+
+        self.page.set_viewport_size({'width': 1440, 'height': 1000})
+        self.page.locator('.run-entry').filter(has_text='Provenance conflict fixture').click()
+        self.page.locator('.sidebar nav').get_by_role('button', name='Execution', exact=False).click()
+        self.assertIn('1 guard retry', self.page.locator('[data-guard-stat="retries"]').inner_text())
+        self.assertIn('2 wasted passes', self.page.locator('[data-guard-stat="wasted"]').inner_text())
+        self.page.locator('[data-map-stage="guard"]').click()
+        prov = self.page.locator('.provenance-conflicts')
+        prov.wait_for()
+        self.assertIn('138.5%', prov.inner_text())
+        self.assertIn('NVDA price 138.50', prov.inner_text())
 
 if __name__=='__main__':unittest.main()

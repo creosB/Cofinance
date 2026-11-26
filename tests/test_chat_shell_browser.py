@@ -172,4 +172,67 @@ class TestChatShellBrowser(unittest.TestCase):
         self.page.get_by_role('button',name='New chat',exact=True).click()
         self.page.get_by_role('heading',name='What should we research?').wait_for()
 
+    def test_deep_think_composer_states_models_shortcut_and_mobile_layout(self):
+        from core.chat_service import ChatService
+        from core.gliner_decide import GlinerQueryRouter
+        from core.local_models import DEFAULT_NARRATOR as MODEL
+        from tests.test_chat import FakeMarket, REPO
+        from tests.test_deep_think import FakeModels
+        from tests.test_orchestrator import StubGliner
+
+        models = FakeModels(self.root / 'dt_models', REPO)
+        models.think_ok = False
+        models.state['selected'] = MODEL
+        dt_service = ChatService(
+            REPO, self.root / 'dt_data', models=models, market_factory=FakeMarket,
+            router_factory=lambda: GlinerQueryRouter(StubGliner(), {'NVDA', 'TSLA'}),
+        )
+        dt_server = create_server(port=0, trace_dir=self.root / 'dt_traces', corpus_dir=self.root / 'none', service=dt_service)
+        dt_thread = threading.Thread(target=dt_server.serve_forever, daemon=True)
+        dt_thread.start()
+        page = self.context.new_page()
+        page.on('pageerror', lambda e: self.errors.append(str(e)))
+        try:
+            origin = 'http://127.0.0.1:' + str(dt_server.server_port)
+            page.goto(origin, wait_until='domcontentloaded')
+            toggle = page.locator('.deep-think-toggle')
+            toggle.wait_for()
+            self.assertTrue(toggle.is_disabled())
+            self.assertEqual(toggle.get_attribute('aria-pressed'), 'false')
+            self.assertEqual(toggle.get_attribute('data-locked'), 'true')
+            setup_btn = page.get_by_role('button', name='Test in Models', exact=True)
+            setup_btn.wait_for()
+            setup_btn.click()
+            page.locator('#deep-think-panel').wait_for()
+            self.assertIn('Models', page.locator('.breadcrumb').inner_text())
+
+            models.think_ok = True
+            page.goto(origin, wait_until='domcontentloaded')
+            toggle = page.locator('.deep-think-toggle')
+            toggle.wait_for()
+            self.assertFalse(toggle.is_disabled())
+            self.assertEqual(page.get_by_role('button', name='Test in Models', exact=True).count(), 0)
+            self.assertEqual(toggle.get_attribute('aria-pressed'), 'false')
+            toggle.click()
+            self.assertEqual(toggle.get_attribute('aria-pressed'), 'true')
+            self.assertIn('On', toggle.locator('.deep-think-chip').inner_text())
+
+            page.set_viewport_size({'width': 390, 'height': 844})
+            self.assertTrue(page.evaluate('document.documentElement.scrollWidth<=innerWidth'))
+            box_rect = toggle.bounding_box()
+            self.assertGreaterEqual(box_rect['height'], 44)
+
+            page.set_viewport_size({'width': 1440, 'height': 900})
+            box = page.get_by_role('textbox', name='Research question')
+            box.fill('Review the NVDA thesis')
+            box.press('Enter')
+            page.locator('.deep-think-used').wait_for(timeout=8000)
+            self.assertIn('Deep think', page.locator('.deep-think-used').inner_text())
+        finally:
+            page.close()
+            dt_server.shutdown()
+            dt_server.server_close()
+            dt_thread.join(timeout=3)
+            dt_service.close()
+
 if __name__=='__main__': unittest.main()

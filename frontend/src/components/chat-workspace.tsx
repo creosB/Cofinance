@@ -163,7 +163,7 @@ export function ChatActions({chat,onRefresh}:{chat:ChatController;onRefresh:()=>
  </div></details>
 }
 
-export function ChatWorkspace({chat,inspect}:{chat:ChatController;inspect:(id:string,spanId?:string)=>void}){
+export function ChatWorkspace({chat,inspect,onOpenModels}:{chat:ChatController;inspect:(id:string,spanId?:string)=>void;onOpenModels?:()=>void}){
  const [draft,setDraft]=useState(''),scroller=useRef<HTMLDivElement>(null),textarea=useRef<HTMLTextAreaElement>(null)
  const [think,setThink]=useState(savedDeepThink)  // off unless the user turned it on; stays a per-answer request
  const conversation=chat.conversation,ownJob=conversation?.jobs.find(j=>activeStatuses.includes(j.status)),globalJob=chat.workspace?.active_job
@@ -187,7 +187,7 @@ export function ChatWorkspace({chat,inspect}:{chat:ChatController;inspect:(id:st
    {notice&&<p className="dock-notice" role="status">{notice}</p>}
    <div className="composer"><AttachmentChips chat={chat} documents={docs} disabled={chat.busy||!!ownJob}/>
     <Textarea ref={textarea} id="research-question" aria-label="Research question" value={draft} onChange={e=>setDraft(e.target.value)} maxLength={3000} rows={1} placeholder={docs.length?'Ask about the attached PDF or an asset':'Ask about a stock or crypto asset'} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();if(!blocked)void send()}}}/>
-    <div className="composer-bar"><AttachButton chat={chat} disabled={chat.busy||!!ownJob}/><ModelPicker chat={chat} compact/><DeepThinkToggle chat={chat} on={think} onChange={v=>{setThink(v);saveDeepThink(v)}} disabled={chat.busy||!!ownJob}/>
+    <div className="composer-bar"><AttachButton chat={chat} disabled={chat.busy||!!ownJob}/><ModelPicker chat={chat} compact/><DeepThinkToggle chat={chat} on={think} onChange={v=>{setThink(v);saveDeepThink(v)}} disabled={chat.busy||!!ownJob} onOpenModels={onOpenModels}/>
      {ownJob&&<Button variant="ghost" size="sm" disabled={chat.busy||ownJob.status==='cancelling'} onClick={()=>{void chat.post('/api/jobs/cancel',{id:ownJob.id}).catch(()=>{})}}><Square size={13}/>Stop run</Button>}
      {chat.hasRetry&&<Button variant="ghost" size="sm" disabled={blocked} onClick={()=>void send(true)}><RotateCcw size={13}/>Retry submission</Button>}
      <span className="composer-spacer"/>

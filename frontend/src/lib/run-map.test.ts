@@ -1,6 +1,6 @@
 import { describe,it,expect } from 'vitest'
 import { interactiveStages,backgroundStages,isNewsRun,numericReview,stateFor,routeFacts,memoryDetail,shadowDetail } from './run-map'
-import type { Run,Span } from './domain'
+import { parseGuardTelemetry, type Run, type Span } from './domain'
 let sequence=0
 const span=(partial:Partial<Span>):Span=>({id:(++sequence).toString(16).padStart(32,'0'),parent_id:null,name:'Fixture step',kind:'tool',actor:'Python',model:'',status:'complete',start_ms:0,duration_ms:10,inputs:{},outputs:{},...partial})
 const run=(spans:Span[],status:Run['status']='complete'):Run=>({id:'a'.repeat(32),format:'cofinance-trace/1',title:'Map unit fixture',mode:'fixture',status,started_at:'2026-11-07T00:00:00Z',duration_ms:100,revision:1,spans})
@@ -116,5 +116,52 @@ describe('shadow rule urgency',()=>{
   const g=(u:boolean)=>span({kind:'gate',name:'Signal gate: DIGEST',outputs:{action:'digest',shadow_rule_urgency:{would_be_urgent:u,rule:u?'results':null}}})
   expect(shadowDetail([g(true),g(false)])).toBe('2 gate checks / shadow rules: 1 would be urgent, no action changed')
   expect(shadowDetail([span({kind:'gate',name:'Signal gate: IGNORE',outputs:{action:'ignore'}})])).toBe('')
+ })
+})
+describe('single-pass reuse, Document Reader, claim provenance, and guard telemetry',()=>{
+ it('labels single_pass_data_answer as verified single-pass instead of Python fallback',()=>{
+  const dataAgent=span({kind:'agent',actor:'Data Analyst',outputs:{summary:'NVDA is 138.5 USD.'}})
+  const dataModel=span({kind:'model',actor:'Data Analyst',model:'AtomicChat/LFM3',parent_id:dataAgent.id})
+  const gate=span({kind:'gate',name:'Synthesis faithfulness',actor:'Market Team Lead',outputs:{faithful_synthesis:true,method:'single_pass_data_answer',allowed_numbers:[138.5]}})
+  const nodes=interactiveStages(run([dataAgent,dataModel,gate]))
+  const lead=nodes.find(n=>n.id==='lead')!
+  expect(lead.owner).toBe('Verified single-pass (Data Analyst)')
+  expect(lead.state).toBe('complete')
+  expect(lead.detail).toContain('Reused verified Data Analyst report')
+  expect(lead.owner).not.toContain('Python fallback')
+  expect(nodes.find(n=>n.id==='guard')?.detail).toContain('Verified single-pass report accepted')
+ })
+ it('includes Document Reader in worker stages only when PDFs were delegated or observed',()=>{
+  const plain=interactiveStages(run([span({kind:'handoff',name:'Executive Route',outputs:{delegated_agents:['Data Analyst']}})]))
+  expect(plain.some(n=>n.id==='document')).toBe(false)
+  const withPdf=interactiveStages(run([
+   span({kind:'handoff',name:'Executive Route',outputs:{delegated_agents:['Data Analyst','Document Reader']}}),
+   span({kind:'agent',actor:'Document Reader',name:'Document Reader',outputs:{summary:'Circular_47.pdf p.1'}}),
+  ]))
+  const doc=withPdf.find(n=>n.id==='document')!
+  expect(doc.title).toBe('Document Reader')
+  expect(doc.owner).toBe('Python PDF reader')
+  expect(doc.state).toBe('complete')
+ })
+ it('surfaces claim provenance conflicts and claim_provenance retries in numericReview and StepExplanation',()=>{
+  const model=span({kind:'model',actor:'Market Team Lead',outputs:'AAPL trades at 138.5%.'})
+  const gate=span({kind:'gate',name:'Synthesis faithfulness',actor:'Market Team Lead',outputs:{
+   faithful_synthesis:false,allowed_numbers:[138.5],rejected_numbers:[],validation_reason:'claim_provenance',
+   provenance_conflicts:[{kind:'asset_misattribution',text:'138.5%',claim:{asset:'AAPL',fields:['price'],unit:'percent',cue:'price',clause:'AAPL trades at 138.5%.'},matches:[{asset:'NVDA',field:'price',shown:'138.50',unit:'currency'}],violations:['asset','unit']}],
+   guard_retry:{reason:'claim_provenance',rejected:['138.5% (AAPL price percent)'],retry_passed_guards:false,used:'fallback'},
+  }})
+  const review=numericReview(gate,[model,gate])!
+  expect(review.provenance).toHaveLength(1)
+  expect(review.explanation).toContain('claim provenance')
+  expect(review.explanation).toContain('wrong asset/unit')
+  expect(review.explanation).toContain('bound a number to the wrong asset, metric, or unit')
+ })
+ it('parses guard_telemetry safely and returns null for older traces without it',()=>{
+  expect(parseGuardTelemetry(undefined)).toBeNull()
+  expect(parseGuardTelemetry({})).toBeNull()
+  const parsed=parseGuardTelemetry({version:1,narrated_checks:2,first_pass_accepted:1,first_pass_acceptance_rate:0.5,guard_retries:1,guard_retry_recovered:1,follow_up_retries:0,fallbacks:0,total_narrator_passes:3,wasted_passes:1,total_narrator_ms:900,wasted_ms:300,wasted_ms_complete:true,bypass_methods:{single_pass_data_answer:1},failure_reasons:{unsupported_risk:1},complete:true})!
+  expect(parsed.first_pass_accepted).toBe(1)
+  expect(parsed.wasted_passes).toBe(1)
+  expect(parsed.bypass_methods.single_pass_data_answer).toBe(1)
  })
 })

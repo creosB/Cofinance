@@ -45,10 +45,13 @@
 .chat-options>summary:hover,.chat-options[open]>summary,.workspace-tools>summary:hover,.history-options>summary:hover{background:var(--secondary);color:var(--foreground)}
 .chat-options-panel{position:absolute;right:0;top:calc(100% + 4px);z-index:30;min-width:240px;max-width:calc(100vw - 32px);background:var(--popover);padding:6px;border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 24px oklch(0.1 0.004 90 / .3)}
 .chat-options-panel>button{width:100%;min-height:44px;justify-content:flex-start;font-weight:400;gap:10px;color:var(--foreground)}
-.workspace-layout .composer-bar{flex-wrap:wrap;gap:8px}
+.workspace-layout .composer-bar{flex-wrap:wrap;gap:6px}
 .workspace-layout .model-picker-compact{min-width:0;max-width:calc(100% - 60px)}
-.workspace-layout .model-picker-compact button{max-width:100%;min-height:44px;height:44px;min-width:0}
+.workspace-layout .model-picker-compact button{max-width:100%;min-height:44px;height:44px;min-width:0;border:1px solid var(--border)!important;background:var(--background)!important;border-radius:var(--radius);padding:0 10px}
+.workspace-layout .model-picker-compact button:hover{border-color:var(--quiet)!important;background:var(--secondary)!important}
 .workspace-layout .model-picker-compact [data-slot=select-value]{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.workspace-layout .attach-button{border:1px solid var(--border);background:var(--background);border-radius:var(--radius)}
+.workspace-layout .attach-button:hover{border-color:var(--quiet);background:var(--secondary);color:var(--foreground)}
 .workspace-layout .send-button{width:44px!important;height:44px!important;flex-shrink:0}
 .workspace-layout .chat-welcome h2{font-size:26px;margin-bottom:24px}
 .workspace-layout .starter-questions button{min-height:44px;height:auto;white-space:normal;text-align:left}
@@ -81,8 +84,14 @@
 .document-sources p{display:flex;align-items:center;gap:8px;margin:0}
 @media (max-width:640px){.attachment-name{max-width:140px}.attachment-remove{width:44px!important;height:44px!important}}
 
-/* Deep think (2026-11-19): composer switch and the label under an answer. */
-.deep-think-toggle{min-height:44px;gap:6px;color:var(--muted-foreground);font-size:13px}
-.deep-think-toggle[data-on]{color:var(--foreground);background:var(--accent)}
-.deep-think-label{display:inline-flex;align-items:center;gap:4px}
+.deep-think-control{display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;max-width:100%}
+.deep-think-toggle{min-height:44px;height:44px;padding:0 12px!important;gap:6px;border-color:var(--border)!important;background:var(--background)!important;color:var(--muted-foreground);font-size:13px;font-weight:500;box-shadow:none!important}
+.deep-think-toggle:hover:not(:disabled){color:var(--foreground);background:var(--secondary)!important;border-color:var(--quiet)!important}
+.deep-think-toggle[data-on]{color:var(--foreground);background:var(--secondary)!important;border-color:var(--ring)!important}
+.deep-think-toggle[data-locked]{border-style:dashed!important;border-color:color-mix(in oklch,var(--warning) 50%,var(--border))!important;color:var(--muted-foreground);opacity:.9}
+.deep-think-chip{display:inline-flex;align-items:center;padding:1px 6px;border-radius:4px;background:var(--accent);color:var(--foreground);font-size:11px;font-weight:600;letter-spacing:.01em}
+.deep-think-setup{min-height:44px;height:44px;padding:0 10px!important;font-size:13px;color:var(--warning)!important}
+.deep-think-setup:hover{background:var(--secondary)!important;color:var(--foreground)!important}
+.deep-think-label{display:inline-flex;align-items:center;gap:5px}
+.deep-think-used{padding:1px 8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--secondary);color:var(--foreground);font-size:12px}
 .deep-think-panel{margin-top:8px}

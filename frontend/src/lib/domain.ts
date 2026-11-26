@@ -10,7 +10,13 @@ export interface RunMeta {
   id: string; title: string; mode: 'live'|'fixture'|'replay'; started_at: string;
   status: 'running'|'complete'|'degraded'|'error'; duration_ms: number|null; revision: number;
 }
-export interface Run extends RunMeta { format: 'cofinance-trace/1'; spans: Span[]; summary?: Json; usage?: unknown; dropped_spans?: number; storage_errors?: number }
+export interface GuardTelemetry {
+  version: number; narrated_checks: number; first_pass_accepted: number; first_pass_acceptance_rate: number|null;
+  guard_retries: number; guard_retry_recovered: number; follow_up_retries: number; fallbacks: number;
+  total_narrator_passes: number; wasted_passes: number; total_narrator_ms: number; wasted_ms: number;
+  wasted_ms_complete: boolean; bypass_methods: Record<string,number>; failure_reasons: Record<string,number>; complete: boolean;
+}
+export interface Run extends RunMeta { format: 'cofinance-trace/1'; spans: Span[]; summary?: Json; usage?: unknown; guard_telemetry?: GuardTelemetry; dropped_spans?: number; storage_errors?: number }
 export interface Corpus { rows: number; window_days: number; collected_at: string; by_source: Record<string,number>; by_ticker: Record<string,number> }
 export const kinds: Kind[] = ['run','route','agent','model','decision','tool','gate','handoff']
 export function object(value: unknown): RecordData { return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as RecordData : {} }
@@ -40,6 +46,22 @@ export function parseMeta(value: unknown): RunMeta {
     !['running','complete','degraded','error'].includes(text(r.status)) || typeof r.started_at!=='string' || numeric(r.revision)===undefined ||
     (r.duration_ms!==null && numeric(r.duration_ms)===undefined))throw new Error('Local server returned an invalid run record.')
   return r as unknown as RunMeta
+}
+export function parseGuardTelemetry(value: unknown): GuardTelemetry|null {
+  const g=object(value)
+  const checks=numeric(g.narrated_checks),accepted=numeric(g.first_pass_accepted),retries=numeric(g.guard_retries)
+  const wasted=numeric(g.wasted_passes),total=numeric(g.total_narrator_passes),wastedMs=numeric(g.wasted_ms),totalMs=numeric(g.total_narrator_ms)
+  if(checks===undefined||accepted===undefined||retries===undefined||wasted===undefined||total===undefined||wastedMs===undefined||totalMs===undefined)return null
+  const counts=(raw:unknown)=>{const out:Record<string,number>={};for(const [k,v] of Object.entries(object(raw))){const n=numeric(v);if(n!==undefined&&n>0)out[k]=n};return out}
+  return {
+    version:numeric(g.version)??1,narrated_checks:checks,first_pass_accepted:accepted,
+    first_pass_acceptance_rate:g.first_pass_acceptance_rate===null?null:(numeric(g.first_pass_acceptance_rate)??null),
+    guard_retries:retries,guard_retry_recovered:numeric(g.guard_retry_recovered)??0,
+    follow_up_retries:numeric(g.follow_up_retries)??0,fallbacks:numeric(g.fallbacks)??0,
+    total_narrator_passes:total,wasted_passes:wasted,total_narrator_ms:totalMs,wasted_ms:wastedMs,
+    wasted_ms_complete:g.wasted_ms_complete===true,bypass_methods:counts(g.bypass_methods),
+    failure_reasons:counts(g.failure_reasons),complete:g.complete===true,
+  }
 }
 export function parseRun(value: unknown): Run {
   parseMeta(value); const r=object(value)

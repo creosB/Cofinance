@@ -5,19 +5,25 @@ import { DeepThinkNote,DeepThinkPanel,DeepThinkToggle,thinkOf } from './deep-thi
 import type { ChatController } from '@/lib/use-chat'
 const chatWith=(selected:string,think?:unknown)=>({workspace:{models:{selected,id:'m',can_select:true,think}},post:async()=>({})}) as unknown as ChatController
 const think=(qualified:boolean,report:unknown=null)=>({budget:384,qualified,loaded:false,report})
-const toggle=(c:ChatController,on:boolean,disabled=false)=>renderToStaticMarkup(<TooltipProvider><DeepThinkToggle chat={c} on={on} onChange={()=>{}} disabled={disabled}/></TooltipProvider>)
+const toggle=(c:ChatController,on:boolean,disabled=false,onOpenModels?:()=>void)=>renderToStaticMarkup(<TooltipProvider><DeepThinkToggle chat={c} on={on} onChange={()=>{}} disabled={disabled} onOpenModels={onOpenModels}/></TooltipProvider>)
 describe('deep think switch',()=>{
  it('is hidden without a narrator and disabled until deep think passed its own test',()=>{
   expect(toggle(chatWith('facts',think(true)),true)).toBe('')
   expect(toggle({workspace:null} as unknown as ChatController,true)).toBe('')
   expect(toggle(chatWith('m',undefined),true)).toBe('')
   const untested=toggle(chatWith('m',think(false)),true)
-  expect(untested).toContain('disabled');expect(untested).toContain('aria-pressed="false"')  // saved "on" never shows as on without a pass
+  expect(untested).toContain('disabled');expect(untested).toContain('aria-pressed="false"');expect(untested).toContain('data-locked="true"')
+  expect(untested).not.toContain('Test in Models')
+  const withShortcut=toggle(chatWith('m',think(false)),false,false,()=>{})
+  expect(withShortcut).toContain('Test in Models')
  })
  it('shows on only when requested and qualified, and locks during a run',()=>{
   const c=chatWith('m',think(true))
-  expect(toggle(c,true)).toContain('aria-pressed="true"')
+  const active=toggle(c,true)
+  expect(active).toContain('aria-pressed="true"');expect(active).toContain('deep-think-chip');expect(active).toContain('On')
+  expect(active).not.toContain('Test in Models')
   expect(toggle(c,false)).toContain('aria-pressed="false"')
+  expect(toggle(c,false)).not.toContain('deep-think-chip')
   expect(toggle(c,true,true)).toContain('disabled')
  })
  it('labels an answer only when deep think was requested, and says why it was not used',()=>{

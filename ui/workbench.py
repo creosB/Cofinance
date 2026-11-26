@@ -149,7 +149,7 @@ def read_trace(directory: Path, run_id: str) -> dict:
         ids.add(span["id"])
     # Sanitize again at the read boundary; a file is data, never trusted HTML.
     result = {key: safe(value) for key, value in run.items() if key != "spans"}
-    result["spans"] = [safe(span) for span in run["spans"][:2000] if isinstance(span, dict)]
+    result["spans"] = [{k: safe(v) for k, v in span.items()} for span in run["spans"][:2000] if isinstance(span, dict)]
     result["revision"] = path.stat().st_mtime_ns
     return result
 
