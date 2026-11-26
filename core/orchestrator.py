@@ -25,6 +25,7 @@ from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Proto
 
 import re
 
+from .claim_provenance import check_claim_provenance, format_conflict_summary
 from .claims import direction_conflicts, unsupported_terms
 from .urgency import OFFICIAL
 from .risk_cues import cue_block, risk_cues, unsupported_risks
@@ -199,6 +200,24 @@ def direction_review(candidate: str, facts: Mapping[str, Any], faithful: bool, v
     return not wrong
 
 
+def provenance_review(
+    candidate: str,
+    facts: Mapping[str, Any],
+    faithful: bool,
+    validation: Dict[str, Any],
+    *,
+    other_numbers: Sequence[float] = (),
+) -> bool:
+    if not faithful or not candidate or not facts:
+        return faithful
+    conflicts = check_claim_provenance(candidate, facts, other_numbers=other_numbers)
+    if conflicts:
+        validation["provenance_conflicts"] = conflicts
+        validation["validation_reason"] = "claim_provenance"
+        return False
+    return True
+
+
 def fact_value(value: Any) -> str:
     """Exact source value. Large integers get separators; floats keep their recorded digits."""
     if isinstance(value, bool):
@@ -325,6 +344,7 @@ class DataAnalystAgent:
         validation = number_review(clean, allowed, faithful)
         faithful = check_wording(clean, prompt, faithful, validation)
         faithful = direction_review(clean, facts, faithful, validation)
+        faithful = provenance_review(clean, facts, faithful, validation)
         if not faithful:
             clean = self._deterministic_fallback(facts)
 
@@ -528,13 +548,16 @@ class TeamLeadOrchestrator:
     MAX_RESTATED = 2
     STRICT_RISK = ("\nStrict: name a risk only from the listed risks, in their words, or say the reports do not identify "
                    "a specific risk. Do not mention execution, supply chain, competition, valuation or any other risk that is not listed.")
-    RETRY_REASONS = {"unsupported_risk", "unsupported_terms", "unsupported_numeric_tokens", "direction_conflict"}
+    RETRY_REASONS = {"unsupported_risk", "unsupported_terms", "unsupported_numeric_tokens", "direction_conflict", "claim_provenance"}
 
     @staticmethod
     def rejected(validation: Mapping[str, Any]) -> List[str]:
         """What a guard rejected, as short strings (shown in the trace and fed back to the retry)."""
-        return [str(x)[:80] for key in ("unsupported_risks", "unsupported_terms", "rejected_numbers", "direction_conflicts")
-                for x in (validation.get(key) or [])][:6]
+        items = [str(x)[:80] for key in ("unsupported_risks", "unsupported_terms", "rejected_numbers", "direction_conflicts")
+                 for x in (validation.get(key) or [])]
+        if validation.get("provenance_conflicts"):
+            items.extend(format_conflict_summary(validation["provenance_conflicts"]))
+        return items[:6]
 
     def feedback(self, validation: Mapping[str, Any]) -> str:
         reason, items = validation.get("validation_reason"), "; ".join(self.rejected(validation))
@@ -545,6 +568,9 @@ class TeamLeadOrchestrator:
                     "Use the reports' own words and do not abbreviate.")
         if reason == "unsupported_numeric_tokens":
             return "\nStrict: some numbers in your draft are not in the reports. Copy numbers exactly from the reports, or leave them out."
+        if reason == "claim_provenance":
+            return (f"\nStrict: some numbers were attached to the wrong asset, metric, or unit: {items}. "
+                    "Match each number to its exact asset, label, and unit from the reports, or leave it out.")
         return ("\nStrict: your draft stated the wrong move since the previous close. Use the reports' change since the previous "
                 "close exactly, or leave the comparison out.")
     STRICT_FOLLOW_UP = ("\nStrict: your answer must be one or two sentences with no more than two numbers. "
@@ -721,6 +747,17 @@ class TeamLeadOrchestrator:
             # Wording evidence is the accepted reports only: not the question, not the previous answer.
             ok = check_wording(text, wording_evidence, ok, val)
             ok = direction_review(text, data_rep.raw_facts if data_rep else {}, ok, val)
+            extra_nums = [
+                *(news_rep.allowed_numbers if news_rep else ()),
+                *(doc_rep.allowed_numbers if doc_rep else ()),
+            ]
+            ok = provenance_review(
+                text,
+                data_rep.raw_facts if data_rep else {},
+                ok,
+                val,
+                other_numbers=extra_nums,
+            )
             invented = unsupported_risks(text, cues) if ok else []
             if invented:
                 val["unsupported_risks"] = invented
