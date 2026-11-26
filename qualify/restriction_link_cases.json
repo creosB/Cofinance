@@ -1,0 +1,660 @@
+[
+  {
+    "id": "rl_fee_wire_pos",
+    "domain": "fees",
+    "structure": "single",
+    "family": "fam_fee_wire",
+    "subject": "wire",
+    "question": "What fee rules and restrictions apply to household wire transfers?",
+    "notices": [
+      {
+        "id": "n1",
+        "title": "Circular 47: Retail Domestic Transfers",
+        "body": [
+          "Branch desks process domestic transfer instructions on banking days.",
+          "Household checking accounts may waive the monthly wire transfer fee.",
+          "Routing numbers are verified automatically before dispatch.",
+          "That exemption applies only to the first outbound transfer each calendar month."
+        ]
+      }
+    ],
+    "gold_claims": ["b002"],
+    "gold_restrictions": ["b004"],
+    "gold_links": [["b002", "b004"]]
+  },
+  {
+    "id": "rl_fee_wire_ctrl",
+    "domain": "fees",
+    "structure": "single",
+    "family": "fam_fee_wire",
+    "subject": "wire",
+    "question": "What fee rules and restrictions apply to household wire transfers?",
+    "notices": [
+      {
+        "id": "n1",
+        "title": "Circular 47: Retail Domestic Transfers",
+        "body": [
+          "Branch desks process domestic transfer instructions on banking days.",
+          "Household checking accounts may waive the monthly wire transfer fee.",
+          "Routing numbers are verified automatically before dispatch.",
+          "Outbound confirmations appear in the monthly account statement."
+        ]
+      }
+    ],
+    "gold_claims": ["b002"],
+    "gold_restrictions": [],
+    "gold_links": []
+  },
+  {
+    "id": "rl_fee_custody_pos",
+    "domain": "fees",
+    "structure": "single",
+    "family": "fam_fee_custody",
+    "subject": "custody",
+    "question": "What fee rules and restrictions apply to direct bond custody?",
+    "notices": [
+      {
+        "id": "n1",
+        "title": "Schedule 12: Direct Bond Accounts",
+        "body": [
+          "Direct treasury holders can receive zero annual custody fee on newly issued bills.",
+          "Account summaries list coupon dates in chronological order.",
+          "The waiver is restricted to balances held to original maturity without early sale.",
+          "Support staff answer settlement questions during market hours."
+        ]
+      }
+    ],
+    "gold_claims": ["b001"],
+    "gold_restrictions": ["b003"],
+    "gold_links": [["b001", "b003"]]
+  },
+  {
+    "id": "rl_fee_custody_ctrl",
+    "domain": "fees",
+    "structure": "single",
+    "family": "fam_fee_custody",
+    "subject": "custody",
+    "question": "What fee rules and restrictions apply to direct bond custody?",
+    "notices": [
+      {
+        "id": "n1",
+        "title": "Schedule 12: Direct Bond Accounts",
+        "body": [
+          "Direct treasury holders can receive zero annual custody fee on newly issued bills.",
+          "Account summaries list coupon dates in chronological order.",
+          "Quarterly holdings reports are published in the portal archive.",
+          "Support staff answer settlement questions during market hours."
+        ]
+      }
+    ],
+    "gold_claims": ["b001"],
+    "gold_restrictions": [],
+    "gold_links": []
+  },
+  {
+    "id": "rl_fee_fx_pos",
+    "domain": "fees",
+    "structure": "two_claim",
+    "family": "fam_fee_fx",
+    "subject": "student",
+    "question": "What foreign currency fee claims and restrictions apply across the two card notices?",
+    "notices": [
+      {
+        "id": "n1",
+        "title": "Bulletin 204: Student Travel Cards",
+        "body": [
+          "Travel alerts can be toggled inside the mobile card panel.",
+          "Student cardholders may waive foreign currency conversion fees abroad.",
+          "Merchant receipts display both local and home currency totals.",
+          "This relief is capped at 500 euros per billing cycle."
+        ]
+      },
+      {
+        "id": "n2",
+        "title": "Bulletin 205: Corporate Travel Cards",
+        "body": [
+          "Finance teams export trip ledgers at month end.",
+          "Corporate cardholders may waive foreign currency conversion fees abroad.",
+          "Replacement cards ship via tracked courier."
+        ]
+      }
+    ],
+    "gold_claims": ["b002", "b006"],
+    "gold_restrictions": ["b004"],
+    "gold_links": [["b002", "b004"]]
+  },
+  {
+    "id": "rl_fee_fx_ctrl",
+    "domain": "fees",
+    "structure": "two_claim",
+    "family": "fam_fee_fx",
+    "subject": "student",
+    "question": "What foreign currency fee claims and restrictions apply across the two card notices?",
+    "notices": [
+      {
+        "id": "n1",
+        "title": "Bulletin 204: Student Travel Cards",
+        "body": [
+          "Travel alerts can be toggled inside the mobile card panel.",
+          "Student cardholders may waive foreign currency conversion fees abroad.",
+          "Merchant receipts display both local and home currency totals.",
+          "Exchange rates follow the network settlement feed."
+        ]
+      },
+      {
+        "id": "n2",
+        "title": "Bulletin 205: Corporate Travel Cards",
+        "body": [
+          "Finance teams export trip ledgers at month end.",
+          "Corporate cardholders may waive foreign currency conversion fees abroad.",
+          "Replacement cards ship via tracked courier."
+        ]
+      }
+    ],
+    "gold_claims": ["b002", "b006"],
+    "gold_restrictions": [],
+    "gold_links": []
+  },
+  {
+    "id": "rl_fee_atm_pos",
+    "domain": "fees",
+    "structure": "two_claim",
+    "family": "fam_fee_atm",
+    "subject": "pension",
+    "question": "What cash machine fee claims and restrictions apply across the two debit notices?",
+    "notices": [
+      {
+        "id": "n1",
+        "title": "Memo 88: Youth Debit Accounts",
+        "body": [
+          "Guardians view balance alerts in the family dashboard.",
+          "Youth debit holders may receive fee-free withdrawals at partner cash machines.",
+          "Card pins are managed through the branch kiosk."
+        ]
+      },
+      {
+        "id": "n2",
+        "title": "Memo 89: Pension Debit Accounts",
+        "body": [
+          "Monthly statements are mailed in large print on request.",
+          "Pension debit holders may receive fee-free withdrawals at partner cash machines.",
+          "Partner terminal maps update every quarter.",
+          "Only four withdrawals each month qualify under this rule."
+        ]
+      }
+    ],
+    "gold_claims": ["b002", "b005"],
+    "gold_restrictions": ["b007"],
+    "gold_links": [["b005", "b007"]]
+  },
+  {
+    "id": "rl_fee_atm_ctrl",
+    "domain": "fees",
+    "structure": "two_claim",
+    "family": "fam_fee_atm",
+    "subject": "pension",
+    "question": "What cash machine fee claims and restrictions apply across the two debit notices?",
+    "notices": [
+      {
+        "id": "n1",
+        "title": "Memo 88: Youth Debit Accounts",
+        "body": [
+          "Guardians view balance alerts in the family dashboard.",
+          "Youth debit holders may receive fee-free withdrawals at partner cash machines.",
+          "Card pins are managed through the branch kiosk."
+        ]
+      },
+      {
+        "id": "n2",
+        "title": "Memo 89: Pension Debit Accounts",
+        "body": [
+          "Monthly statements are mailed in large print on request.",
+          "Pension debit holders may receive fee-free withdrawals at partner cash machines.",
+          "Partner terminal maps update every quarter.",
+          "Printed slips show the remaining account balance."
+        ]
+      }
+    ],
+    "gold_claims": ["b002", "b005"],
+    "gold_restrictions": [],
+    "gold_links": []
+  },
+  {
+    "id": "rl_date_filing_pos",
+    "domain": "dates",
+    "structure": "single",
+    "family": "fam_date_filing",
+    "subject": "amendment",
+    "question": "What submission date claims and restrictions apply to electronic amendments?",
+    "notices": [
+      {
+        "id": "n1",
+        "title": "Notice 31: Annual Tax Filing Calendar",
+        "body": [
+          "Taxpayers sign into the registry with a verified token.",
+          "Electronic amendment requests submitted by June 30 qualify for standard review.",
+          "Confirmation PDFs remain downloadable for seven years.",
+          "The cutoff does not move forward when that date falls on a weekend."
+        ]
+      }
+    ],
+    "gold_claims": ["b002"],
+    "gold_restrictions": ["b004"],
+    "gold_links": [["b002", "b004"]]
+  },
+  {
+    "id": "rl_date_filing_ctrl",
+    "domain": "dates",
+    "structure": "single",
+    "family": "fam_date_filing",
+    "subject": "amendment",
+    "question": "What submission date claims and restrictions apply to electronic amendments?",
+    "notices": [
+      {
+        "id": "n1",
+        "title": "Notice 31: Annual Tax Filing Calendar",
+        "body": [
+          "Taxpayers sign into the registry with a verified token.",
+          "Electronic amendment requests submitted by June 30 qualify for standard review.",
+          "Confirmation PDFs remain downloadable for seven years.",
+          "Receipt numbers are emailed upon portal submission."
+        ]
+      }
+    ],
+    "gold_claims": ["b002"],
+    "gold_restrictions": [],
+    "gold_links": []
+  },
+  {
+    "id": "rl_date_div_pos",
+    "domain": "dates",
+    "structure": "single",
+    "family": "fam_date_dividend",
+    "subject": "reinvestment",
+    "question": "What election date claims and restrictions apply to dividend reinvestment?",
+    "notices": [
+      {
+        "id": "n1",
+        "title": "Circular 62: Shareholder Election Dates",
+        "body": [
+          "Registered investors can enroll in automatic dividend reinvestment before September 15.",
+          "Transfer agents record election confirmations in the ledger.",
+          "Enrollment is valid only if settled shares appear on the register three business days earlier.",
+          "Annual reports are posted in the investor archive."
+        ]
+      }
+    ],
+    "gold_claims": ["b001"],
+    "gold_restrictions": ["b003"],
+    "gold_links": [["b001", "b003"]]
+  },
+  {
+    "id": "rl_date_div_ctrl",
+    "domain": "dates",
+    "structure": "single",
+    "family": "fam_date_dividend",
+    "subject": "reinvestment",
+    "question": "What election date claims and restrictions apply to dividend reinvestment?",
+    "notices": [
+      {
+        "id": "n1",
+        "title": "Circular 62: Shareholder Election Dates",
+        "body": [
+          "Registered investors can enroll in automatic dividend reinvestment before September 15.",
+          "Transfer agents record election confirmations in the ledger.",
+          "Updated statements list each recorded shareholder election.",
+          "Annual reports are posted in the investor archive."
+        ]
+      }
+    ],
+    "gold_claims": ["b001"],
+    "gold_restrictions": [],
+    "gold_links": []
+  },
+  {
+    "id": "rl_date_grant_pos",
+    "domain": "dates",
+    "structure": "two_claim",
+    "family": "fam_date_grant",
+    "subject": "regional",
+    "question": "What deadline claims and restrictions apply across the two autumn equipment grant notices?",
+    "notices": [
+      {
+        "id": "n1",
+        "title": "Directive 14: Regional Clinic Grants",
+        "body": [
+          "Budget templates are published in spreadsheet format.",
+          "Regional clinics qualify for autumn equipment grants when applications arrive by October 10.",
+          "Each dossier receives an intake reference code.",
+          "Submissions received after 17:00 local time on that day cannot be accepted."
+        ]
+      },
+      {
+        "id": "n2",
+        "title": "Directive 15: National Hospital Grants",
+        "body": [
+          "Procurement officers upload supplier quotes in the portal.",
+          "National hospitals qualify for autumn equipment grants when applications arrive by October 10.",
+          "Award summaries appear in the ministry gazette."
+        ]
+      }
+    ],
+    "gold_claims": ["b002", "b006"],
+    "gold_restrictions": ["b004"],
+    "gold_links": [["b002", "b004"]]
+  },
+  {
+    "id": "rl_date_grant_ctrl",
+    "domain": "dates",
+    "structure": "two_claim",
+    "family": "fam_date_grant",
+    "subject": "regional",
+    "question": "What deadline claims and restrictions apply across the two autumn equipment grant notices?",
+    "notices": [
+      {
+        "id": "n1",
+        "title": "Directive 14: Regional Clinic Grants",
+        "body": [
+          "Budget templates are published in spreadsheet format.",
+          "Regional clinics qualify for autumn equipment grants when applications arrive by October 10.",
+          "Each dossier receives an intake reference code.",
+          "Helpdesk clerks confirm file uploads by email."
+        ]
+      },
+      {
+        "id": "n2",
+        "title": "Directive 15: National Hospital Grants",
+        "body": [
+          "Procurement officers upload supplier quotes in the portal.",
+          "National hospitals qualify for autumn equipment grants when applications arrive by October 10.",
+          "Award summaries appear in the ministry gazette."
+        ]
+      }
+    ],
+    "gold_claims": ["b002", "b006"],
+    "gold_restrictions": [],
+    "gold_links": []
+  },
+  {
+    "id": "rl_date_appeal_pos",
+    "domain": "dates",
+    "structure": "two_claim",
+    "family": "fam_date_appeal",
+    "subject": "customs",
+    "question": "What review window claims and restrictions apply across the two administrative notices?",
+    "notices": [
+      {
+        "id": "n1",
+        "title": "Order 71: Licensing Board Reviews",
+        "body": [
+          "Licensing applicants may request an administrative review within 30 calendar days of notice delivery.",
+          "Hearing schedules are posted on the clerk bulletin board.",
+          "Panel minutes are archived in the public docket."
+        ]
+      },
+      {
+        "id": "n2",
+        "title": "Order 72: Customs Tariff Appeals",
+        "body": [
+          "Customs importers may request an administrative review within 30 calendar days of notice delivery.",
+          "Tariff schedules list harmonized product codes.",
+          "The window closes earlier unless a formal protest letter is logged within 10 days."
+        ]
+      }
+    ],
+    "gold_claims": ["b001", "b004"],
+    "gold_restrictions": ["b006"],
+    "gold_links": [["b004", "b006"]]
+  },
+  {
+    "id": "rl_date_appeal_ctrl",
+    "domain": "dates",
+    "structure": "two_claim",
+    "family": "fam_date_appeal",
+    "subject": "customs",
+    "question": "What review window claims and restrictions apply across the two administrative notices?",
+    "notices": [
+      {
+        "id": "n1",
+        "title": "Order 71: Licensing Board Reviews",
+        "body": [
+          "Licensing applicants may request an administrative review within 30 calendar days of notice delivery.",
+          "Hearing schedules are posted on the clerk bulletin board.",
+          "Panel minutes are archived in the public docket."
+        ]
+      },
+      {
+        "id": "n2",
+        "title": "Order 72: Customs Tariff Appeals",
+        "body": [
+          "Customs importers may request an administrative review within 30 calendar days of notice delivery.",
+          "Tariff schedules list harmonized product codes.",
+          "Case officers assign sequential docket numbers."
+        ]
+      }
+    ],
+    "gold_claims": ["b001", "b004"],
+    "gold_restrictions": [],
+    "gold_links": []
+  },
+  {
+    "id": "rl_ent_ferry_pos",
+    "domain": "entitlements",
+    "structure": "single",
+    "family": "fam_ent_transit",
+    "subject": "ferry",
+    "question": "What entitlement claims and restrictions apply to resident ferry vouchers?",
+    "notices": [
+      {
+        "id": "n1",
+        "title": "Bulletin 19: Coastal Commuter Passes",
+        "body": [
+          "Harbor terminals post departure boards at pier entrances.",
+          "Registered island residents are entitled to two monthly ferry vouchers.",
+          "Ticket kiosks scan digital and printed barcodes.",
+          "Unused passes expire 30 days after issue and cannot be transferred."
+        ]
+      }
+    ],
+    "gold_claims": ["b002"],
+    "gold_restrictions": ["b004"],
+    "gold_links": [["b002", "b004"]]
+  },
+  {
+    "id": "rl_ent_ferry_ctrl",
+    "domain": "entitlements",
+    "structure": "single",
+    "family": "fam_ent_transit",
+    "subject": "ferry",
+    "question": "What entitlement claims and restrictions apply to resident ferry vouchers?",
+    "notices": [
+      {
+        "id": "n1",
+        "title": "Bulletin 19: Coastal Commuter Passes",
+        "body": [
+          "Harbor terminals post departure boards at pier entrances.",
+          "Registered island residents are entitled to two monthly ferry vouchers.",
+          "Ticket kiosks scan digital and printed barcodes.",
+          "Digital pass barcodes refresh inside the commuter app."
+        ]
+      }
+    ],
+    "gold_claims": ["b002"],
+    "gold_restrictions": [],
+    "gold_links": []
+  },
+  {
+    "id": "rl_ent_archive_pos",
+    "domain": "entitlements",
+    "structure": "single",
+    "family": "fam_ent_library",
+    "subject": "archive",
+    "question": "What access claims and restrictions apply to the special archive reading room?",
+    "notices": [
+      {
+        "id": "n1",
+        "title": "Policy 53: Research Reading Rooms",
+        "body": [
+          "Visiting fellows may access the special archive reading room during term weeks.",
+          "Lockers stand beside the ground-floor check-in counter.",
+          "Entry is limited to holders who reserve a desk at least 48 hours ahead.",
+          "Catalog terminals stand near the main lobby."
+        ]
+      }
+    ],
+    "gold_claims": ["b001"],
+    "gold_restrictions": ["b003"],
+    "gold_links": [["b001", "b003"]]
+  },
+  {
+    "id": "rl_ent_archive_ctrl",
+    "domain": "entitlements",
+    "structure": "single",
+    "family": "fam_ent_library",
+    "subject": "archive",
+    "question": "What access claims and restrictions apply to the special archive reading room?",
+    "notices": [
+      {
+        "id": "n1",
+        "title": "Policy 53: Research Reading Rooms",
+        "body": [
+          "Visiting fellows may access the special archive reading room during term weeks.",
+          "Lockers stand beside the ground-floor check-in counter.",
+          "Reading lamps illuminate every numbered desk.",
+          "Catalog terminals stand near the main lobby."
+        ]
+      }
+    ],
+    "gold_claims": ["b001"],
+    "gold_restrictions": [],
+    "gold_links": []
+  },
+  {
+    "id": "rl_ent_credit_pos",
+    "domain": "entitlements",
+    "structure": "two_claim",
+    "family": "fam_ent_credit",
+    "subject": "solar",
+    "question": "What rebate claims and restrictions apply across the two homeowner notices?",
+    "notices": [
+      {
+        "id": "n1",
+        "title": "Circular 91: Residential Solar Rebates",
+        "body": [
+          "Licensed installers submit wiring diagrams with each claim.",
+          "Homeowners installing rooftop solar panels are eligible for a 15 percent municipal rebate.",
+          "Inspectors photograph meter readings after commissioning.",
+          "The benefit does not apply to properties already receiving a county energy credit."
+        ]
+      },
+      {
+        "id": "n2",
+        "title": "Circular 92: Residential Insulation Rebates",
+        "body": [
+          "Contractors attach material invoices to the application.",
+          "Homeowners installing attic insulation are eligible for a 15 percent municipal rebate.",
+          "Municipal clerks issue payout notices by post."
+        ]
+      }
+    ],
+    "gold_claims": ["b002", "b006"],
+    "gold_restrictions": ["b004"],
+    "gold_links": [["b002", "b004"]]
+  },
+  {
+    "id": "rl_ent_credit_ctrl",
+    "domain": "entitlements",
+    "structure": "two_claim",
+    "family": "fam_ent_credit",
+    "subject": "solar",
+    "question": "What rebate claims and restrictions apply across the two homeowner notices?",
+    "notices": [
+      {
+        "id": "n1",
+        "title": "Circular 91: Residential Solar Rebates",
+        "body": [
+          "Licensed installers submit wiring diagrams with each claim.",
+          "Homeowners installing rooftop solar panels are eligible for a 15 percent municipal rebate.",
+          "Inspectors photograph meter readings after commissioning.",
+          "Approved payouts settle via direct bank transfer."
+        ]
+      },
+      {
+        "id": "n2",
+        "title": "Circular 92: Residential Insulation Rebates",
+        "body": [
+          "Contractors attach material invoices to the application.",
+          "Homeowners installing attic insulation are eligible for a 15 percent municipal rebate.",
+          "Municipal clerks issue payout notices by post."
+        ]
+      }
+    ],
+    "gold_claims": ["b002", "b006"],
+    "gold_restrictions": [],
+    "gold_links": []
+  },
+  {
+    "id": "rl_ent_leave_pos",
+    "domain": "entitlements",
+    "structure": "two_claim",
+    "family": "fam_ent_leave",
+    "subject": "contractor",
+    "question": "What training day entitlements and restrictions apply across the two handbook notices?",
+    "notices": [
+      {
+        "id": "n1",
+        "title": "Handbook 401: Salaried Staff Benefits",
+        "body": [
+          "Team leads log course dates in the payroll calendar.",
+          "Salaried staff receive four paid training days each calendar year.",
+          "Workshop slides are stored in the internal library."
+        ]
+      },
+      {
+        "id": "n2",
+        "title": "Handbook 402: Contractor Stipend Program",
+        "body": [
+          "Invoice templates include a dedicated learning line item.",
+          "Independent contractors receive four paid training days each calendar year.",
+          "Quarterly summaries list completed workshops.",
+          "Attendance is restricted to accredited courses approved before enrollment."
+        ]
+      }
+    ],
+    "gold_claims": ["b002", "b005"],
+    "gold_restrictions": ["b007"],
+    "gold_links": [["b005", "b007"]]
+  },
+  {
+    "id": "rl_ent_leave_ctrl",
+    "domain": "entitlements",
+    "structure": "two_claim",
+    "family": "fam_ent_leave",
+    "subject": "contractor",
+    "question": "What training day entitlements and restrictions apply across the two handbook notices?",
+    "notices": [
+      {
+        "id": "n1",
+        "title": "Handbook 401: Salaried Staff Benefits",
+        "body": [
+          "Team leads log course dates in the payroll calendar.",
+          "Salaried staff receive four paid training days each calendar year.",
+          "Workshop slides are stored in the internal library."
+        ]
+      },
+      {
+        "id": "n2",
+        "title": "Handbook 402: Contractor Stipend Program",
+        "body": [
+          "Invoice templates include a dedicated learning line item.",
+          "Independent contractors receive four paid training days each calendar year.",
+          "Quarterly summaries list completed workshops.",
+          "Certificates upload directly to the vendor portal."
+        ]
+      }
+    ],
+    "gold_claims": ["b002", "b005"],
+    "gold_restrictions": [],
+    "gold_links": []
+  }
+]
