@@ -129,6 +129,58 @@ class TestDocumentAnswers(unittest.TestCase):
         result = team(Says('')).run('What was revenue?')
         self.assertIsNone(result.document_report)
 
+    def test_multi_document_excerpts_stay_grouped_by_source_and_ascending_page(self):
+        doc_a = {
+            'id': 'doc-a',
+            'name': 'Circular_47.pdf',
+            'pages': [
+                'Household checking accounts may waive transfer fees each month.',
+                'Branch lobby hours run Monday through Friday.',
+                'The household transfer fee waiver applies only to the first transfer each month.',
+            ],
+        }
+        doc_b = {
+            'id': 'doc-b',
+            'name': 'Circular_48.pdf',
+            'pages': [
+                'Business checking accounts may waive transfer fees on domestic accounts.',
+            ],
+        }
+        rep = DocumentReaderAgent().run('transfer fee waiver household business', [doc_a, doc_b], EventBus(), 's')
+        self.assertEqual(rep.validation['document_count'], 2)
+        self.assertEqual([g['name'] for g in rep.raw_facts['groups']], ['Circular_47.pdf', 'Circular_48.pdf'])
+        self.assertEqual(rep.raw_facts['groups'][0]['pages'], [1, 3])
+        self.assertEqual(rep.raw_facts['groups'][1]['pages'], [1])
+        self.assertEqual([(e['name'], e['page']) for e in rep.raw_facts['excerpts']], [
+            ('Circular_47.pdf', 1),
+            ('Circular_47.pdf', 3),
+            ('Circular_48.pdf', 1),
+        ])
+        self.assertIn('grouped by source file', rep.summary)
+        self.assertIn('Source "Circular_47.pdf":', rep.summary)
+        self.assertIn('Source "Circular_48.pdf":', rep.summary)
+        idx_a1 = rep.summary.index('Page 1: "Household')
+        idx_a3 = rep.summary.index('Page 3: "The household')
+        idx_b = rep.summary.index('Source "Circular_48.pdf":')
+        self.assertLess(idx_a1, idx_a3)
+        self.assertLess(idx_a3, idx_b)
+
+    def test_multi_document_synthesis_prompt_scopes_restrictions_to_source_file(self):
+        seen_prompts = []
+
+        class CaptureLLM:
+            def complete(self, system, prompt, **kwargs):
+                seen_prompts.append(prompt)
+                return 'Circular 47 covers household accounts, page 1.'
+
+        doc_a = {'id': 'a', 'name': 'Circular_47.pdf', 'pages': ['Household fee waiver for transfer accounts.']}
+        doc_b = {'id': 'b', 'name': 'Circular_48.pdf', 'pages': ['Business fee waiver for transfer accounts.']}
+        team(CaptureLLM()).run('Compare transfer fee waivers', documents=[doc_a, doc_b])
+        self.assertTrue(seen_prompts)
+        self.assertIn('keep each fact and restriction inside its own source file', seen_prompts[0])
+        self.assertIn('Source "Circular_47.pdf":', seen_prompts[0])
+        self.assertIn('Source "Circular_48.pdf":', seen_prompts[0])
+
 
 class TestStore(unittest.TestCase):
     def setUp(self):

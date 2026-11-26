@@ -34,12 +34,35 @@ export function AttachmentChips({chat,documents,disabled}:{chat:ChatController;d
  </li>)}</ul>
 }
 
-/** The pages the Document Reader quoted for this answer. Unmatched pages were shown only because no page shared a word. */
+export interface GroupedDocumentSource {
+ key:string
+ document_id:string
+ name:string
+ pages:number[]
+ matched:boolean
+}
+
+export function groupDocumentSources(sources:DocumentSource[]):GroupedDocumentSource[]{
+ const groups=new Map<string,GroupedDocumentSource>()
+ for(const s of sources){
+  const key=s.document_id||s.name
+  const existing=groups.get(key)
+  if(existing){
+   if(!existing.pages.includes(s.page))existing.pages.push(s.page)
+   existing.matched=existing.matched||s.matched
+  }else{
+   groups.set(key,{key,document_id:s.document_id,name:s.name,pages:[s.page],matched:s.matched})
+  }
+ }
+ return Array.from(groups.values()).map(g=>({...g,pages:[...g.pages].sort((a,b)=>a-b)}))
+}
+
 export function DocumentSources({sources}:{sources?:DocumentSource[]}){
  if(!sources?.length)return null
  const unmatched=sources.every(s=>!s.matched)
+ const grouped=groupDocumentSources(sources)
  return <div className="sources document-sources" aria-label="Pages used">
-  {sources.map(s=><p key={s.document_id+':'+s.page}><FileText size={14} aria-hidden="true"/><span className="source-name">{s.name}</span><span className="source-meta">page {s.page}</span></p>)}
+  {grouped.map(g=><p key={g.key} data-document-group={g.name}><FileText size={14} aria-hidden="true"/><span className="source-name">{g.name}</span><span className="source-meta">{g.pages.length===1?'page '+g.pages[0]:'pages '+g.pages.join(', ')}</span></p>)}
   {unmatched&&<p className="quiet">No page shared words with the question, so the first pages were used.</p>}
  </div>
 }

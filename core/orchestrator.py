@@ -478,20 +478,33 @@ class DocumentReaderAgent:
     NAME = "Document Reader"
 
     def run(self, question: str, documents: Sequence[Mapping[str, Any]], bus: EventBus, session_id: str) -> SpecialistReport:
-        from .documents import select_excerpts
+        from .documents import group_excerpts, select_excerpts
         excerpts = select_excerpts(documents, question)
-        if excerpts:
-            note = "" if all(e["matched"] for e in excerpts) else " No page shares words with the question, so the first pages are shown."
-            summary = ("Excerpts from the attached files, quoted by Python." + note + "\n"
-                       + "\n".join(f'From "{e["name"]}", page {e["page"]}: "{e["text"]}"' for e in excerpts))
+        groups = group_excerpts(excerpts)
+        ordered = [e for g in groups for e in g["excerpts"]]
+        if ordered:
+            note = "" if all(e["matched"] for e in ordered) else " No page shares words with the question, so the first pages are shown."
+            if len(groups) > 1:
+                blocks = [
+                    f'Source "{g["name"]}":\n' + "\n".join(f'  Page {e["page"]}: "{e["text"]}"' for e in g["excerpts"])
+                    for g in groups
+                ]
+                summary = ("Excerpts from the attached files, quoted by Python and grouped by source file." + note + "\n"
+                           + "\n".join(blocks))
+            else:
+                summary = ("Excerpts from the attached files, quoted by Python." + note + "\n"
+                           + "\n".join(f'From "{e["name"]}", page {e["page"]}: "{e["text"]}"' for e in ordered))
         else:
             summary = "The attached files have no readable text."
-        allowed = ([n for e in excerpts for n in numbers_in(e["text"])] + [float(e["page"]) for e in excerpts]
-                   + [n for e in excerpts for n in numbers_in(str(e["name"]))])
+        allowed = ([n for e in ordered for n in numbers_in(e["text"])] + [float(e["page"]) for e in ordered]
+                   + [n for e in ordered for n in numbers_in(str(e["name"]))])
+        group_meta = [{"document_id": g["document_id"], "name": g["name"], "pages": [e["page"] for e in g["excerpts"]]} for g in groups]
         validation = {"validation_reason": "python_excerpts",
+                      "document_count": len(groups),
+                      "groups": group_meta,
                       "excerpts": [{"name": e["name"], "page": e["page"], "matched": e["matched"], "characters": len(e["text"])}
-                                   for e in excerpts]}
-        return SpecialistReport(agent_name=self.NAME, tickers=[], raw_facts={"excerpts": excerpts}, allowed_numbers=allowed,
+                                   for e in ordered]}
+        return SpecialistReport(agent_name=self.NAME, tickers=[], raw_facts={"excerpts": ordered, "groups": group_meta}, allowed_numbers=allowed,
                                 chart_refs=[], summary=summary, faithful_numbers=True, validation=validation)
 
 
@@ -672,7 +685,11 @@ class TeamLeadOrchestrator:
             + "\n"
             f"Data Analyst report:\n{data_rep.summary if data_rep else 'Not requested for this question.'}\n\n"
             f"News Researcher report:\n{news_rep.summary if news_rep else 'Not requested for this question.'}\n\n"
-            + (f"Document Reader report (files the user attached; name the page you use):\n{doc_rep.summary}\n\n" if doc_rep else "")
+            + (
+                f"Document Reader report (files the user attached; keep each fact and restriction inside its own source file, and name the file and page you use):\n{doc_rep.summary}\n\n"
+                if doc_rep and len(doc_rep.raw_facts.get("groups") or []) > 1
+                else (f"Document Reader report (files the user attached; name the page you use):\n{doc_rep.summary}\n\n" if doc_rep else "")
+            )
             + cue_block(cues)
             # Last, because small narrators follow the most recent instruction (live 2026-11-08: placed before the
             # reports, it was ignored and every follow-up restated the full fact block).

@@ -171,3 +171,20 @@ def select_excerpts(documents: Sequence[Mapping[str, Any]], question: str, top: 
         first = [x for x in pages if x[0] is pages[0][0]][:2]
         chosen = [(d, i, p, False) for d, i, p in first]
     return [_excerpt(d, i, p, wanted, matched) for d, i, p, matched in chosen]
+
+
+def group_excerpts(excerpts: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+    """Group excerpts by source document in first-appearance order, sorting pages ascending within each file."""
+    grouped: Dict[tuple, Dict[str, Any]] = {}
+    for ex in excerpts:
+        key = (ex.get('document_id'), ex.get('name'))
+        bucket = grouped.get(key)
+        if bucket is None:
+            bucket = {'document_id': ex.get('document_id'), 'name': ex.get('name'), 'excerpts': []}
+            grouped[key] = bucket
+        bucket['excerpts'].append(dict(ex))
+    out: List[Dict[str, Any]] = []
+    for bucket in grouped.values():
+        bucket['excerpts'].sort(key=lambda e: int(e.get('page', 0)))
+        out.append(bucket)
+    return out
