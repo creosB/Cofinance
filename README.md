@@ -44,7 +44,7 @@ npm test
 npm run build
 ```
 
-[Dashboard operations and security](frontend/README.md) | [State diagrams](docs/statecharts.md) | [Memory design](docs/designs/remember_forget.md)
+[Dashboard operations and security](frontend/README.md) | [Preflight, backup and recovery](docs/OPERATIONS.md) | [State diagrams](docs/statecharts.md) | [Memory design](docs/designs/remember_forget.md)
 
 ## History and license
 

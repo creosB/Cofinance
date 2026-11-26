@@ -261,6 +261,48 @@ def features():
         print(f'{f["id"]:14s} {f["view"]:10s} {f["name"]}\n{"":25s}proof: {", ".join(f["proof"])}{live}')
 
 
+def preflight_cmd(as_json=False, data_dir=None):
+    import json
+    from core.ops import run_preflight
+    printable_stdout()
+    report = run_preflight(ROOT, Path(data_dir) if data_dir else None)
+    if as_json:
+        print(json.dumps(report, indent=2))
+    else:
+        for c in report['checks']:
+            print(f'[{c["status"].upper():4s}] {c["id"]:24s} {c["detail"]}')
+        print(f'preflight: {"OK" if report["ok"] else "FAILED"} ({report["pass_count"]} pass, {report["warn_count"]} warn, {report["fail_count"]} fail)')
+    return 0 if report['ok'] else 1
+
+
+def backup_cmd(dest=None, data_dir=None):
+    import json
+    from datetime import datetime, timezone
+    from core.ops import backup_state
+    printable_stdout()
+    src = Path(data_dir) if data_dir else ROOT / 'data'
+    if dest:
+        out = Path(dest)
+    else:
+        stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+        out = src / '_backups' / f'backup_{stamp}'
+    manifest = backup_state(src, out)
+    print(json.dumps({'backup_dir': str(out), 'files': len(manifest['files']), 'format': manifest['format']}, indent=2))
+    return 0
+
+
+def restore_cmd(backup_dir, data_dir=None, dry_run=False, force=False):
+    import json
+    from core.ops import restore_state
+    printable_stdout()
+    target = Path(data_dir) if data_dir else ROOT / 'data'
+    if not dry_run and target.resolve() == (ROOT / 'data').resolve() and dashboard_state(timeout=1) is not None:
+        raise SystemExit('Dashboard is running at http://127.0.0.1:8878; stop it before restoring live data/.')
+    result = restore_state(Path(backup_dir), target, dry_run=dry_run, force=force)
+    print(json.dumps(result, indent=2))
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog='dev.py')
     sub = ap.add_subparsers(dest='cmd', required=True)
@@ -279,6 +321,17 @@ def main(argv=None):
     f.add_argument('--bg', action='store_true')
     sub.add_parser('dashboard')
     sub.add_parser('features')
+    pf = sub.add_parser('preflight')
+    pf.add_argument('--json', action='store_true')
+    pf.add_argument('--data-dir', default=None)
+    bk = sub.add_parser('backup')
+    bk.add_argument('--dest', default=None)
+    bk.add_argument('--data-dir', default=None)
+    rs = sub.add_parser('restore')
+    rs.add_argument('backup_dir')
+    rs.add_argument('--data-dir', default=None)
+    rs.add_argument('--dry-run', action='store_true')
+    rs.add_argument('--force', action='store_true')
     w = sub.add_parser('wait')
     w.add_argument('name')
     w.add_argument('--max', type=float, default=WAIT_DEFAULT)
@@ -293,6 +346,12 @@ def main(argv=None):
         raise SystemExit(child(a.argv[1:] if a.argv[:1] == ['--'] else a.argv))
     if a.cmd == 'features':
         return features()
+    if a.cmd == 'preflight':
+        raise SystemExit(preflight_cmd(as_json=a.json, data_dir=a.data_dir))
+    if a.cmd == 'backup':
+        raise SystemExit(backup_cmd(dest=a.dest, data_dir=a.data_dir))
+    if a.cmd == 'restore':
+        raise SystemExit(restore_cmd(a.backup_dir, data_dir=a.data_dir, dry_run=a.dry_run, force=a.force))
     if a.cmd == 'dashboard':
         return restart_dashboard()
     if a.cmd in ('news', 'forward'):
