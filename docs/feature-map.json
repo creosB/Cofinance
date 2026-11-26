@@ -5,7 +5,7 @@
     {"id": "chat", "name": "Ask about an asset", "view": "chat", "reach": "Chat view: type a question and send",
      "api": ["/api/chat", "/api/job", "/api/jobs/cancel", "/api/conversation", "/api/events"],
      "code": ["core/chat_service.py", "core/orchestrator.py", "core/router_worker.py", "frontend/src/components/chat-workspace.tsx", "frontend/src/components/workspace-navigation.tsx", "frontend/src/lib/use-chat.ts", "frontend/src/lib/live-sync.ts"],
-     "proof": ["tests/test_chat.py", "tests/test_followup_context.py", "tests/test_orchestrator.py", "tests/test_events_stream.py", "tests/test_router_onnx.py", "tests/test_concurrent_io.py", "tests/test_parity_oracle.py", "tests/test_chat_shell_browser.py", "frontend/src/components/workspace-navigation.test.tsx", "frontend/src/lib/live-sync.test.ts"],
+     "proof": ["tests/test_chat.py", "tests/test_followup_context.py", "tests/test_orchestrator.py", "tests/test_single_pass_data.py", "tests/test_events_stream.py", "tests/test_router_onnx.py", "tests/test_concurrent_io.py", "tests/test_parity_oracle.py", "tests/test_chat_shell_browser.py", "frontend/src/components/workspace-navigation.test.tsx", "frontend/src/lib/live-sync.test.ts"],
      "live": "COFINANCE_BROWSER_TESTS=1 python -m unittest tests.test_chat_shell_browser"},
     {"id": "token_usage", "name": "Runtime narrator token counts", "view": "chat", "reach": "Under each answer; expand for per-role counts. Running and failed runs use their trace.",
      "api": [], "code": ["core/usage.py", "core/local_models.py", "core/run_trace.py", "core/chat_service.py", "frontend/src/components/token-usage.tsx"],

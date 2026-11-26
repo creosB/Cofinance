@@ -324,6 +324,7 @@ class ChatService:
                     check();result=narrator.complete(*args,**kwargs);check();return result
             class ThinkingNarrator(CheckedNarrator):
                 """Deep think: the Market Team Lead's final answer only. Specialists and headline judging never think."""
+                is_thinking=True
                 def complete(self,*args,**kwargs):
                     check();result=narrator.complete(*args,think=True,**kwargs);check();return result
             llm=CheckedNarrator()

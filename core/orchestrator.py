@@ -345,6 +345,11 @@ class DataAnalystAgent:
         faithful = check_wording(clean, prompt, faithful, validation)
         faithful = direction_review(clean, facts, faithful, validation)
         faithful = provenance_review(clean, facts, faithful, validation)
+        invented_risks = unsupported_risks(clean, risk_cues(facts, {})) if faithful else []
+        if invented_risks:
+            validation["unsupported_risks"] = invented_risks
+            validation["validation_reason"] = "unsupported_risk"
+            faithful = False
         if not faithful:
             clean = self._deterministic_fallback(facts)
 
@@ -606,6 +611,75 @@ class TeamLeadOrchestrator:
         self.document_agent = document_agent or DocumentReaderAgent()
 
     NEWS_ONLY = "python_news_answer"
+    DATA_ONLY = "single_pass_data_answer"
+    REQUESTED_METRICS = (
+        (re.compile(r"\bforward\s+p/?e\b", re.I), ("forward_pe_ratio",), ("forward p/e", "forward pe")),
+        (re.compile(r"\b(?:p/?e|price[- ]to[- ]earnings)\b", re.I), ("pe_ratio", "forward_pe_ratio"), ("p/e", "pe ratio", "price-to-earnings")),
+        (re.compile(r"\beps\b|\bearnings per share\b", re.I), ("eps",), ("eps", "earnings per share")),
+        (re.compile(r"\brevenue\b", re.I), ("revenue_ttm",), ("revenue",)),
+        (re.compile(r"\bmarket\s+cap\b", re.I), ("market_cap",), ("market cap",)),
+        (re.compile(r"\bvolume\b", re.I), ("volume",), ("volume",)),
+        (re.compile(r"\b(?:52[- ]week|one[- ]year)\b", re.I), ("high_52_week", "low_52_week", "drawdown_from_52_week_high_pct"), ("52-week", "52 week", "one-year", "one year")),
+        (re.compile(r"\b(?:all[- ]time\s+high|ath|drawdown)\b", re.I), ("all_time_high", "drawdown_from_all_time_high_pct", "ath_drawdown", "ath_drawdown_pct"), ("all-time high", "all time high", "ath", "drawdown")),
+        (re.compile(r"\bvolatilit\w*\b", re.I), ("annualized_daily_log_volatility_pct",), ("volatilit", "price swing")),
+        (re.compile(r"\b(?:fear|greed|sentiment)\b", re.I), ("fear_greed_index", "fear_greed"), ("fear", "greed", "sentiment", "overheated")),
+        (re.compile(r"\bprevious\s+(?:session\s+)?close\b", re.I), ("previous_session_close",), ("previous session", "previous close")),
+    )
+
+    @staticmethod
+    def _unwrap_traced_llm(llm: Any) -> Any:
+        cur = llm
+        if cur is not None and type(cur).__name__ == "TracedLLM" and hasattr(cur, "backend"):
+            cur = cur.backend
+        return cur
+
+    def _same_narrator(self) -> bool:
+        agent = getattr(self.data_agent, "agent", self.data_agent)
+        data_llm = self._unwrap_traced_llm(getattr(agent, "llm", None))
+        lead_llm = self._unwrap_traced_llm(self.lead_llm)
+        if getattr(self.lead_llm, "is_thinking", False) or getattr(lead_llm, "is_thinking", False):
+            return False
+        return data_llm is not None and data_llm is lead_llm
+
+    @classmethod
+    def _missing_requested_metric(cls, user_query: str, summary: str, raw_facts: Mapping[str, Any]) -> bool:
+        low_summary = (summary or "").lower()
+        for pat, fact_keys, summary_terms in cls.REQUESTED_METRICS:
+            if not pat.search(user_query or ""):
+                continue
+            has_fact = any(
+                isinstance(snap, Mapping) and any(snap.get(k) is not None for k in fact_keys)
+                for snap in (raw_facts or {}).values()
+            )
+            if has_fact and not any(term in low_summary for term in summary_terms):
+                return True
+        return False
+
+    def _data_only(self, routed: RoutedQuery, risk_mode: str, delegated: List[str], data_rep: SpecialistReport,
+                   cues: Sequence[Mapping[str, Any]], session_id: str) -> TeamRunResult:
+        base = data_rep.summary.rstrip()
+        low_base = base.lower()
+        risks = [
+            str(c["text"])
+            for c in cues
+            if not any(str(a).lower() in low_base for a in (c.get("anchors") or ()))
+        ]
+        if risks and base and not base.endswith((".", "!", "?")):
+            base += "."
+        answer = base + (" Risk the reports support: " + "; ".join(risks) + "." if risks else "")
+        self.bus.publish(A2AEvent(session_id, "GATE_CHECK", self.NAME, {
+            "faithful_synthesis": True,
+            "method": self.DATA_ONLY,
+            "validation_reason": self.DATA_ONLY,
+            "allowed_numbers": list(data_rep.allowed_numbers),
+            "allowed_numbers_count": len(data_rep.allowed_numbers),
+            "unsupported_risks": [],
+            "reused_specialist": DataAnalystAgent.NAME,
+            "risks": risks,
+        }))
+        return TeamRunResult(routed=routed, risk_mode=risk_mode, delegated_agents=delegated, data_report=data_rep,
+                             news_report=None, final_synthesis=answer, faithful_synthesis=True,
+                             events=list(self.bus.history))
 
     def _news_only(self, routed: RoutedQuery, risk_mode: str, delegated: List[str], news_rep: SpecialistReport,
                    cues: Sequence[Mapping[str, Any]], session_id: str) -> TeamRunResult:
@@ -704,6 +778,11 @@ class TeamLeadOrchestrator:
         # particular risk" while one was listed), so the model had nothing to add except ways to be wrong.
         if news_rep is not None and data_rep is None and doc_rep is None:
             return self._news_only(routed, risk_mode, delegated, news_rep, cues, session_id)
+        if (data_rep is not None and news_rep is None and doc_rep is None
+                and not previous and data_rep.faithful_numbers and self._same_narrator()
+                and not unsupported_risks(data_rep.summary, cues)
+                and not self._missing_requested_metric(user_query, data_rep.summary, data_rep.raw_facts)):
+            return self._data_only(routed, risk_mode, delegated, data_rep, cues, session_id)
         synth_prompt = (
             f"User question: {' '.join(user_query.split())[:600]}\n"
             + (f"Conversation memory, earlier accepted answers (context only): {previous}\n" if previous else "")
