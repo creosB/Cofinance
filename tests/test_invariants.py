@@ -123,6 +123,46 @@ class TestFrozenEvidence(unittest.TestCase):
         self.assertEqual(missing, [], 'Every benchmark write-up starts with a > [!WARNING] Experimental callout, so no '
                          'reader mistakes a measurement for advice.')
 
+    def test_readme_benchmarks_pass_checklist(self):
+        import json
+        readme = (ROOT / 'README.md').read_text(encoding='utf-8')
+        targets = re.findall(r'\]\((docs/benchmarks/[^)#\s]+)\)', readme)
+        self.assertTrue(targets, 'README.md must link at least one benchmark artifact under docs/benchmarks/.')
+        failures = []
+        for rel in targets:
+            p = ROOT / rel
+            if not p.exists():
+                failures.append(f'{rel}: missing file')
+                continue
+            if p.suffix == '.md':
+                txt = p.read_text(encoding='utf-8')
+                low = txt.lower()
+                if '[!warning]' not in low or 'experimental' not in low:
+                    failures.append(f'{rel}: missing Experimental warning')
+                linked = re.findall(r'\]\(([^)#\s]+\.jsonl?)\)', txt)
+                if not linked or not any((p.parent / link).exists() for link in linked):
+                    failures.append(f'{rel}: missing existing sibling .json/.jsonl result link')
+                if 'protocol' not in low and not re.search(r'\b[0-9a-f]{8,64}\b', txt):
+                    failures.append(f'{rel}: missing frozen protocol or hash provenance')
+                if not any(w in low for w in ('malformed', 'error', 'abstain', 'abstention', 'skipped', 'failure', 'fallback')):
+                    failures.append(f'{rel}: missing error/abstention accounting')
+                if not any(w in low for w in ('baseline', 'direct', 'always-up', 'crowd', 'unchanged')):
+                    failures.append(f'{rel}: missing baseline comparison')
+                if not any(w in low for w in ('not tested', 'what was not', 'limits', 'limitations', 'not proven', 'does not', 'not a product-accuracy', 'not an independent')):
+                    failures.append(f'{rel}: missing explicit scope limits or what was not tested')
+            elif p.suffix == '.json':
+                data = json.loads(p.read_text(encoding='utf-8'))
+                if not isinstance(data, dict):
+                    failures.append(f'{rel}: JSON report must be an object')
+                    continue
+                if 'experimental' not in str(data.get('warning', '')).lower():
+                    failures.append(f'{rel}: JSON report missing experimental warning')
+                if not data.get('limits'):
+                    failures.append(f'{rel}: JSON report missing limits')
+                if not any('sha256' in k.lower() for k in data):
+                    failures.append(f'{rel}: JSON report missing sha256 provenance')
+        self.assertEqual(failures, [], 'Every README benchmark line must pass the Benchmark Checklist before publishing.')
+
     def test_linked_evidence_exists(self):
         missing = []
         for doc in [ROOT / 'README.md', *(ROOT / 'docs').rglob('*.md')]:
