@@ -66,7 +66,6 @@ def _sample_trace(
                 },
             },
             {"name": "Narrate evidence", "kind": "model", "status": "complete", "outputs": data_reply},
-            {"name": "Narrate evidence", "kind": "model", "status": "complete", "outputs": lead_reply},
         ],
     }
 
@@ -78,7 +77,7 @@ class TestOuterLoop(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "secret_filename_8822.json").write_text(
-                json.dumps(_sample_trace(query=secret_query, lead_reply=secret_reply)),
+                json.dumps(_sample_trace(query=secret_query, data_reply=secret_reply, lead_reply=secret_reply)),
                 encoding="utf-8",
             )
             (root / "bad_json.json").write_text("{not valid json", encoding="utf-8")

@@ -340,6 +340,44 @@ def spotcheck_cmd(action, corpus='data/news_corpus_20261108', overwrite=False):
     return 0
 
 
+def guard_stats_cmd(traces='data/traces', mode='all', as_json=False):
+    import json
+    from core.guard_telemetry import summarize_guard_directory
+    printable_stdout()
+    tpath = ROOT / traces if not Path(traces).is_absolute() else Path(traces)
+    report = summarize_guard_directory(tpath, mode=mode)
+    if as_json:
+        print(json.dumps(report, indent=2, sort_keys=True))
+        return 0
+    cov = report['coverage']
+    fpa = report['first_pass_acceptance_rate']
+    fpa_str = f'{fpa * 100:.1f}%' if fpa is not None else 'n/a'
+    w_share = report['wasted_ms_share']
+    w_str = f'{w_share * 100:.1f}%' if w_share is not None else 'n/a'
+    print(
+        f'Guard telemetry ({cov["chat_traces"]} chat traces / {cov["total_files"]} files, mode={report["mode_filter"]}): '
+        f'pass-1 accepted {report["first_pass_accepted"]}/{report["narrated_checks"]} ({fpa_str}), '
+        f'guard retries {report["guard_retries"]} (recovered {report["guard_retry_recovered"]}), '
+        f'fallbacks {report["fallbacks"]}, '
+        f'wasted passes {report["wasted_passes"]}/{report["total_narrator_passes"]} '
+        f'({report["wasted_ms"]:.1f}/{report["total_narrator_ms"]:.1f} ms, {w_str})'
+    )
+    if report['failure_reasons']:
+        reasons = ', '.join(f'{k}={v}' for k, v in report['failure_reasons'].items())
+        print(f'  failure_reasons: {reasons}')
+    if report['bypass_methods']:
+        byp = ', '.join(f'{k}={v}' for k, v in report['bypass_methods'].items())
+        print(f'  bypass_methods:  {byp}')
+    for row in report['by_actor']:
+        r_rate = f'{row["first_pass_acceptance_rate"] * 100:.1f}%' if row['first_pass_acceptance_rate'] is not None else 'n/a'
+        print(
+            f'  {row["actor"]:18s} pass1={row["first_pass_accepted"]}/{row["narrated_checks"]} ({r_rate}) '
+            f'retries={row["guard_retries"]} fallbacks={row["fallbacks"]} '
+            f'wasted={row["wasted_passes"]}/{row["total_passes"]} ({row["wasted_ms"]:.1f} ms)'
+        )
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog='dev.py')
     sub = ap.add_subparsers(dest='cmd', required=True)
@@ -380,6 +418,10 @@ def main(argv=None):
     sc.add_argument('action', choices=('prepare', 'score'))
     sc.add_argument('--corpus', default='data/news_corpus_20261108')
     sc.add_argument('--overwrite', action='store_true')
+    gs = sub.add_parser('guard-stats')
+    gs.add_argument('--traces', default='data/traces')
+    gs.add_argument('--mode', default='all', choices=('all', 'live', 'fixture', 'replay'))
+    gs.add_argument('--json', action='store_true')
     w = sub.add_parser('wait')
     w.add_argument('name')
     w.add_argument('--max', type=float, default=WAIT_DEFAULT)
@@ -406,6 +448,8 @@ def main(argv=None):
         raise SystemExit(memory_eval_cmd(chat_db=a.chat_db, traces=a.traces))
     if a.cmd == 'spotcheck':
         raise SystemExit(spotcheck_cmd(a.action, corpus=a.corpus, overwrite=a.overwrite))
+    if a.cmd == 'guard-stats':
+        raise SystemExit(guard_stats_cmd(traces=a.traces, mode=a.mode, as_json=a.json))
     if a.cmd == 'dashboard':
         return restart_dashboard()
     if a.cmd in ('news', 'forward'):

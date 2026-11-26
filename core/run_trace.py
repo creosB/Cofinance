@@ -146,7 +146,9 @@ class TraceRecorder:
             self.data["duration_ms"] = round(max(0, self.clock() - self.started) * 1000, 3)
             self.data["summary"] = safe(summary)
             from .usage import summarize
+            from .guard_telemetry import summarize_guards
             self.data["usage"] = summarize(self.data["spans"], self.data["dropped_spans"])
+            self.data["guard_telemetry"] = summarize_guards(self.data["spans"], self.data["dropped_spans"])
             self.flush()
             return self.data
 
