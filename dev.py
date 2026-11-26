@@ -317,6 +317,29 @@ def outer_loop_cmd(traces='data/traces', registry_in=None, fail_on_mismatch=Fals
     return 0
 
 
+def memory_eval_cmd(chat_db='data/chat_v2.db', traces='data/traces'):
+    import json
+    from qualify.memory_eval import evaluate_memory
+    printable_stdout()
+    cpath = ROOT / chat_db if not Path(chat_db).is_absolute() else Path(chat_db)
+    tpath = ROOT / traces if not Path(traces).is_absolute() else Path(traces)
+    report = evaluate_memory(cpath, tpath)
+    print(json.dumps(report, indent=2, sort_keys=True))
+    return 0 if report['synthetic_plumbing']['passed'] else 1
+
+
+def spotcheck_cmd(action, corpus='data/news_corpus_20261108', overwrite=False):
+    import json
+    from qualify.label_spotcheck import prepare_spotcheck, score_spotcheck
+    printable_stdout()
+    cdir = ROOT / corpus if not Path(corpus).is_absolute() else Path(corpus)
+    if action == 'prepare':
+        print(json.dumps(prepare_spotcheck(cdir, overwrite=overwrite), indent=2))
+        return 0
+    print(json.dumps(score_spotcheck(cdir), indent=2))
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog='dev.py')
     sub = ap.add_subparsers(dest='cmd', required=True)
@@ -350,6 +373,13 @@ def main(argv=None):
     ol.add_argument('--traces', default='data/traces')
     ol.add_argument('--registry-in', default=None)
     ol.add_argument('--fail-on-mismatch', action='store_true')
+    me = sub.add_parser('memory-eval')
+    me.add_argument('--chat-db', default='data/chat_v2.db')
+    me.add_argument('--traces', default='data/traces')
+    sc = sub.add_parser('spotcheck')
+    sc.add_argument('action', choices=('prepare', 'score'))
+    sc.add_argument('--corpus', default='data/news_corpus_20261108')
+    sc.add_argument('--overwrite', action='store_true')
     w = sub.add_parser('wait')
     w.add_argument('name')
     w.add_argument('--max', type=float, default=WAIT_DEFAULT)
@@ -372,6 +402,10 @@ def main(argv=None):
         raise SystemExit(restore_cmd(a.backup_dir, data_dir=a.data_dir, dry_run=a.dry_run, force=a.force))
     if a.cmd == 'outer-loop':
         raise SystemExit(outer_loop_cmd(traces=a.traces, registry_in=a.registry_in, fail_on_mismatch=a.fail_on_mismatch))
+    if a.cmd == 'memory-eval':
+        raise SystemExit(memory_eval_cmd(chat_db=a.chat_db, traces=a.traces))
+    if a.cmd == 'spotcheck':
+        raise SystemExit(spotcheck_cmd(a.action, corpus=a.corpus, overwrite=a.overwrite))
     if a.cmd == 'dashboard':
         return restart_dashboard()
     if a.cmd in ('news', 'forward'):
