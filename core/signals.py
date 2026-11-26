@@ -92,39 +92,97 @@ class SignalGate:
         self.last_alert = last_alert if last_alert is not None else {}
         self.clock = clock
 
+    @staticmethod
+    def _validate_judgment(j: object) -> Judgment:
+        if not isinstance(j, Judgment) or any(
+            isinstance(p, bool) or not isinstance(p, (int, float)) or not math.isfinite(p) or not 0 <= p <= 1
+            for p in (j.material, j.urgent, j.direction_p)
+        ) or j.direction not in {'bullish', 'bearish', 'neutral', 'unclear'} or type(j.alert_allowed) is not bool:
+            raise ValueError('Invalid classifier judgment')
+        return j
+
     def process(self, items: Iterable[Item], alerts_already: int = 0) -> List[Outcome]:
         """`alerts_already`: alerts already sent in the caller's cap window (Clock 1 persists it in SQLite),
         so a crash-and-restart cannot hand out a fresh alert budget. Defaults to a per-call cap."""
         out: List[Outcome] = []
         judged, alerts = 0, max(0, int(alerts_already))
         now = self.clock()
+        batch_fn = getattr(self.classifier, "judge_batch", None)
+        if not callable(batch_fn):
+            for it in items:
+                if it.published_at and now - it.published_at > self.cfg.max_age_s:
+                    out.append(Outcome(it, Action.IGNORE, "stale"))
+                    continue
+                if it.key in self.seen:
+                    out.append(Outcome(it, Action.IGNORE, "duplicate"))
+                    continue
+                if judged >= self.cfg.max_judgments:
+                    out.append(Outcome(it, Action.DEFERRED, "judgment_budget"))
+                    continue
+                judged += 1
+                try:
+                    j = self._validate_judgment(self.classifier.judge(it))
+                except Exception as exc:
+                    out.append(Outcome(it, Action.DEFERRED, f"classifier_error:{type(exc).__name__}"))
+                    continue
+                self.seen.add(it.key)
+                out.append(self._decide(it, j, now, alerts))
+                if out[-1].action is Action.ALERT:
+                    alerts += 1
+            return out
+
+        pending_slots: List[tuple[int, Item]] = []
+        pending_keys: set[str] = set()
+
+        def flush_pending() -> None:
+            nonlocal alerts
+            if not pending_slots:
+                return
+            batch_items = [it for _, it in pending_slots]
+            try:
+                if len(batch_items) == 1:
+                    raw_results: List[object] = [self.classifier.judge(batch_items[0])]
+                else:
+                    raw_results = list(batch_fn(batch_items))
+                    if len(raw_results) != len(batch_items):
+                        raise ValueError("Batch classifier returned mismatched result count")
+            except Exception as exc:
+                raw_results = [exc for _ in batch_items]
+            for (slot, it), raw in zip(pending_slots, raw_results):
+                try:
+                    if isinstance(raw, BaseException):
+                        raise raw
+                    j = self._validate_judgment(raw)
+                except Exception as exc:
+                    out[slot] = Outcome(it, Action.DEFERRED, f"classifier_error:{type(exc).__name__}")
+                    continue
+                self.seen.add(it.key)
+                outcome = self._decide(it, j, now, alerts)
+                out[slot] = outcome
+                if outcome.action is Action.ALERT:
+                    alerts += 1
+            pending_slots.clear()
+            pending_keys.clear()
+
         for it in items:
             if it.published_at and now - it.published_at > self.cfg.max_age_s:
                 out.append(Outcome(it, Action.IGNORE, "stale"))
                 continue
+            if it.key in pending_keys:
+                flush_pending()
             if it.key in self.seen:
                 out.append(Outcome(it, Action.IGNORE, "duplicate"))
                 continue
             if judged >= self.cfg.max_judgments:
-                out.append(Outcome(it, Action.DEFERRED, "judgment_budget"))   # not marked seen
+                out.append(Outcome(it, Action.DEFERRED, "judgment_budget"))
                 continue
             judged += 1
-            try:
-                j = self.classifier.judge(it)
-                # NaN makes every '< threshold' comparison false, so rules mode could ALERT on NaN.
-                # Treat malformed model output like a failed call; leave the item retryable.
-                if not isinstance(j, Judgment) or any(
-                    isinstance(p, bool) or not isinstance(p, (int, float)) or not math.isfinite(p) or not 0 <= p <= 1
-                    for p in (j.material, j.urgent, j.direction_p)
-                ) or j.direction not in {'bullish', 'bearish', 'neutral', 'unclear'} or type(j.alert_allowed) is not bool:
-                    raise ValueError('Invalid classifier judgment')
-            except Exception as exc:                                   # fail closed, never ALERT
-                out.append(Outcome(it, Action.DEFERRED, f"classifier_error:{type(exc).__name__}"))
-                continue
-            self.seen.add(it.key)
-            out.append(self._decide(it, j, now, alerts))
-            if out[-1].action is Action.ALERT:
-                alerts += 1
+            slot = len(out)
+            out.append(Outcome(it, Action.DEFERRED, "pending"))
+            pending_slots.append((slot, it))
+            pending_keys.add(it.key)
+
+        flush_pending()
         return out
 
     def _decide(self, it: Item, j: Judgment, now: float, alerts_so_far: int) -> Outcome:

@@ -115,6 +115,8 @@ class RoutedQuery:
 class GlinerDecideClassifier(Classifier):
     """Implements `core.signals.Classifier` on top of `fastino/GLiNER2.5-Decide`."""
 
+    BATCH_SIZE = 6
+
     def __init__(self, backend: ExtractorBackend) -> None:
         self.backend = backend
 
@@ -124,18 +126,15 @@ class GlinerDecideClassifier(Classifier):
 
         return cls(AutoExtractor.from_pretrained(model_id))
 
-    def judge(self, item: Item) -> Judgment:
+    @staticmethod
+    def _passage(item: Item) -> str:
         passage = f"[{item.ticker.upper()}] {item.title}".strip()
         if item.text:
             passage = f"{passage}\n{item.text.strip()}"
-        try:
-            res = self.backend.classify_text(passage, SIGNAL_SCHEMA, include_confidence=True)
-        except TypeError:
-            # Fallback if a backend stub does not accept include_confidence
-            res = self.backend.classify_text(passage, SIGNAL_SCHEMA)
+        return passage
 
-        # Fail closed: a missing or unknown head must never default to a confident label.
-        # (Defaulting materiality to "noise" @ 0.0 used to produce material_p = 1.0.)
+    @staticmethod
+    def _parse_judgment(res: Any) -> Judgment:
         heads: Dict[str, Tuple[str, float]] = {}
         for head in ("materiality", "urgency", "direction"):
             raw = res.get(head) if isinstance(res, Mapping) else None
@@ -167,6 +166,50 @@ class GlinerDecideClassifier(Classifier):
             direction=dir_label,
             direction_p=round(dir_conf, 4),
         )
+
+    def judge(self, item: Item) -> Judgment:
+        passage = self._passage(item)
+        try:
+            res = self.backend.classify_text(passage, SIGNAL_SCHEMA, include_confidence=True)
+        except TypeError:
+            res = self.backend.classify_text(passage, SIGNAL_SCHEMA)
+        return self._parse_judgment(res)
+
+    def _safe_judge(self, item: Item) -> Judgment | Exception:
+        try:
+            return self.judge(item)
+        except Exception as exc:
+            return exc
+
+    def judge_batch(self, items: Sequence[Item], *, batch_size: int = BATCH_SIZE) -> List[Judgment | Exception]:
+        batch_items = list(items)
+        if not batch_items:
+            return []
+        batch_fn = getattr(self.backend, "batch_classify_text", None)
+        if len(batch_items) == 1 or not callable(batch_fn):
+            return [self._safe_judge(it) for it in batch_items]
+
+        size = max(1, int(batch_size))
+        out: List[Judgment | Exception] = []
+        for start in range(0, len(batch_items), size):
+            chunk = batch_items[start:start + size]
+            passages = [self._passage(it) for it in chunk]
+            try:
+                try:
+                    raw_list = batch_fn(passages, SIGNAL_SCHEMA, batch_size=len(passages), include_confidence=True)
+                except TypeError:
+                    raw_list = batch_fn(passages, SIGNAL_SCHEMA)
+                if not isinstance(raw_list, Sequence) or isinstance(raw_list, (str, bytes)) or len(raw_list) != len(chunk):
+                    raise GlinerOutputError("GLiNER batch output length mismatch")
+            except Exception:
+                out.extend(self._safe_judge(it) for it in chunk)
+                continue
+            for raw in raw_list:
+                try:
+                    out.append(self._parse_judgment(raw))
+                except Exception as exc:
+                    out.append(exc)
+        return out
 
 
 class GlinerQueryRouter:

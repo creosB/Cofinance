@@ -168,6 +168,20 @@ class TracedExtractor:
         return self.trace.call("Classify heads", "model", lambda: self.backend.classify_text(text, schema, **kwargs),
                                actor=self.actor, model=self.model, inputs={"text": text, "heads": list(schema)})
 
+    def batch_classify_text(self, texts, schema, **kwargs):
+        batch_fn = getattr(self.backend, "batch_classify_text", None)
+        if not callable(batch_fn):
+            return [self.classify_text(t, schema, **kwargs) for t in texts]
+        items = list(texts)
+        return self.trace.call(
+            "Classify heads (batch)",
+            "model",
+            lambda: batch_fn(items, schema, **kwargs),
+            actor=self.actor,
+            model=self.model,
+            inputs={"count": len(items), "heads": list(schema)},
+        )
+
     def extract_entities(self, text, entity_types):
         return self.trace.call("Resolve entities", "model", lambda: self.backend.extract_entities(text, entity_types),
                                actor=self.actor, model=self.model, inputs={"text": text, "entity_types": entity_types})
@@ -238,6 +252,28 @@ class TracedClassifier:
                 output = self.classifier.judge(item)
             span["output"] = output
             return output
+
+    def judge_batch(self, items):
+        batch_items = list(items)
+        batch_fn = getattr(self.classifier, "judge_batch", None)
+        if self.leaf_model or not callable(batch_fn) or len(batch_items) <= 1:
+            results = []
+            for item in batch_items:
+                try:
+                    results.append(self.judge(item))
+                except Exception as exc:
+                    results.append(exc)
+            return results
+        raw_results = list(batch_fn(batch_items))
+        for item, outcome in zip(batch_items, raw_results):
+            inputs = {"ticker": item.ticker, "title": item.title, "source": item.source, "url": item.url, "item_key": item.key}
+            with self.trace.span("Judge headline", "decision", actor="Signal judge", model=self.model, inputs=inputs) as span:
+                if isinstance(outcome, BaseException):
+                    span["status"] = "error"
+                    span["error"] = f"{type(outcome).__name__}: {str(outcome)[:200]}"
+                else:
+                    span["output"] = outcome
+        return raw_results
 
 
 def instrument_classifier(classifier: Any, trace: TraceRecorder):

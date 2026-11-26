@@ -227,16 +227,23 @@ class RouterProcess:
         ready=self.receive(120)
         if not ready.get('ready'):self.close();raise ModelError('Cached routing model failed to load.')
         self.backend=ready.get('backend','pytorch_fp32')
-    def call(self,method,text,schema,kwargs):
+    def _rpc(self,payload,timeout=20):
         with self.lock:
             self.start();self.check();self.seq+=1
-            message={'id':self.seq,'method':method,'text':text,'schema':schema,'kwargs':kwargs}
+            message={'id':self.seq,**payload}
             self.process.stdin.write(json.dumps(message,ensure_ascii=True)+'\n');self.process.stdin.flush()
-            value=self.receive(20)
+            value=self.receive(timeout)
             if value.get('id')!=self.seq or 'result' not in value:
                 raise ModelError('Routing inference failed or returned an invalid response.')
             return value['result']
+    def call(self,method,text,schema,kwargs):
+        return self._rpc({'method':method,'text':text,'schema':schema,'kwargs':kwargs},timeout=20)
     def classify_text(self,text,schema,**kwargs):return self.call('classify_text',text,schema,kwargs)
+    def batch_classify_text(self,texts,schema,**kwargs):
+        items=list(texts)
+        if not items:return []
+        timeout=min(120,max(20,10*len(items)))
+        return self._rpc({'method':'batch_classify_text','texts':items,'schema':schema,'kwargs':kwargs},timeout=timeout)
     def extract_entities(self,text,entity_types):return self.call('extract_entities',text,entity_types,{})
     def close(self):
         process=self.process;self.process=None;self.backend=None
@@ -284,12 +291,13 @@ def main():
         )
     protocol.write(json.dumps({'ready':True,'backend':backend})+'\n');protocol.flush()
     for line in sys.stdin:
-        if len(line)>32000:break
+        if len(line)>256000:break
         message=json.loads(line)
         try:
             method=message['method']
             with contextlib.redirect_stdout(sys.stderr):
                 if method=='classify_text':result=model.classify_text(message['text'],message['schema'],**message.get('kwargs',{}))
+                elif method=='batch_classify_text':result=model.batch_classify_text(message['texts'],message['schema'],**message.get('kwargs',{}))
                 elif method=='extract_entities':result=model.extract_entities(message['text'],message['schema'])
                 else:raise ValueError('Unsupported inference method')
             value={'id':message['id'],'result':result}
