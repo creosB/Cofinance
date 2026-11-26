@@ -88,6 +88,41 @@ class TestChatShellBrowser(unittest.TestCase):
         chip.wait_for(state='detached')
         self.assertEqual(self.service.store.session(sid)['documents'],[])
 
+    def test_multi_pdf_grouped_sources_and_event_driven_sse(self):
+        from tests.test_documents import make_pdf
+        from ui import dashboard
+        pdf_a = make_pdf([
+            'Household checking accounts may waive transfer fees each month.',
+            'Branch lobby hours run Monday through Friday.',
+            'The household transfer fee waiver applies only to the first transfer each month.',
+        ])
+        pdf_b = make_pdf([
+            'Business checking accounts may waive transfer fees on domestic accounts.',
+        ])
+        with patch.object(dashboard, 'EVENT_TICK_S', 3.0):
+            self.page.get_by_role('button', name='New chat', exact=True).click()
+            self.page.get_by_role('heading', name='What should we research?').wait_for()
+            file_input = self.page.locator('input[type=file]')
+            file_input.set_input_files({'name': 'Circular_47.pdf', 'mimeType': 'application/pdf', 'buffer': pdf_a})
+            chip = self.page.get_by_role('list', name='Attached PDFs')
+            chip.get_by_text('Circular_47.pdf').wait_for()
+            file_input.set_input_files({'name': 'Circular_48.pdf', 'mimeType': 'application/pdf', 'buffer': pdf_b})
+            chip.get_by_text('Circular_48.pdf').wait_for()
+            box = self.page.get_by_role('textbox', name='Research question')
+            box.fill('Compare household and business transfer fee waivers')
+            box.press('Enter')
+            sources = self.page.get_by_label('Pages used')
+            sources.wait_for(timeout=8000)
+            row_a = sources.locator('[data-document-group="Circular_47.pdf"]')
+            row_b = sources.locator('[data-document-group="Circular_48.pdf"]')
+            self.assertEqual(row_a.count(), 1)
+            self.assertEqual(row_b.count(), 1)
+            self.assertIn('pages 1, 3', row_a.inner_text())
+            self.assertIn('page 1', row_b.inner_text())
+            answer_text = self.page.locator('.msg-answer').inner_text()
+            self.assertIn('Circular_47.pdf', answer_text)
+            self.assertIn('Circular_48.pdf', answer_text)
+
     def test_tools_collapse_persistence_and_conversation_options(self):
         self.choose()
         side=self.page.locator('.workspace-sidebar')  # answers carry their own Execution action; test the sidebar only
