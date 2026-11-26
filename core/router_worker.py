@@ -26,11 +26,8 @@ def onnx_paths(cache_dir: Path) -> tuple[Path, Path]:
 
 
 def file_sha256(path: Path) -> str:
-    h=hashlib.sha256()
     with Path(path).open('rb') as fh:
-        while chunk:=fh.read(4*1024*1024):
-            h.update(chunk)
-    return h.hexdigest()
+        return hashlib.file_digest(fh, 'sha256').hexdigest()
 
 
 def verify_onnx_cache(cache_dir: Path) -> Path | None:
@@ -266,6 +263,28 @@ def _install_offline_guard():
     socket.socket.connect=guarded
 
 
+def _load_worker_model(cache_dir: Path | None, mode: str, threads: int = 6):
+    mode = (mode or 'auto').strip().lower()
+    if mode != 'off' and cache_dir is not None:
+        from .gliner_onnx import STANDALONE_FORMAT, load_standalone_onnx
+        try:
+            standalone = load_standalone_onnx(cache_dir, threads=threads)
+        except Exception:
+            standalone = None
+            if mode == 'required':
+                raise
+        if standalone is not None:
+            return standalone, STANDALONE_FORMAT
+
+    from gliner2 import AutoExtractor
+    import torch
+    torch.set_num_threads(threads)
+    path = Path.home() / '.cache/huggingface/hub/models--fastino--GLiNER2.5-Decide/snapshots' / REVISION
+    model = AutoExtractor.from_pretrained(str(path), local_files_only=True)
+    backend = maybe_attach_onnx_encoder(model, cache_dir, mode=mode, threads=threads)
+    return model, backend
+
+
 def main():
     import contextlib
     _install_offline_guard()
@@ -275,18 +294,19 @@ def main():
             meta=export_onnx_encoder(Path(sys.argv[2]), source_onnx=src)
         print(json.dumps(meta, indent=2, sort_keys=True), flush=True)
         return
+    if len(sys.argv)>=3 and sys.argv[1]=='export-standalone':
+        from .gliner_onnx import export_standalone_onnx
+        src=Path(sys.argv[3]) if len(sys.argv)>=4 else None
+        with contextlib.redirect_stdout(sys.stderr):
+            meta=export_standalone_onnx(Path(sys.argv[2]), source_onnx=src)
+        print(json.dumps(meta, indent=2, sort_keys=True), flush=True)
+        return
     protocol=sys.stdout
     with contextlib.redirect_stdout(sys.stderr):
-        from gliner2 import AutoExtractor
-        import torch
-        torch.set_num_threads(6)
-        path=Path.home()/'.cache/huggingface/hub/models--fastino--GLiNER2.5-Decide/snapshots'/REVISION
-        model=AutoExtractor.from_pretrained(str(path),local_files_only=True)
         cache_env=os.environ.get('COFINANCE_ROUTER_CACHE')
-        backend=maybe_attach_onnx_encoder(
-            model,
+        model, backend = _load_worker_model(
             Path(cache_env) if cache_env else None,
-            mode=os.environ.get('COFINANCE_ROUTER_ONNX','auto'),
+            os.environ.get('COFINANCE_ROUTER_ONNX', 'auto'),
             threads=6,
         )
     protocol.write(json.dumps({'ready':True,'backend':backend})+'\n');protocol.flush()
