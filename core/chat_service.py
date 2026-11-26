@@ -2,6 +2,7 @@
 real local routing and optional qualified narrator. No legacy Streamlit imports.
 """
 from __future__ import annotations
+from concurrent.futures import ThreadPoolExecutor
 import dataclasses
 import json
 import os
@@ -337,18 +338,31 @@ class ChatService:
             same=lambda ts:bool(set(ts or [])&set(tickers))
             previous=research[-1]['content'] if research and same((research[-1].get('payload') or {}).get('tickers')) else ''
             hits=self.recall_memory(session,job['query'],trace,exclude_run=research[-1].get('run_id') if research else None,tickers=tickers)
-            result=run_traced_team(orch,job['query'],trace,session_id=job['session_id'],context=context_from(previous,hits),
-                                   documents=documents or None)
-            check()
-            answer=result.final_synthesis or 'No accepted evidence is available for this request.'
-            if routed.intent=='watchlist_add':answer+=' Use the Add to watchlist button to confirm tracking.'
-            odds=None
-            if self.crowd_odds:
-                # Deterministic and outside the narrator: these values are shown as recorded, never narrated or guarded.
-                try:odds=trace.call('Look up crowd odds','tool',lambda:self.crowd_odds(tickers),actor='Prediction markets',
-                                    inputs={'tickers':tickers,'source':'Polymarket public API, read-only','trading':False})
-                except Exception:odds=None  # an aid, never a blocker
+            odds_pool=ThreadPoolExecutor(max_workers=1) if self.crowd_odds else None
+            odds_future=odds_pool.submit(self.crowd_odds,tickers) if odds_pool else None
+            try:
+                result=run_traced_team(orch,job['query'],trace,session_id=job['session_id'],context=context_from(previous,hits),
+                                       documents=documents or None)
                 check()
+                answer=result.final_synthesis or 'No accepted evidence is available for this request.'
+                if routed.intent=='watchlist_add':answer+=' Use the Add to watchlist button to confirm tracking.'
+                odds=None
+                if odds_future is not None:
+                    def await_odds():
+                        while True:
+                            check()
+                            try:
+                                return odds_future.result(timeout=0.05)
+                            except TimeoutError:
+                                continue
+                    # Deterministic and outside the narrator: these values are shown as recorded, never narrated or guarded.
+                    try:odds=trace.call('Look up crowd odds','tool',await_odds,actor='Prediction markets',
+                                        inputs={'tickers':tickers,'source':'Polymarket public API, read-only','trading':False})
+                    except Exception:odds=None  # an aid, never a blocker
+                    check()
+            finally:
+                if odds_pool is not None:
+                    odds_pool.shutdown(wait=False,cancel_futures=True)
             headline=None
             if result.news_report and os.environ.get('COFINANCE_HEADLINE_SIGNAL','on').strip().lower()!='off':
                 # headline-v1, experimental. Python sums the stored judgments of exactly the headlines the News Researcher

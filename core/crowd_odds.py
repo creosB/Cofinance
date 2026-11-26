@@ -7,6 +7,7 @@ calibration study (docs/benchmarks/polymarket-calibration.json), when that bucke
 """
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 import json
 import re
 import time
@@ -129,12 +130,25 @@ def select(ticker: str, events: Sequence[dict], now: float, calibration: Optiona
 def lookup(tickers: Sequence[str], *, search: Callable[[str], list] = search_events, now: Optional[float] = None,
            calibration: Optional[dict] = None) -> dict:
     now = time.time() if now is None else now
-    markets, errors = [], []
-    for ticker in list(dict.fromkeys(tickers))[:MAX_ASSETS]:
+    targets = list(dict.fromkeys(tickers))[:MAX_ASSETS]
+
+    def fetch_one(ticker: str):
         term = TERMS.get(ticker.upper(), (ticker.lower(),))[0]
         try:
-            markets += select(ticker, search(term), now, calibration)
+            return select(ticker, search(term), now, calibration), None
         except Exception as exc:  # crowd odds are an aid: a failure never blocks research
-            errors.append(f"{ticker}: {type(exc).__name__}")
+            return [], f"{ticker}: {type(exc).__name__}"
+
+    if len(targets) > 1:
+        with ThreadPoolExecutor(max_workers=len(targets)) as pool:
+            results = list(pool.map(fetch_one, targets))
+    else:
+        results = [fetch_one(t) for t in targets]
+
+    markets, errors = [], []
+    for found, err in results:
+        markets.extend(found)
+        if err:
+            errors.append(err)
     return {"source": "Polymarket public API, read-only", "fetched_at": _iso(now), "markets": markets, "errors": errors,
             "calibration_study": (calibration or {}).get("study"), "note": NOTE}

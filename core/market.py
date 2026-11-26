@@ -2,6 +2,7 @@
 Alternative.me sentiment. Never generates demo values or calls Streamlit.
 """
 from __future__ import annotations
+from concurrent.futures import ThreadPoolExecutor
 import json
 import math
 import re
@@ -112,6 +113,17 @@ class MarketTools:
         except (OSError, ValueError, KeyError, IndexError, TypeError, OverflowError, AttributeError):
             snap["ath_drawdown"] = "Unavailable: no full-history highs from the source; a 52-week high is not an all-time high"
 
+    def _fetch_sentiment(self):
+        try:
+            sentiment=self.fetch("https://api.alternative.me/fng/?limit=1"); self.check()
+            item=sentiment["data"][0];value=int(item["value"])
+            if not 0<=value<=100:raise ValueError("Invalid sentiment")
+            as_of=datetime.fromtimestamp(int(item["timestamp"]),timezone.utc).isoformat()
+            return ({"fear_greed_index":value,"fear_greed_label":str(item["value_classification"]),"fear_greed_as_of":as_of},
+                    {"title":"Crypto Fear & Greed Index (market-wide, not asset-specific)","url":"https://alternative.me/crypto/fear-and-greed-index/","source":"Alternative.me","as_of":as_of})
+        except (OSError,ValueError,KeyError,IndexError,TypeError):
+            return {"sentiment_status":"Unavailable, no neutral score substituted"},None
+
     def get_snapshot(self,ticker):
         valid_symbol(ticker);self.check()
         symbol=ticker+"-USD" if ticker in CRYPTO else ticker
@@ -151,19 +163,29 @@ class MarketTools:
                 if finite(high) and high>0:snap["drawdown_from_52_week_high_pct"]=round((1-price/high)*100,4)
                 returns=[math.log(b["close"]/a["close"]) for a,b in zip(points,points[1:])]
                 if len(returns)>=20:snap["annualized_daily_log_volatility_pct"]=round(statistics.stdev(returns)*math.sqrt(365)*100,4)
-                self.add_all_time_high(snap,symbol,price)
-                try:
-                    sentiment=self.fetch("https://api.alternative.me/fng/?limit=1")
-                    item=sentiment["data"][0];value=int(item["value"])
-                    if not 0<=value<=100:raise ValueError("Invalid sentiment")
-                    snap.update(fear_greed_index=value,fear_greed_label=str(item["value_classification"]),fear_greed_as_of=datetime.fromtimestamp(int(item["timestamp"]),timezone.utc).isoformat())
-                    self.evidence.append({"title":"Crypto Fear & Greed Index (market-wide, not asset-specific)","url":"https://alternative.me/crypto/fear-and-greed-index/","source":"Alternative.me","as_of":snap["fear_greed_as_of"]})
-                except (OSError,ValueError,KeyError,IndexError,TypeError):snap["sentiment_status"]="Unavailable, no neutral score substituted"
+                ath_out={}
+                with ThreadPoolExecutor(max_workers=2) as pool:
+                    f_ath=pool.submit(self.add_all_time_high,ath_out,symbol,price)
+                    f_sent=pool.submit(self._fetch_sentiment)
+                    f_ath.result()
+                    sent_fields,sent_ev=f_sent.result()
+                snap.update(ath_out)
+                snap.update(sent_fields)
+                if sent_ev:
+                    self.evidence.append(sent_ev)
             else:
                 # The chart response never carries fundamentals (the old reads here were always empty). Missing fields
                 # remain visibly absent; each present one keeps its own as-of date.
-                self.add_fundamentals(snap,symbol)
-                self.add_all_time_high(snap,symbol,price)
+                fund_out={"currency":snap.get("currency")}
+                ath_out={}
+                with ThreadPoolExecutor(max_workers=2) as pool:
+                    f_fund=pool.submit(self.add_fundamentals,fund_out,symbol)
+                    f_ath=pool.submit(self.add_all_time_high,ath_out,symbol,price)
+                    f_fund.result()
+                    f_ath.result()
+                fund_out.pop("currency",None)
+                snap.update(fund_out)
+                snap.update(ath_out)
             self.evidence.append({"title":ticker+" market data","url":"https://finance.yahoo.com/quote/"+quote(symbol,safe=""),"source":"Yahoo Finance","as_of":snap["price_as_of"]})
         except (OSError,ValueError,KeyError,IndexError,TypeError,OverflowError):
             snap["error"]="Source request failed or returned invalid market data. No values were substituted."
