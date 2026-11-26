@@ -1,0 +1,587 @@
+{
+  "arms": {
+    "cascade_gliner_d1": {
+      "accuracy": 0.9583,
+      "alert_recall": 0.6667,
+      "balanced_accuracy": 0.9583,
+      "brier": 0.0495,
+      "ece": 0.1396,
+      "errors": 0,
+      "false_alert_rate": 0.0,
+      "macro_f1": 0.9583,
+      "material_auc": 1.0,
+      "n": 24,
+      "p50_ms": 6108.8,
+      "p95_ms": 22914.6,
+      "routes": {
+        "d1_error_fallback": 0,
+        "escalated_d1": 22,
+        "gliner_only": 2
+      },
+      "total_s": 188.32,
+      "trap_accuracy": 1.0,
+      "urgent_auc": 0.8796
+    },
+    "d1": {
+      "accuracy": 0.9583,
+      "alert_recall": 0.6667,
+      "balanced_accuracy": 0.9583,
+      "brier": 0.0476,
+      "ece": 0.1327,
+      "errors": 0,
+      "false_alert_rate": 0.0,
+      "macro_f1": 0.9583,
+      "material_auc": 1.0,
+      "n": 24,
+      "p50_ms": 5367.4,
+      "p95_ms": 21805.5,
+      "total_s": 180.73,
+      "trap_accuracy": 1.0,
+      "urgent_auc": 0.8796
+    },
+    "gliner": {
+      "accuracy": 0.875,
+      "alert_recall": 0.0,
+      "balanced_accuracy": 0.875,
+      "brier": 0.1729,
+      "ece": 0.2328,
+      "errors": 0,
+      "false_alert_rate": 0.0,
+      "macro_f1": 0.873,
+      "material_auc": 0.8542,
+      "n": 24,
+      "p50_ms": 648.7,
+      "p95_ms": 1242.0,
+      "total_s": 18.45,
+      "trap_accuracy": 0.625,
+      "urgent_auc": 0.5
+    }
+  },
+  "d1_dtype": "float32",
+  "d1_revision": "a6bce774e6dde338dcc3036ceb5d91f78bf4c19e",
+  "data_path": "qualify/headlines.jsonl",
+  "data_sha256": "cb6ede1f128f3f6616761e5ee5e5dd3215c0b720bf7d5d3d1e76ad6ce534c5a8",
+  "decisions": {
+    "cascade_gliner_d1": {
+      "adopt": false,
+      "candidate_p50_ms": 6108.8,
+      "latency_met": false,
+      "macro_f1_gain": 0.0853,
+      "material_auc_ci95_lo": 0.0,
+      "material_auc_diff": 0.1458,
+      "max_p50_ms": 5000.0,
+      "regression": false,
+      "skill_gain_met": true,
+      "verdict": "REJECT_TOO_SLOW_ON_CPU"
+    },
+    "d1": {
+      "adopt": false,
+      "candidate_p50_ms": 5367.4,
+      "latency_met": false,
+      "macro_f1_gain": 0.0853,
+      "material_auc_ci95_lo": 0.0,
+      "material_auc_diff": 0.1458,
+      "max_p50_ms": 5000.0,
+      "regression": false,
+      "skill_gain_met": true,
+      "verdict": "REJECT_TOO_SLOW_ON_CPU"
+    }
+  },
+  "format": "cofinance-d1-eval/1",
+  "gliner_backend": "encoder_fp32",
+  "limits": [
+    "24 synthetic/authored headlines from qualify/headlines.jsonl, not real live market feeds",
+    "CPU-only measurement on one Windows machine; GPU latency was not tested",
+    "d1-2B evaluated via SystemOneSignalClassifier with default noul/choice prompts, not fine-tuned"
+  ],
+  "paired_vs_gliner": {
+    "cascade_gliner_d1": {
+      "balanced_accuracy": {
+        "ci95": [
+          -0.0714,
+          0.25
+        ],
+        "diff": 0.0833
+      },
+      "macro_f1": {
+        "ci95": [
+          -0.0828,
+          0.2571
+        ],
+        "diff": 0.0853
+      },
+      "material_auc": {
+        "ci95": [
+          0.0,
+          0.3407
+        ],
+        "diff": 0.1458
+      }
+    },
+    "d1": {
+      "balanced_accuracy": {
+        "ci95": [
+          -0.0714,
+          0.25
+        ],
+        "diff": 0.0833
+      },
+      "macro_f1": {
+        "ci95": [
+          -0.0828,
+          0.2571
+        ],
+        "diff": 0.0853
+      },
+      "material_auc": {
+        "ci95": [
+          0.0,
+          0.3407
+        ],
+        "diff": 0.1458
+      }
+    }
+  },
+  "protocol_sha256": "033ae167af1d9c2add70a00c69f6aae9c664d58dc2ffbdc3fe046a9b62656789",
+  "rows": {
+    "d1": [
+      {
+        "direction": "neutral",
+        "direction_p": 0.5144,
+        "id": "acme-halt",
+        "material_p": 0.6278,
+        "ms": 32912.0,
+        "urgent_p": 0.6203
+      },
+      {
+        "direction": "bullish",
+        "direction_p": 0.2941,
+        "id": "acme-deal",
+        "material_p": 0.8413,
+        "ms": 24302.4,
+        "urgent_p": 0.7573
+      },
+      {
+        "direction": "bearish",
+        "direction_p": 0.5781,
+        "id": "acme-ceo",
+        "material_p": 0.9029,
+        "ms": 4976.3,
+        "urgent_p": 0.8881
+      },
+      {
+        "direction": "bearish",
+        "direction_p": 0.6843,
+        "id": "gamma-fda",
+        "material_p": 0.9213,
+        "ms": 5286.2,
+        "urgent_p": 0.877
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.5543,
+        "id": "beta-sec",
+        "material_p": 0.8632,
+        "ms": 5211.5,
+        "urgent_p": 0.8196
+      },
+      {
+        "direction": "bearish",
+        "direction_p": 0.5615,
+        "id": "acme-miss",
+        "material_p": 0.895,
+        "ms": 5448.5,
+        "urgent_p": 0.7766
+      },
+      {
+        "direction": "bullish",
+        "direction_p": 0.8331,
+        "id": "beta-raise",
+        "material_p": 0.9192,
+        "ms": 4626.6,
+        "urgent_p": 0.3996
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.4635,
+        "id": "acme-buyback",
+        "material_p": 0.8378,
+        "ms": 4815.6,
+        "urgent_p": 0.5814
+      },
+      {
+        "direction": "bearish",
+        "direction_p": 0.9028,
+        "id": "gamma-customer",
+        "material_p": 0.9385,
+        "ms": 4548.9,
+        "urgent_p": 0.8855
+      },
+      {
+        "direction": "bearish",
+        "direction_p": 0.7341,
+        "id": "beta-recall",
+        "material_p": 0.9302,
+        "ms": 5135.4,
+        "urgent_p": 0.8822
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.3845,
+        "id": "acme-dividend",
+        "material_p": 0.7352,
+        "ms": 4778.2,
+        "urgent_p": 0.6163
+      },
+      {
+        "direction": "bullish",
+        "direction_p": 0.8704,
+        "id": "gamma-contract",
+        "material_p": 0.9395,
+        "ms": 4628.5,
+        "urgent_p": 0.7951
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.8172,
+        "id": "acme-charity",
+        "material_p": 0.0168,
+        "ms": 4419.3,
+        "urgent_p": 0.0074
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.5209,
+        "id": "beta-listicle",
+        "material_p": 0.604,
+        "ms": 6031.0,
+        "urgent_p": 0.0203
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.8438,
+        "id": "gamma-logo",
+        "material_p": 0.0534,
+        "ms": 6896.8,
+        "urgent_p": 0.0214
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.6844,
+        "id": "acme-cafe",
+        "material_p": 0.0636,
+        "ms": 5044.4,
+        "urgent_p": 0.033
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.5746,
+        "id": "beta-anniv",
+        "material_p": 0.1271,
+        "ms": 6438.7,
+        "urgent_p": 0.017
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.7707,
+        "id": "gamma-recap",
+        "material_p": 0.207,
+        "ms": 5230.2,
+        "urgent_p": 0.0172
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.5643,
+        "id": "acme-history",
+        "material_p": 0.1902,
+        "ms": 6582.0,
+        "urgent_p": 0.0827
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.6564,
+        "id": "beta-speculation",
+        "material_p": 0.4831,
+        "ms": 5451.3,
+        "urgent_p": 0.0718
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.8167,
+        "id": "gamma-not-affected",
+        "material_p": 0.3109,
+        "ms": 7415.4,
+        "urgent_p": 0.1192
+      },
+      {
+        "direction": "unclear",
+        "direction_p": 0.3341,
+        "id": "acme-inject",
+        "material_p": 0.0349,
+        "ms": 7656.2,
+        "urgent_p": 0.036
+      },
+      {
+        "direction": "unclear",
+        "direction_p": 0.4936,
+        "id": "beta-quiz",
+        "material_p": 0.0645,
+        "ms": 6720.3,
+        "urgent_p": 0.0538
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.7311,
+        "id": "gamma-peer",
+        "material_p": 0.126,
+        "ms": 6174.0,
+        "urgent_p": 0.0446
+      }
+    ],
+    "gliner": [
+      {
+        "direction": "unclear",
+        "direction_p": 0.2886,
+        "id": "acme-halt",
+        "material_p": 0.7202,
+        "ms": 676.9,
+        "urgent_p": 0.426
+      },
+      {
+        "direction": "bullish",
+        "direction_p": 0.3275,
+        "id": "acme-deal",
+        "material_p": 0.5649,
+        "ms": 1028.2,
+        "urgent_p": 0.2414
+      },
+      {
+        "direction": "bearish",
+        "direction_p": 0.3824,
+        "id": "acme-ceo",
+        "material_p": 0.7283,
+        "ms": 605.4,
+        "urgent_p": 0.5159
+      },
+      {
+        "direction": "bearish",
+        "direction_p": 0.5158,
+        "id": "gamma-fda",
+        "material_p": 0.5991,
+        "ms": 1213.8,
+        "urgent_p": 0.2358
+      },
+      {
+        "direction": "bearish",
+        "direction_p": 0.4435,
+        "id": "beta-sec",
+        "material_p": 0.6639,
+        "ms": 710.9,
+        "urgent_p": 0.2284
+      },
+      {
+        "direction": "bearish",
+        "direction_p": 0.5891,
+        "id": "acme-miss",
+        "material_p": 0.6237,
+        "ms": 623.8,
+        "urgent_p": 0.2446
+      },
+      {
+        "direction": "bullish",
+        "direction_p": 0.8095,
+        "id": "beta-raise",
+        "material_p": 0.7031,
+        "ms": 616.2,
+        "urgent_p": 0.2531
+      },
+      {
+        "direction": "bullish",
+        "direction_p": 0.4392,
+        "id": "acme-buyback",
+        "material_p": 0.5814,
+        "ms": 591.2,
+        "urgent_p": 0.2229
+      },
+      {
+        "direction": "bearish",
+        "direction_p": 0.5258,
+        "id": "gamma-customer",
+        "material_p": 0.61,
+        "ms": 660.1,
+        "urgent_p": 0.2452
+      },
+      {
+        "direction": "bearish",
+        "direction_p": 0.3306,
+        "id": "beta-recall",
+        "material_p": 0.5537,
+        "ms": 637.3,
+        "urgent_p": 0.2306
+      },
+      {
+        "direction": "bearish",
+        "direction_p": 0.4049,
+        "id": "acme-dividend",
+        "material_p": 0.6057,
+        "ms": 563.7,
+        "urgent_p": 0.2559
+      },
+      {
+        "direction": "bullish",
+        "direction_p": 0.661,
+        "id": "gamma-contract",
+        "material_p": 0.6472,
+        "ms": 592.3,
+        "urgent_p": 0.241
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.4237,
+        "id": "acme-charity",
+        "material_p": 0.0721,
+        "ms": 609.5,
+        "urgent_p": 0.2471
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.3352,
+        "id": "beta-listicle",
+        "material_p": 0.4923,
+        "ms": 938.6,
+        "urgent_p": 0.2666
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.405,
+        "id": "gamma-logo",
+        "material_p": 0.4125,
+        "ms": 557.4,
+        "urgent_p": 0.2716
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.3832,
+        "id": "acme-cafe",
+        "material_p": 0.326,
+        "ms": 570.0,
+        "urgent_p": 0.256
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.3719,
+        "id": "beta-anniv",
+        "material_p": 0.2379,
+        "ms": 593.6,
+        "urgent_p": 0.2599
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.3196,
+        "id": "gamma-recap",
+        "material_p": 0.3455,
+        "ms": 1247.0,
+        "urgent_p": 0.2523
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.3482,
+        "id": "acme-history",
+        "material_p": 0.6136,
+        "ms": 997.6,
+        "urgent_p": 0.2753
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.314,
+        "id": "beta-speculation",
+        "material_p": 0.4895,
+        "ms": 694.0,
+        "urgent_p": 0.2641
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.5627,
+        "id": "gamma-not-affected",
+        "material_p": 0.2965,
+        "ms": 722.8,
+        "urgent_p": 0.1253
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.3803,
+        "id": "acme-inject",
+        "material_p": 0.7337,
+        "ms": 1567.6,
+        "urgent_p": 0.2438
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.3296,
+        "id": "beta-quiz",
+        "material_p": 0.4547,
+        "ms": 843.3,
+        "urgent_p": 0.2217
+      },
+      {
+        "direction": "neutral",
+        "direction_p": 0.3035,
+        "id": "gamma-peer",
+        "material_p": 0.5919,
+        "ms": 589.3,
+        "urgent_p": 0.2543
+      }
+    ]
+  },
+  "splits": {
+    "cascade_gliner_d1": {
+      "first_half": {
+        "balanced_accuracy": null,
+        "errors": 0,
+        "macro_f1": 0.5,
+        "material_auc": null,
+        "n": 12
+      },
+      "second_half": {
+        "balanced_accuracy": null,
+        "errors": 0,
+        "macro_f1": 0.4783,
+        "material_auc": null,
+        "n": 12
+      }
+    },
+    "d1": {
+      "first_half": {
+        "balanced_accuracy": null,
+        "errors": 0,
+        "macro_f1": 0.5,
+        "material_auc": null,
+        "n": 12
+      },
+      "second_half": {
+        "balanced_accuracy": null,
+        "errors": 0,
+        "macro_f1": 0.4783,
+        "material_auc": null,
+        "n": 12
+      }
+    },
+    "gliner": {
+      "first_half": {
+        "balanced_accuracy": null,
+        "errors": 0,
+        "macro_f1": 0.5,
+        "material_auc": null,
+        "n": 12
+      },
+      "second_half": {
+        "balanced_accuracy": null,
+        "errors": 0,
+        "macro_f1": 0.4286,
+        "material_auc": null,
+        "n": 12
+      }
+    }
+  },
+  "warning": "Experimental one-look screen on 24 synthetic headlines. Not a trading signal, not financial advice."
+}
