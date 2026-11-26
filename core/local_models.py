@@ -193,8 +193,9 @@ def local_json(url, body=None, key="", timeout=90):
 
 
 class LocalModels:
-    def __init__(self, root: Path, repo: Path):
+    def __init__(self, root: Path, repo: Path, on_change=None):
         self.root, self.repo = Path(root), Path(repo)
+        self._on_change = on_change
         self.root.mkdir(parents=True, exist_ok=True)
         self.lock = threading.RLock()
         self.cancel = threading.Event()
@@ -290,6 +291,9 @@ class LocalModels:
         with self.lock:
             self.state.update(values)
             atomic(self.root / "state.json", self.state)
+        cb = getattr(self, "_on_change", None)
+        if cb:
+            cb()
 
     def is_loaded(self, model=None):
         running = self.ready and self.process is not None and self.process.poll() is None

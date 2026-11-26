@@ -100,20 +100,31 @@ def make_dashboard_handler(dist: Path, trace_dir: Path, corpus_dir: Path, servic
             self.send_header('X-Content-Type-Options', 'nosniff')
             self.end_headers()
             self.close_connection = True
-            last, quiet, started = None, 0.0, time.monotonic()
+            wait_change = getattr(service, 'wait_change', None)
+            last, started = None, time.monotonic()
+            last_write = started
             try:
                 self.wfile.write(b'retry: 3000\n\n')
                 while not getattr(service, 'closed', False) and time.monotonic() - started < EVENT_LIFE_S:
+                    seq = getattr(service, 'change_seq', 0) if callable(wait_change) else 0
                     mark = event_mark(service, session_id)
+                    now = time.monotonic()
                     if mark != last:
-                        last, quiet = mark, 0.0
+                        last, last_write = mark, now
                         self.wfile.write(f'event: change\ndata: {mark}\n\n'.encode())
-                    elif quiet >= EVENT_KEEPALIVE_S:
-                        quiet = 0.0
+                        self.wfile.flush()
+                    elif now - last_write >= EVENT_KEEPALIVE_S:
+                        last_write = now
                         self.wfile.write(b': keep-alive\n\n')
-                    self.wfile.flush()
-                    time.sleep(EVENT_TICK_S)
-                    quiet += EVENT_TICK_S
+                        self.wfile.flush()
+                    remaining_life = EVENT_LIFE_S - (time.monotonic() - started)
+                    if remaining_life <= 0 or getattr(service, 'closed', False):
+                        break
+                    if callable(wait_change):
+                        remaining_ka = max(0.0, EVENT_KEEPALIVE_S - (time.monotonic() - last_write))
+                        wait_change(seq, min(remaining_life, remaining_ka))
+                    else:
+                        time.sleep(min(EVENT_TICK_S, remaining_life))
             except OSError:
                 return
 

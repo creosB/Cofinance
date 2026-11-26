@@ -38,8 +38,9 @@ def valid_id(value):
 
 
 class ChatStore:
-    def __init__(self,path):
+    def __init__(self,path,on_change=None):
         self.path=Path(path)
+        self._on_change=on_change
         self.path.parent.mkdir(parents=True,exist_ok=True)
         with self.db() as db:
             db.executescript("""
@@ -65,9 +66,15 @@ class ChatStore:
             with db:yield db
         finally:db.close()
 
+    def _changed(self):
+        if self._on_change:
+            self._on_change()
+
     def recover(self):
         with self.db() as db:
-            db.execute("UPDATE chat_jobs SET status='interrupted',stage='Server restarted',error='Run interrupted by server restart. Not automatically retried.',updated=? WHERE status IN (?,?,?)",(time.time(),*sorted(ACTIVE)))
+            changed=db.execute("UPDATE chat_jobs SET status='interrupted',stage='Server restarted',error='Run interrupted by server restart. Not automatically retried.',updated=? WHERE status IN (?,?,?)",(time.time(),*sorted(ACTIVE))).rowcount
+        if changed:
+            self._changed()
 
     def sessions(self):
         with self.db() as db:
@@ -97,12 +104,15 @@ class ChatStore:
             db.execute("DELETE FROM chat_sessions WHERE id=?",(session_id,))
         with self.db() as db:
             db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        self._changed()
         return {'messages':messages,'runs':runs}
 
     def create_session(self,request_id):
         valid_id(request_id);now=time.time()
         with self.db() as db:
-            db.execute("INSERT OR IGNORE INTO chat_sessions(id,title,created,updated) VALUES (?,'New research',?,?)",(request_id,now,now))
+            changed=db.execute("INSERT OR IGNORE INTO chat_sessions(id,title,created,updated) VALUES (?,'New research',?,?)",(request_id,now,now)).rowcount
+        if changed:
+            self._changed()
         return self.session(request_id)
 
     def session(self,session_id):
@@ -139,6 +149,7 @@ class ChatStore:
             if isinstance(pages, ExtractedPages):
                 db.execute('INSERT INTO pdf_source_v1(document_id,pages) VALUES (?,?)',(doc['id'],json.dumps(pages.source_pages)))
             db.execute("UPDATE chat_sessions SET updated=? WHERE id=?",(doc['created'],session_id))
+        self._changed()
         return dict(doc,duplicate=False)
 
     def documents(self,session_id):
@@ -157,6 +168,7 @@ class ChatStore:
                 raise KeyError("Document not found in this conversation.")
         with self.db() as db:
             db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        self._changed()
         return {'removed':document_id}
 
     def job(self,run_id):
@@ -184,6 +196,7 @@ class ChatStore:
             db.execute("INSERT INTO chat_jobs VALUES (?,?,?,?,?,'queued','Queued',?,?,'')",(run_id,request_id,session_id,query,model,now,now))
             db.execute("INSERT INTO chat_messages(id,session_id,role,content,created,run_id) VALUES (?,?,'user',?,?,?)",(uuid.uuid4().hex,session_id,query,now,run_id))
             db.execute("UPDATE chat_sessions SET title=CASE WHEN title='New research' THEN ? ELSE title END,updated=? WHERE id=?",(query[:80],now,session_id))
+        self._changed()
         return self.job(run_id)
 
     def progress(self,run_id,stage,status=None,error=""):
@@ -194,10 +207,12 @@ class ChatStore:
         if status is not None and not sources:raise ValueError("Unknown run status.")
         with self.db() as db:
             if status is None:
-                db.execute("UPDATE chat_jobs SET stage=?,updated=? WHERE id=? AND status='running'",(stage[:160],time.time(),run_id))
+                changed=db.execute("UPDATE chat_jobs SET stage=?,updated=? WHERE id=? AND status='running'",(stage[:160],time.time(),run_id)).rowcount
             else:
-                db.execute(f"UPDATE chat_jobs SET stage=?,status=?,updated=?,error=? WHERE id=? AND status IN ({','.join('?'*len(sources))})",
-                           (stage[:160],status,time.time(),error[:300],run_id,*sources))
+                changed=db.execute(f"UPDATE chat_jobs SET stage=?,status=?,updated=?,error=? WHERE id=? AND status IN ({','.join('?'*len(sources))})",
+                           (stage[:160],status,time.time(),error[:300],run_id,*sources)).rowcount
+        if changed:
+            self._changed()
 
     def finish(self,run_id,answer,payload,tickers,status):
         """Save the answer and end the run in one transaction. Only a running run can finish, so a stopped, failed or
@@ -213,6 +228,7 @@ class ChatStore:
                 raise ValueError("The run is no longer running, so its answer was not saved.")
             db.execute("INSERT INTO chat_messages(id,session_id,role,content,created,run_id,payload) VALUES (?,?,'assistant',?,?,?,?)",(uuid.uuid4().hex,job['session_id'],answer[:16000],now,run_id,encoded))
             db.execute("UPDATE chat_sessions SET tickers=?,updated=? WHERE id=?",(json.dumps(tickers),now,job['session_id']))
+        self._changed()
 
     def watchlist(self):
         with self.db() as db:return [dict(r) for r in db.execute("SELECT * FROM user_watchlist ORDER BY added DESC")]
@@ -220,5 +236,7 @@ class ChatStore:
     def add_watch(self,ticker):
         from .market import valid_symbol
         valid_symbol(ticker)
-        with self.db() as db:db.execute("INSERT OR IGNORE INTO user_watchlist VALUES (?,?)",(ticker,time.time()))
+        with self.db() as db:changed=db.execute("INSERT OR IGNORE INTO user_watchlist VALUES (?,?)",(ticker,time.time())).rowcount
+        if changed:
+            self._changed()
         return self.watchlist()

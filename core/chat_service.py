@@ -89,8 +89,11 @@ class ChatService:
             calibration=load_calibration(self.repo/'docs'/'benchmarks'/'polymarket-calibration.json')
             crowd_odds=lambda tickers:lookup(tickers,calibration=calibration)
         self.crowd_odds=crowd_odds
-        self.store=ChatStore(self.root/'chat_v2.db');self.store.recover()
-        self.models=models or LocalModels(self.root/'local_models',self.repo)
+        self._change_cond=threading.Condition();self._change_seq=0
+        self.store=ChatStore(self.root/'chat_v2.db',on_change=self.notify_change);self.store.recover()
+        self.models=models or LocalModels(self.root/'local_models',self.repo,on_change=self.notify_change)
+        if models is not None and hasattr(self.models,'_on_change'):
+            self.models._on_change=self.notify_change
         self.market_factory=market_factory;self.router_factory=router_factory
         self.news_backend_factory=news_backend_factory;self.feed_fetch=feed_fetch
         # MemoryPort. Hybrid (keyword + Hy-Memory lite, rank fusion) is the default since 2026-11-08: it passed the
@@ -114,6 +117,22 @@ class ChatService:
         self.news={'phase':'idle','stage':'','run_id':None,'error':'','started':None,'finished':None,'request_id':None}
         self.news_cancel=None;self.news_thread=None
         self.models.state['router']='cached' if self.gliner_path().exists() else 'missing'
+
+    @property
+    def change_seq(self):
+        with self._change_cond:
+            return self._change_seq
+
+    def notify_change(self):
+        with self._change_cond:
+            self._change_seq+=1
+            self._change_cond.notify_all()
+
+    def wait_change(self,since_seq,timeout):
+        with self._change_cond:
+            if self._change_seq==since_seq and not self.closed and timeout>0:
+                self._change_cond.wait(timeout)
+            return self._change_seq
 
     def gliner_path(self):
         return Path.home()/'.cache/huggingface/hub/models--fastino--GLiNER2.5-Decide/snapshots'/GLINER_REVISION
@@ -379,6 +398,7 @@ class ChatService:
                 if self.active==job['id']:self.active=None
                 self.events.pop(job['id'],None);self.think_runs.discard(job['id'])
                 if remember is None:self.threads.pop(job['id'],None)  # clarification, cancel and error paths
+            self.notify_change()
         if remember is None:return
         try:
             if not self.closed:self.remember(*remember)
@@ -827,11 +847,17 @@ class ChatService:
             self.news.update(phase='running',stage='Starting collection',run_id=trace.run_id,error='',started=time.time(),finished=None,request_id=request_id)
             self.news_thread=threading.Thread(target=self.collect,args=(trace,cancel),daemon=True)
             self.news_thread.start()
+        self.notify_change()
         return self.news_snapshot()
 
     def news_progress(self,stage):
+        changed=False
         with self.lock:
-            if self.news['phase']=='running':self.news['stage']=stage
+            if self.news['phase']=='running':
+                self.news['stage']=stage
+                changed=True
+        if changed:
+            self.notify_change()
 
     def collect(self,trace,cancel):
         from .gliner_decide import GlinerDecideClassifier
@@ -850,9 +876,11 @@ class ChatService:
             headlines=self.judge_headlines(store,check)
             if headlines.get('judged'):stage+='; judged '+str(headlines['judged'])+' headlines'
             with self.lock:self.news.update(phase='idle',stage=stage,finished=time.time(),headlines=headlines)
+            self.notify_change()
         except Exception as exc:
             if trace.data.get('status')=='running':trace.finish(error=True)
             with self.lock:self.news.update(phase='error',stage='Collection failed',error=f'{type(exc).__name__}: {str(exc)[:200]}',finished=time.time())
+            self.notify_change()
         finally:
             if store:store.close()
 
@@ -885,6 +913,7 @@ class ChatService:
 
     def close(self):
         self.closed=True;self.warm_cancel.set()
+        self.notify_change()
         if self.warm_thread:self.warm_thread.join(timeout=2)
         if self.news_cancel:self.news_cancel.set()
         if self.news_thread:self.news_thread.join(timeout=2)

@@ -84,5 +84,125 @@ class TestEventStream(unittest.TestCase):
         self.assertLess(time.monotonic() - started, 1.2)
 
 
+class TestEventDrivenSSE(unittest.TestCase):
+    def setUp(self):
+        from core.chat_service import ChatService
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.service = ChatService(Path(__file__).resolve().parents[1], root=self.root)
+        patches = [
+            mock.patch.object(dashboard, 'EVENT_TICK_S', 1.5),
+            mock.patch.object(dashboard, 'EVENT_KEEPALIVE_S', 2.0),
+            mock.patch.object(dashboard, 'EVENT_LIFE_S', 4.0),
+        ]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+        self.server = dashboard.create_server(
+            port=0,
+            trace_dir=self.root / 'traces',
+            corpus_dir=self.root / 'none',
+            service=self.service,
+        )
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+        self.port = self.server.server_port
+
+    def tearDown(self):
+        self.service.close()
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=2)
+        self.tmp.cleanup()
+
+    def _read_event(self, resp):
+        lines = []
+        while True:
+            raw = resp.readline()
+            if not raw:
+                return ''.join(lines)
+            line = raw.decode('utf-8')
+            lines.append(line)
+            if line == '\n' and any(x.startswith('event: change') for x in lines):
+                return ''.join(lines)
+
+    def test_store_and_model_updates_wake_stream_immediately_without_polling(self):
+        conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=5)
+        self.addCleanup(conn.close)
+        conn.request('GET', '/api/events', headers={'Host': f'127.0.0.1:{self.port}'})
+        resp = conn.getresponse()
+        self.assertEqual(resp.status, 200)
+
+        first = self._read_event(resp)
+        self.assertIn('event: change', first)
+
+        t0 = time.monotonic()
+        self.service.store.add_watch('NVDA')
+        second = self._read_event(resp)
+        elapsed_store = time.monotonic() - t0
+        self.assertIn('event: change', second)
+        self.assertNotEqual(first, second)
+        self.assertLess(elapsed_store, 0.25)
+
+        t1 = time.monotonic()
+        self.service.models.update(stage='Model check')
+        third = self._read_event(resp)
+        elapsed_model = time.monotonic() - t1
+        self.assertIn('event: change', third)
+        self.assertNotEqual(second, third)
+        self.assertLess(elapsed_model, 0.25)
+
+        t2 = time.monotonic()
+        self.service.close()
+        rest = resp.read()
+        elapsed_close = time.monotonic() - t2
+        self.assertEqual(rest, b'')
+        self.assertLess(elapsed_close, 0.25)
+
+    def test_close_wakes_stream_before_slow_model_shutdown(self):
+        orig_close = self.service.models.close
+        self.service.models.close = lambda: (time.sleep(0.5), orig_close())
+        conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=5)
+        self.addCleanup(conn.close)
+        conn.request('GET', '/api/events', headers={'Host': f'127.0.0.1:{self.port}'})
+        resp = conn.getresponse()
+        self._read_event(resp)
+
+        t0 = time.monotonic()
+        closer = threading.Thread(target=self.service.close, daemon=True)
+        closer.start()
+        rest = resp.read()
+        elapsed = time.monotonic() - t0
+        closer.join(timeout=2)
+        self.assertEqual(rest, b'')
+        self.assertLess(elapsed, 0.25)
+
+    def test_no_lost_wakeup_when_mutation_occurs_during_event_mark(self):
+        orig_snapshot = self.service.snapshot
+        injected = {'done': False}
+
+        def racing_snapshot():
+            snap = orig_snapshot()
+            if not injected['done']:
+                injected['done'] = True
+                self.service.store.add_watch('AAPL')
+            return snap
+
+        self.service.snapshot = racing_snapshot
+        conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=5)
+        self.addCleanup(conn.close)
+        conn.request('GET', '/api/events', headers={'Host': f'127.0.0.1:{self.port}'})
+        resp = conn.getresponse()
+
+        first = self._read_event(resp)
+        t0 = time.monotonic()
+        second = self._read_event(resp)
+        elapsed = time.monotonic() - t0
+        self.assertIn('event: change', first)
+        self.assertIn('event: change', second)
+        self.assertNotEqual(first, second)
+        self.assertLess(elapsed, 0.25)
+
+
 if __name__ == '__main__':
     unittest.main()
