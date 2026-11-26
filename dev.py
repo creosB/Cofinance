@@ -303,6 +303,20 @@ def restore_cmd(backup_dir, data_dir=None, dry_run=False, force=False):
     return 0
 
 
+def outer_loop_cmd(traces='data/traces', registry_in=None, fail_on_mismatch=False):
+    import json
+    from qualify.outer_loop import replay_directory
+    printable_stdout()
+    report = replay_directory(
+        ROOT / traces if not Path(traces).is_absolute() else Path(traces),
+        registry_in=Path(registry_in) if registry_in else None,
+    )
+    print(json.dumps(report, indent=2, sort_keys=True))
+    if fail_on_mismatch and report['coverage']['unapproved_mismatches'] > 0:
+        return 1
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog='dev.py')
     sub = ap.add_subparsers(dest='cmd', required=True)
@@ -332,6 +346,10 @@ def main(argv=None):
     rs.add_argument('--data-dir', default=None)
     rs.add_argument('--dry-run', action='store_true')
     rs.add_argument('--force', action='store_true')
+    ol = sub.add_parser('outer-loop')
+    ol.add_argument('--traces', default='data/traces')
+    ol.add_argument('--registry-in', default=None)
+    ol.add_argument('--fail-on-mismatch', action='store_true')
     w = sub.add_parser('wait')
     w.add_argument('name')
     w.add_argument('--max', type=float, default=WAIT_DEFAULT)
@@ -352,6 +370,8 @@ def main(argv=None):
         raise SystemExit(backup_cmd(dest=a.dest, data_dir=a.data_dir))
     if a.cmd == 'restore':
         raise SystemExit(restore_cmd(a.backup_dir, data_dir=a.data_dir, dry_run=a.dry_run, force=a.force))
+    if a.cmd == 'outer-loop':
+        raise SystemExit(outer_loop_cmd(traces=a.traces, registry_in=a.registry_in, fail_on_mismatch=a.fail_on_mismatch))
     if a.cmd == 'dashboard':
         return restart_dashboard()
     if a.cmd in ('news', 'forward'):
