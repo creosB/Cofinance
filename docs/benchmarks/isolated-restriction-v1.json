@@ -1,0 +1,169 @@
+{
+  "format": "cofinance-isolated-restriction-link/1",
+  "warning": "Experimental diagnostic screen on the 24 previously authored matched notices. Not a fresh held-out evaluation, not a live change, and not financial advice.",
+  "dev_set_reuse": true,
+  "protocol_freeze_commit": "236cfa5",
+  "protocol_sha256": "86af600f4f0c2a07cafce7093db1fa24ffdcd530e6912bd21574d4f0b16b755d",
+  "bootstrap": {
+    "method": "paired family-cluster bootstrap",
+    "families": 12,
+    "draws": 2000,
+    "seed": 20261127
+  },
+  "cases_sha256": "a043e003981921ded4a0550592cdd4ec5fbc785f3e1bb13253b8b5052ee1abd2",
+  "runtime": {
+    "id": "lfm3-1.7b-atomic-ad-q4km",
+    "model_sha256": "b22df65673b54ed326f18f74826d76f3b65dadc237ffd6306cd52be04544827d",
+    "backend": "vulkan",
+    "runtime": "b12110"
+  },
+  "n_cases": 24,
+  "decisions": {
+    "full_packet_mask": "INCONCLUSIVE_MALFORMED",
+    "isolated_notice_mask": "REJECT_LOW_ACCURACY_OR_NOISE"
+  },
+  "paired": {
+    "isolated_minus_full_exact_link": {
+      "point": 0.2084,
+      "ci_lo": -0.0417,
+      "ci_hi": 0.4167
+    },
+    "isolated_minus_full_link_f1": {
+      "point": 0.5,
+      "ci_lo": 0.14,
+      "ci_hi": 0.8889
+    },
+    "isolated_minus_full_restriction_recall": {
+      "point": 0.6667,
+      "ci_lo": 0.4167,
+      "ci_hi": 0.9167
+    }
+  },
+  "results": {
+    "all": {
+      "isolated_notice_mask": {
+        "n": 24,
+        "valid": 24,
+        "malformed": 0,
+        "claim_f1": 0.9254,
+        "restriction_precision": 0.5455,
+        "restriction_recall": 1.0,
+        "restriction_f1": 0.7059,
+        "link_precision": 0.6875,
+        "link_recall": 0.9167,
+        "link_f1": 0.7857,
+        "exact_link_hits": 19,
+        "exact_link_accuracy": 0.7917,
+        "wrong_target_hits": 0,
+        "wrong_target_total": 6,
+        "clean_any_link_hits": 2,
+        "clean_controls_total": 12,
+        "input_tokens": 8261,
+        "output_tokens": 1000,
+        "seconds": 29.627
+      },
+      "full_packet_mask": {
+        "n": 24,
+        "valid": 18,
+        "malformed": 6,
+        "claim_f1": 0.7742,
+        "restriction_precision": 0.8,
+        "restriction_recall": 0.3333,
+        "restriction_f1": 0.4706,
+        "link_precision": 1.0,
+        "link_recall": 0.1667,
+        "link_f1": 0.2857,
+        "exact_link_hits": 14,
+        "exact_link_accuracy": 0.5833,
+        "wrong_target_hits": 0,
+        "wrong_target_total": 6,
+        "clean_any_link_hits": 0,
+        "clean_controls_total": 12,
+        "input_tokens": 5811,
+        "output_tokens": 2125,
+        "seconds": 31.623
+      },
+      "lexical": {
+        "n": 24,
+        "valid": 24,
+        "malformed": 0,
+        "claim_f1": 0.9474,
+        "restriction_precision": 1.0,
+        "restriction_recall": 0.9167,
+        "restriction_f1": 0.9565,
+        "link_precision": 0.9091,
+        "link_recall": 0.8333,
+        "link_f1": 0.8696,
+        "exact_link_hits": 22,
+        "exact_link_accuracy": 0.9167,
+        "wrong_target_hits": 1,
+        "wrong_target_total": 6,
+        "clean_any_link_hits": 0,
+        "clean_controls_total": 12,
+        "seconds": 0.0
+      },
+      "select_all": {
+        "n": 24,
+        "valid": 24,
+        "malformed": 0,
+        "claim_f1": 0.4337,
+        "restriction_precision": 0.0923,
+        "restriction_recall": 1.0,
+        "restriction_f1": 0.169,
+        "link_precision": 0.0192,
+        "link_recall": 1.0,
+        "link_f1": 0.0377,
+        "exact_link_hits": 0,
+        "exact_link_accuracy": 0.0,
+        "wrong_target_hits": 6,
+        "wrong_target_total": 6,
+        "clean_any_link_hits": 12,
+        "clean_controls_total": 12,
+        "seconds": 0.0
+      }
+    },
+    "two_claim": {
+      "isolated_notice_mask": {
+        "n": 12,
+        "malformed": 0,
+        "exact_link_hits": 8,
+        "exact_link_accuracy": 0.6667,
+        "link_f1": 0.7059,
+        "restriction_recall": 1.0,
+        "restriction_precision": 0.4615,
+        "wrong_target_hits": 0,
+        "clean_any_link_hits": 2
+      },
+      "full_packet_mask": {
+        "n": 12,
+        "malformed": 5,
+        "exact_link_hits": 7,
+        "exact_link_accuracy": 0.5833,
+        "link_f1": 0.2857,
+        "restriction_recall": 0.1667,
+        "restriction_precision": 1.0,
+        "wrong_target_hits": 0,
+        "clean_any_link_hits": 0
+      },
+      "lexical": {
+        "n": 12,
+        "malformed": 0,
+        "exact_link_hits": 11,
+        "exact_link_accuracy": 0.9167,
+        "link_f1": 0.8333,
+        "restriction_recall": 1.0,
+        "restriction_precision": 1.0,
+        "wrong_target_hits": 1,
+        "clean_any_link_hits": 0
+      }
+    }
+  },
+  "production_change": false,
+  "limits": [
+    "Diagnostic dev-set screen on the 24 previously authored notices from restriction_link_v1; not an unseen held-out test.",
+    "Every notice in this fixture has one gold claim per notice; intra-notice multi-claim linking is not tested here because isolated_notice_mask links restrictions to all local claims in the same notice.",
+    "Structural isolation forbids cross-notice links by construction; it cannot catch a genuine cross-document amendment that intentionally overrides another notice.",
+    "Arm asymmetry: isolated_notice_mask runs one call per notice (160-token cap each) while full_packet_mask runs one call per packet (280-token cap); this is a mechanism screen rather than an equal-budget comparison.",
+    "Requires a fresh unseen multi-notice corpus before any live pipeline integration."
+  ]
+}

@@ -111,7 +111,7 @@ def decode_isolated_notice(raw_text: str, span_ids: Sequence[str]) -> Dict[str, 
     out: Dict[str, str] = {}
     for sid in span_ids:
         val = obj[sid]
-        if val not in ROLES:
+        if not isinstance(val, str) or val not in ROLES:
             raise ValueError(f"Invalid role {val!r} for {sid}")
         out[sid] = val
     return out
@@ -167,8 +167,10 @@ def decode_full_packet(raw_text: str, span_ids: Sequence[str]) -> Dict[str, Any]
             raise ValueError(f"Malformed span entry for {sid}")
         role = entry["role"]
         target = entry["target"]
-        if role not in ROLES:
+        if not isinstance(role, str) or role not in ROLES:
             raise ValueError(f"Invalid role {role!r}")
+        if not isinstance(target, str):
+            raise ValueError(f"Invalid target {target!r}")
         if role == "claim":
             claims.append(sid)
         elif role == "restriction":

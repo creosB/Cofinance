@@ -109,6 +109,41 @@ class TestIsolatedRestrictionLink(unittest.TestCase):
         self.assertEqual(IRL.decide({**base, "clean_any_link_hits": 2}), "REJECT_LOW_ACCURACY_OR_NOISE")
         self.assertEqual(IRL.decide({**base, "restriction": {"recall": 0.5}}), "REJECT_LOW_ACCURACY_OR_NOISE")
 
+    def test_decoder_rejects_untyped_values_and_counts_malformed_in_denominators(self):
+        with self.assertRaisesRegex(ValueError, "Invalid role"):
+            IRL.decode_isolated_notice(json.dumps({"b001": ["claim"]}), ["b001"])
+        with self.assertRaisesRegex(ValueError, "Invalid target"):
+            IRL.decode_full_packet(
+                json.dumps({"b001": {"role": "restriction", "target": ["b001"]}}),
+                ["b001"],
+            )
+        with self.assertRaisesRegex(ValueError, "do not match body spans"):
+            IRL.decode_isolated_notice(json.dumps({"b001": "claim", "b999": "none"}), ["b001"])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp) / "iso_bad"
+            IRL.freeze(run_dir)
+
+            def broken_post(body):
+                name = body["response_format"]["json_schema"]["name"]
+                if name == "full_packet_mask":
+                    return {
+                        "choices": [{"finish_reason": "stop", "message": {"content": "not-json"}}],
+                        "usage": {"prompt_tokens": 10, "completion_tokens": 5},
+                    }
+                req = body["response_format"]["json_schema"]["schema"]["required"]
+                return {
+                    "choices": [{"finish_reason": "stop", "message": {"content": json.dumps({s: "none" for s in req})}}],
+                    "usage": {"prompt_tokens": 10, "completion_tokens": 5},
+                }
+
+            rep = IRL.run_eval(run_dir, post_fn=broken_post)
+            full_all = rep["results"]["all"]["full_packet_mask"]
+            self.assertEqual(full_all["n"], 24)
+            self.assertEqual(full_all["malformed"], 24)
+            self.assertEqual(full_all["exact_link_accuracy"], 0.0)
+            self.assertEqual(rep["decisions"]["full_packet_mask"], "INCONCLUSIVE_MALFORMED")
+
 
 if __name__ == "__main__":
     unittest.main()
