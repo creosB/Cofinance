@@ -58,3 +58,18 @@ To restore into `data/`:
    `python dev.py restore data/_backups/<snapshot> --force`
 3. `restore` verifies the full manifest first, writes a pre-restore safety backup under `data/_backups/pre_restore_<timestamp>`, atomically replaces each target file, clears stale `-wal` and `-shm` sidecars, and re-verifies every restored file's SHA-256 and SQLite integrity.
 4. Re-run `python dev.py preflight` before restarting the dashboard.
+
+## Offline verification tools
+
+All verification harnesses run manually, offline, and read-only on saved state (no scheduler):
+
+```text
+python dev.py outer-loop --fail-on-mismatch
+python dev.py memory-eval
+python dev.py spotcheck prepare
+python dev.py spotcheck score
+```
+
+- `outer-loop`: replays saved local chat traces via fail-closed `StrictReplayLLM` with a socket network fence and privacy-preserving diff fingerprints.
+- `memory-eval`: checks whether `data/chat_v2.db` has reached 30 real follow-ups (`waiting_for_data` below 30), audits `shadow_keyword` trace agreement, and verifies `LocalKeywordMemory` vs `HybridMemory` synthetic plumbing.
+- `spotcheck`: draws a sealed, stratified 20-row blind CSV (`spotcheck_20_blind.csv`) without model labels for human review, then computes agreement, Cohen's kappa, balanced accuracy, and per-row disagreements once completed.
