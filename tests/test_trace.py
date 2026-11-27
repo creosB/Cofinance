@@ -1,7 +1,9 @@
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from core.cascade import CascadeClassifier
 from core.collector import FetchResult
@@ -54,6 +56,46 @@ class TestRecorder(unittest.TestCase):
             self.assertEqual(len(saved["spans"]), 1)
             self.assertEqual(saved["dropped_spans"], 1)
             self.assertFalse(list(Path(temp).glob("*.tmp")))
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows readers can block atomic replacement')
+    def test_an_open_reader_does_not_drop_the_final_trace_on_windows(self):
+        from ui.workbench import read_trace
+
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            trace = TraceRecorder('Read during write', directory=directory)
+            trace.event('Fetch quote', 'tool', {'price': 23.0})
+            old = read_trace(directory, trace.run_id)
+            dest = directory / (trace.run_id + '.json')
+            with dest.open('rb') as reader, patch('core.run_trace.time.sleep', side_effect=lambda _delay: reader.close()) as wait:
+                trace.finish(summary={'answer': 'A quote was recorded.'})
+            wait.assert_called_once()
+            saved = read_trace(directory, trace.run_id)
+            self.assertNotEqual(saved['revision'], old['revision'])
+            self.assertEqual(saved['status'], 'complete')
+            self.assertEqual(saved['summary']['answer'], 'A quote was recorded.')
+            self.assertEqual(saved['spans'][-1]['outputs'], {'price': 23.0})
+            self.assertEqual(saved['storage_errors'], 0)
+            self.assertEqual(saved['dropped_spans'], 0)
+            self.assertFalse(list(directory.glob('.trace-*.tmp')))
+
+    def test_permanent_replace_error_is_bounded_and_leaves_the_last_good_snapshot(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            trace = TraceRecorder('Cannot replace', directory=directory)
+            dest = directory / (trace.run_id + '.json')
+            previous = dest.read_bytes()
+            blocked = PermissionError('fixture write failure')
+            blocked.winerror = 5
+            with patch('core.run_trace.os.replace', side_effect=blocked) as replace, patch('core.run_trace.time.sleep'):
+                trace.finish()
+            self.assertGreater(replace.call_count, 1)
+            self.assertLessEqual(replace.call_count, 6)
+            self.assertEqual(trace.data['storage_errors'], 1)
+            self.assertEqual(dest.read_bytes(), previous)
+            self.assertFalse(list(directory.glob('.trace-*.tmp')))
+            trace.flush()
+            self.assertEqual(json.loads(dest.read_bytes())['storage_errors'], 1)
 
     def test_storage_failure_does_not_change_call_outcome(self):
         with tempfile.TemporaryDirectory() as temp:

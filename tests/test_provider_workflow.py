@@ -128,6 +128,7 @@ class TestProviderWorkflow(unittest.TestCase):
                                         answer = session['messages'][-1]
                                         payload = answer['payload']
                                         trace = json.loads((root / 'traces' / (answer['run_id'] + '.json')).read_text(encoding='utf-8'))
+                                        self.assertEqual((trace['dropped_spans'], trace['storage_errors']), (0, 0), question)
                                         card = page.locator('.msg-answer').nth(index)
                                         seen = {k: v.get('currency') for k, v in payload.get('snapshots', {}).items()}
                                         routes = [s.get('outputs') for s in trace['spans'] if s['name'] == 'Route conversational request']

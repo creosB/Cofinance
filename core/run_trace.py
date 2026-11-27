@@ -23,6 +23,8 @@ from pathlib import Path
 from typing import Any, Callable
 
 TRACE_FORMAT = "cofinance-trace/1"
+TRACE_REPLACE_BACKOFF = (0.005, 0.015, 0.035, 0.075)
+WINDOWS_REPLACE_CONTENTION = frozenset({5, 32, 33})
 SECRET = re.compile(r"api.?key|token|cookie|password|secret|authorization|credential|session", re.I)
 SAFE_TRACE_KEYS = frozenset({
     "previous_session_close",
@@ -58,6 +60,18 @@ def utc() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def replace_trace(temp: Path, destination: Path) -> None:
+    for delay in TRACE_REPLACE_BACKOFF:
+        try:
+            os.replace(temp, destination)
+            return
+        except OSError as exc:
+            if getattr(exc, 'winerror', None) not in WINDOWS_REPLACE_CONTENTION:
+                raise
+            time.sleep(delay)
+    os.replace(temp, destination)
+
+
 class TraceRecorder:
     def __init__(self, title: str, *, mode: str = "live", directory: str | Path | None = None,
                  clock: Callable[[], float] = time.perf_counter, max_spans: int = 2000) -> None:
@@ -86,7 +100,7 @@ class TraceRecorder:
                                                  prefix=".trace-", suffix=".tmp", delete=False) as file:
                     temp = Path(file.name)
                     json.dump(self.data, file, ensure_ascii=True, allow_nan=False)
-                os.replace(temp, self.directory / (self.run_id + ".json"))
+                replace_trace(temp, self.directory / (self.run_id + ".json"))
             except (OSError, ValueError):
                 self.data["storage_errors"] += 1  # recording must not change a business outcome
                 if temp:

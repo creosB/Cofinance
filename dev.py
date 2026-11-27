@@ -395,6 +395,7 @@ def verify_cmd(full=False, browser=True):
                 'tests.test_invariants',
                 'tests.test_feature_map',
                 'tests.test_events_stream',
+                'tests.test_trace',
                 'tests.test_open_chat',
                 'tests.test_research_acceptance',
                 'tests.test_evidence_status',
