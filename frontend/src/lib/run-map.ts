@@ -1,4 +1,4 @@
-import { object, text, numeric, duration, type Run, type Span } from './domain'
+import { object, text, numeric, type Run, type Span } from './domain'
 
 export type StageState='running'|'complete'|'fallback'|'error'|'not_observed'|'not_dispatched'|'not_reached'
 export interface MapStage {id:string;title:string;owner:string;description:string;state:StageState;detail:string;spans:Span[];primary:Span|null}
@@ -106,7 +106,7 @@ export function interactiveStages(run:Run):MapStage[]{
  const singlePass=lead.length===0&&gateMethod==='single_pass_data_answer'
  const pythonNews=lead.length===0&&['python_news_answer','python_digest','no_news'].includes(gateMethod)
  const leadOwner=lead[0]?.model||(singlePass?'Verified single-pass (Data Analyst)':pythonNews?'Python news synthesis':run.status==='error'?'Not reached':'Python fallback')
- const leadDetail=[lead.length?lead.length+' synthesis call'+(lead.length===1?'':'s'):singlePass?'Reused verified Data Analyst report, no second synthesis pass':pythonNews?'Deterministic news answer, no synthesis pass needed':run.status==='error'?'Run stopped before synthesis':'No synthesis model call recorded',memoryDetail(memory)].filter(Boolean).join(' / ')
+ const leadDetail=[lead.length?lead.length+' synthesis call'+(lead.length===1?'':'s'):singlePass?'Verified single-pass: reused Data Analyst report':pythonNews?'Deterministic news answer, no synthesis pass needed':run.status==='error'?'Run stopped before synthesis':'No synthesis model call recorded',memoryDetail(memory)].filter(Boolean).join(' / ')
  const leadStage=stage('lead','Team Lead synthesis',leadOwner,'The same selected narrator combines accepted reports in a separate role call, or Python reuses a single verified specialist report directly. Conversation memory is passed as context only; its numbers never pass the guard.',[...lead,...memory],run,leadDetail)
  if((singlePass||pythonNews)&&leadStage.state==='not_observed')leadStage.state='complete'
  const workerStages:MapStage[]=[
@@ -209,4 +209,3 @@ export function numbers(value:string):number[]{
  }).filter(Number.isFinite)
 }
 export function routeFacts(span:Span){const o=object(span.outputs);return text(o.intent)?{intent:text(o.intent).replaceAll('_',' '),confidence:numeric(o.intent_confidence),tickers:Array.isArray(o.tickers)?o.tickers.join(', '):'',horizon:text(o.horizon).replaceAll('_',' ')}:null}
-export function elapsed(spans:Span[]){return duration(spans.reduce((n,s)=>n+(s.kind==='model'?(s.duration_ms||0):0),0))}

@@ -1,13 +1,74 @@
 """Real browser regressions for chat navigation. Disposable SQLite, fake evidence, no model or network."""
 import os
+import re
 import tempfile
 import threading
 import unittest
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlsplit
+from core.gliner_decide import GlinerQueryRouter
+from core.market import MarketTools
+from tests.execution_proof import require_clean_execution
 from tests.test_chat import service, wait
+from tests.test_research_acceptance import ModelFixture, THY, listing
 from ui.dashboard import create_server
+
+
+class ResearchClock(datetime):
+    @classmethod
+    def now(cls, tz=None):
+        stamp = cls(2026, 11, 27, 19, 0, tzinfo=timezone.utc)
+        return stamp.astimezone(tz) if tz else stamp.replace(tzinfo=None)
+
+
+class JourneyRouter(ModelFixture):
+    def extract_entities(self, text, entity_types):
+        return {'entities': {'company': [asset for asset in ('THY', 'Toyota', 'VOD.L') if asset in text]}}
+
+
+class JourneyMarket:
+    listings = {
+        'THY': THY,
+        'Toyota': [listing('TM', 'Toyota Motor ADR', 'EQUITY', 'NYQ', 90000),
+                   listing('7203.T', 'Toyota Motor', 'EQUITY', 'JPX', 55000)],
+        'VOD.L': [listing('VOD.L', 'Vodafone Group', 'EQUITY', 'LSE', 55000)],
+    }
+    quotes = {
+        'THYAO.IS': ('Turkish Airlines', 'TRY', 'Istanbul', 'Europe/Istanbul', 303.5, 298.25, 15),
+        '7203.T': ('Toyota Motor', 'JPY', 'Tokyo', 'Asia/Tokyo', 2810, 2775, 6),
+        'VOD.L': ('Vodafone Group', 'GBp', 'London', 'Europe/London', 84.2, 82.65, 16),
+    }
+
+    def __init__(self):
+        self.fail = set()
+        self.reads = []
+
+    def fetch(self, url):
+        request = urlsplit(url)
+        params = parse_qs(request.query)
+        if request.path.endswith('/search'):
+            return {'quotes': self.listings.get(params['q'][0], [])}
+        if 'fundamentals-timeseries' in request.path:
+            return {'timeseries': {'result': []}}
+        if '/chart/' not in request.path:
+            raise AssertionError('Unexpected provider request: '+request.path)
+        ticker = request.path.rsplit('/', 1)[1]
+        if params.get('range') == ['max']:
+            return {'chart': {'result': []}}
+        self.reads.append(ticker)
+        if ticker in self.fail:
+            raise TimeoutError('fixture timeout')
+        name, currency, exchange, tz, latest, previous, hour = self.quotes[ticker]
+        stamp = datetime(2026, 11, 27, hour, 30, tzinfo=timezone.utc).timestamp()
+        meta = dict(symbol=ticker, longName=name, currency=currency, instrumentType='EQUITY',
+                    fullExchangeName=exchange, exchangeTimezoneName=tz, regularMarketPrice=latest,
+                    regularMarketTime=stamp, currentTradingPeriod={'regular': {'start': stamp-6*3600, 'end': stamp}},
+                    fiftyTwoWeekHigh=latest*1.2, fiftyTwoWeekLow=previous*.8)
+        return {'chart': {'result': [{'meta': meta, 'timestamp': [stamp-86400, stamp],
+                                      'indicators': {'quote': [{'close': [previous, latest]}]}}]}}
 
 
 @unittest.skipUnless(os.environ.get('COFINANCE_BROWSER_TESTS') == '1', 'installed Chrome checks are opt-in')
@@ -383,7 +444,7 @@ class TestChatShellBrowser(unittest.TestCase):
         try:
             page.goto(self.origin, wait_until='domcontentloaded')
             box = page.get_by_role('textbox', name='Research question')
-            page.get_by_text('Connecting to the local workspace.', exact=False).wait_for()
+            page.get_by_text('Connecting. Draft kept.', exact=False).wait_for()
             box.fill('Review NVDA after startup')
             box.press('Enter')
             self.assertEqual(box.input_value(), 'Review NVDA after startup')
@@ -398,6 +459,124 @@ class TestChatShellBrowser(unittest.TestCase):
             self.assertEqual(len(self.service.store.session_ids()), 3)
         finally:
             page.close()
+
+    def prepare_research_journey(self):
+        market = JourneyMarket()
+        clock = patch('core.market.datetime', ResearchClock)
+        clock.start()
+        self.addCleanup(clock.stop)
+        self.service.router_factory = lambda: GlinerQueryRouter(JourneyRouter(), {'NVDA', 'VOD.L'})
+        self.service.market_factory = lambda cancel=None: MarketTools(fetch=market.fetch, cancel=cancel)
+        return market
+
+    def submit_question(self, page, question, index=0):
+        from playwright.sync_api import expect
+
+        box = page.get_by_role('textbox', name='Research question')
+        box.fill(question)
+        button = page.get_by_role('button', name='Send question')
+        expect(button).to_be_enabled()
+        if page.viewport_size['width'] <= 700:
+            button.tap()
+        else:
+            box.press('Enter')
+        answer = page.get_by_role('article', name='Research response').nth(index)
+        expect(answer).to_be_visible(timeout=10000)
+        return answer
+
+    def test_check_the_right_listing_open_execution_and_verify_yesterdays_close(self):
+        from playwright.sync_api import expect
+
+        market = self.prepare_research_journey()
+        page = self.page
+        before = set(self.service.store.session_ids())
+        answer = self.submit_question(page, 'THY, the Turkish stock. What is it trading at?')
+        expect(answer.locator('.facts-asset')).to_contain_text('THYAO.IS')
+        expect(answer.locator('.facts-quote')).to_have_text('303.50 TRY')
+        expect(answer.locator('[data-quote-state="last_session"]')).to_contain_text('Yahoo Finance')
+        expect(answer.get_by_text('1Y high', exact=True)).to_be_hidden()
+        expect(answer.get_by_role('link', name=re.compile('THYAO.IS market data'))).to_be_hidden()
+        expect(answer.locator('figure.price-chart')).to_have_count(0)
+        self.assertEqual(market.reads, ['THYAO.IS'])
+        self.assertEqual(self.service.store.watchlist(), [])
+        (sid,) = set(self.service.store.session_ids()) - before
+        first_run = self.service.store.session(sid)['messages'][-1]['run_id']
+
+        draft = 'What was its previous close?'
+        box = page.get_by_role('textbox', name='Research question')
+        box.fill(draft)
+        answer.get_by_role('button', name='Execution', exact=True).click()
+        require_clean_execution(page, self.root/'traces', first_run, mode='live')
+        page.locator('.sidebar').get_by_role('button', name='Chat', exact=True).click()
+        expect(box).to_have_value(draft)
+        box.press('Enter')
+        followup = page.get_by_role('article', name='Research response').nth(1)
+        expect(followup.locator('.msg-body')).to_contain_text(re.compile(r'THYAO.IS previous-session close: 298.25.*TRY on 2026-11-26', re.S))
+        cite = followup.get_by_role('button', name=re.compile(r'Source .*THYAO.IS.*Previous', re.I))
+        cite.focus()
+        cite.press('Enter')
+        metric = followup.locator('[data-fact-field="previous_session_close"]')
+        expect(metric).to_be_focused()
+        expect(metric).to_contain_text('298.25 TRY on 2026-11-26')
+        followup.get_by_text('Sources (1)', exact=True).click()
+        expect(followup.get_by_role('link', name=re.compile('THYAO.IS market data'))).to_have_attribute('href', 'https://finance.yahoo.com/quote/THYAO.IS')
+        followup.get_by_role('button', name='Track THYAO.IS', exact=True).click()
+        expect(followup.get_by_role('button', name='Tracking THYAO.IS', exact=True)).to_be_visible()
+        page.reload(wait_until='domcontentloaded')
+        expect(page.locator('.sidebar').get_by_role('button', name='Untrack THYAO.IS')).to_be_visible()
+        page.locator('.sidebar').get_by_role('button', name='Untrack THYAO.IS').click()
+        expect(page.locator('.sidebar').get_by_role('button', name='Untrack THYAO.IS')).to_have_count(0)
+        self.assertEqual(self.service.store.watchlist(), [])
+        self.assertEqual(market.reads, ['THYAO.IS', 'THYAO.IS'])
+
+    def test_phone_comparison_reveals_timeout_then_retries_with_both_units(self):
+        from playwright.sync_api import expect
+
+        market = self.prepare_research_journey()
+        market.fail.add('VOD.L')
+        before = set(self.service.store.session_ids())
+        with self.browser.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True, has_touch=True) as context:
+            page = context.new_page()
+            errors = []
+            page.on('pageerror', lambda exc: errors.append(str(exc)))
+            page.goto(self.origin, wait_until='domcontentloaded')
+            question = 'Compare Toyota on the Tokyo exchange and VOD.L in London.'
+            partial = self.submit_question(page, question)
+            expect(partial.locator('.msg-body').first).to_contain_text('comparison is incomplete')
+            expect(partial.locator('[data-quote-state="unavailable"]')).to_have_text(re.compile('Quote timed out'))
+            expect(partial.locator('.facts-quote')).to_have_text('2,810.00 JPY')
+            london = partial.locator('.facts').filter(has_text='VOD.L')
+            expect(london.locator('[data-quote-state="unavailable"]')).to_contain_text('Quote timed out')
+            expect(partial).not_to_contain_text('84.20')
+            self.assertCountEqual(market.reads, ['7203.T', 'VOD.L'])
+
+            market.fail.clear()
+            answer = self.submit_question(page, question, index=1)
+            expect(answer.locator('.facts-quote')).to_have_count(2)
+            for ticker, quote in [('7203.T', '2,810.00 JPY'), ('VOD.L', '84.20 GBp')]:
+                expect(answer.locator('.facts').filter(has_text=ticker).locator('.facts-quote')).to_have_text(quote)
+            expect(answer.locator('figure.price-chart')).to_have_count(0)
+            history = answer.get_by_text('Price history (2)', exact=True)
+            expect(history).to_be_visible()
+            self.assertGreaterEqual(history.bounding_box()['height'], 44)
+            history.tap()
+            expect(answer.get_by_role('img', name=re.compile(r'7203.T daily close-price chart, 1 year, JPY'))).to_be_visible()
+            expect(answer.get_by_role('img', name=re.compile(r'VOD.L daily close-price chart, 1 year, GBp'))).to_be_visible()
+            history.tap()
+            expect(answer.locator('figure.price-chart')).to_have_count(0)
+            self.assertTrue(page.evaluate('document.documentElement.scrollWidth <= innerWidth'))
+            self.assertEqual(errors, [])
+            self.assertCountEqual(market.reads, ['7203.T', 'VOD.L', '7203.T', 'VOD.L'])
+            (sid,) = set(self.service.store.session_ids()) - before
+            messages = [m for m in self.service.store.session(sid)['messages'] if m['role']=='assistant']
+            draft = page.get_by_role('textbox', name='Research question')
+            draft.fill('Which moved more since the previous close?')
+            answer.get_by_role('button', name='Execution', exact=True).tap()
+            require_clean_execution(page, self.root/'traces', messages[-1]['run_id'], mode='live')
+            back = page.get_by_role('button', name='Back to chat')
+            self.assertGreaterEqual(back.bounding_box()['width'], 44)
+            back.tap()
+            expect(draft).to_have_value('Which moved more since the previous close?')
 
     def test_clear_all_failure_is_visible_and_can_be_retried_with_empty_history(self):
         clear = self.service.clear_conversations

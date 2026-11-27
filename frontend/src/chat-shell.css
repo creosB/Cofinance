@@ -38,7 +38,7 @@
 .workspace-layout .breadcrumb{min-width:0}
 .workspace-layout .chat-title{font-size:15px;font-weight:500;flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .workspace-layout .topbar-actions{flex-shrink:0;margin-left:auto;gap:4px}
-.open-mobile-sidebar{display:none}
+.open-mobile-sidebar,.execution-back-chat{display:none}
 .header-leading>button,.workspace-layout .topbar-actions>button{height:44px;width:44px;flex-shrink:0}
 .chat-options{position:relative}
 .chat-options>summary{display:flex;align-items:center;justify-content:center;width:44px;height:44px;list-style:none;cursor:pointer;border-radius:var(--radius);color:var(--muted-foreground)}
@@ -59,10 +59,12 @@
 @media(max-width:700px){
  .workspace-layout{display:block}
  .workspace-layout>.workspace-sidebar{display:none}
- .workspace-layout .open-mobile-sidebar{display:inline-flex}
+ .workspace-layout .open-mobile-sidebar,.workspace-layout .execution-back-chat{display:inline-flex;min-width:44px;min-height:44px}
  .workspace-layout .open-desktop-sidebar{display:none}
  .workspace-layout .topbar{height:60px;min-height:60px;display:flex;grid-template-columns:none;padding:8px 12px;flex-wrap:nowrap;gap:8px}
  .workspace-layout .topbar .breadcrumb{display:flex;min-width:0}
+ .workspace-layout .breadcrumb[data-view="execution"]>.state-badge{display:inline-flex;margin-left:0}
+ .workspace-layout .breadcrumb[data-view="execution"]>svg{display:none}
  .workspace-layout .topbar-actions{margin-left:auto;justify-content:flex-end}
  .workspace-layout .chat-column{padding-left:16px;padding-right:16px}
  .workspace-layout .chat-welcome{padding:24px 0 40px}

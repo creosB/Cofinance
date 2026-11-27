@@ -79,7 +79,7 @@ class TestRunMapBrowser(unittest.TestCase):
         saved = read_trace(self.traces, trace.run_id)
         self.assertEqual(saved['status'], 'complete')
         expect_rendered_trace(self.page, saved)
-        expect(self.page.get_by_text('Trace incomplete: 0 omitted steps; 1 storage errors.')).to_be_visible()
+        expect(self.page.get_by_text('Trace incomplete: 1 save error.')).to_be_visible()
         expect(self.page.locator('.error-banner')).to_have_count(0)
         with self.assertRaisesRegex(AssertionError, 'trace_storage_errors'):
             capture_execution(self.page, self.traces, trace.run_id)
@@ -126,7 +126,7 @@ class TestRunMapBrowser(unittest.TestCase):
         self.page.locator('.run-entry').filter(has_text='Price-only fixture').click()
         self.page.locator('.sidebar nav').get_by_role('button',name='Execution',exact=False).click()
         node=self.page.locator('[data-map-stage="news"]');self.assertIn('Not dispatched',node.inner_text())
-        node.click();self.assertIn('diagram position does not mean',self.page.locator('.map-observations').inner_text())
+        node.click();self.assertEqual(self.page.locator('.map-observation-list button').count(),0)
     def test_background_replay_does_not_masquerade_as_an_operational_service(self):
         class Judge:
             def judge(self,item):return Judgment(.6,.2,'neutral',.7)

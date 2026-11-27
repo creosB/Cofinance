@@ -1,5 +1,3 @@
-// Chat follows a document-like Linear layout: one scroll region, a centred reading column,
-// the composer docked at the bottom, and provenance in quiet secondary text.
 import { useEffect, useRef, useState } from 'react'
 import { Activity, ArrowUp, ArrowUpRight, Check, Download, Eraser, History, ListX, LoaderCircle, Newspaper, Plus, RotateCcw, Square, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -8,7 +6,7 @@ import '../conversations.css'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ModelPicker } from './model-library'
-import { AnswerProcess, TraceActivity } from './run-map'
+import { TraceActivity } from './run-map'
 import { PriceChart } from './price-chart'
 import { CrowdOdds } from './crowd-odds'
 import { HeadlineSignal } from './headline-signal'
@@ -17,7 +15,7 @@ import { AttachButton, AttachmentChips, DocumentSources } from './attachments'
 import { DeepThinkNote, DeepThinkToggle, saveDeepThink, savedDeepThink, thinkOf } from './deep-think'
 import { ago, evidenceUrl, statusLabel } from '@/lib/domain'
 import { canForget, contextLine, itemFor } from '@/lib/memory'
-import { refText, segments, targetId } from '@/lib/citations'
+import { refText, segments, targetId, type CiteRef } from '@/lib/citations'
 import { MemoryPanel } from './memory-panel'
 import { Input } from '@/components/ui/input'
 import { ChevronDown, MoreHorizontal, Search } from 'lucide-react'
@@ -28,60 +26,76 @@ const num=(v:unknown)=>typeof v==='number'&&Number.isFinite(v)?v:undefined
 const price=(v:number)=>v.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:v<1?6:4})
 export const when=(iso:unknown)=>{const d=new Date(typeof iso==='string'?iso:'');return Number.isNaN(d.getTime())?'':d.toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
 
-/** Tool values exactly as recorded, formatted for reading. Never narrated, never estimated. */
 function Facts({ticker,snap}:{ticker:string;snap:Snapshot}){
  const p=num(snap.price),cur=typeof snap.currency==='string'?snap.currency:''
  const name=typeof snap.name==='string'&&snap.name!==ticker?snap.name:''
- if(p===undefined)return <div className="facts"><div className="facts-asset"><strong>{ticker}</strong><span>Market data unavailable. No values were substituted.</span></div></div>
- const receipt=snap.quote_status as unknown as {state?:string;as_of?:string}|undefined
- const freshness:Record<string,string>={recent:'Recent provider quote, not guaranteed live',delayed:'Delayed quote, not live',last_session:'Last regular-session quote, not live',last_known:'Last known quote, freshness not confirmed',stale:'Stale quote, not a current price',timestamp_unknown:'Quote time unavailable',timestamp_invalid:'Source quote time is invalid'}
- const identity=[snap.exchange,snap.quote_type].filter(v=>typeof v==='string'&&v).join(' / ')
- const rows:[string,string][]=[['Last quote',price(p)+(cur?' '+cur:'')]]
- const prev=num(snap.previous_session_close);if(prev!==undefined)rows.push(['Previous close',price(prev)+(cur?' '+cur:'')])
- const lo=num(snap.low_52_week),hi=num(snap.high_52_week);if(lo!==undefined&&hi!==undefined)rows.push(['1Y range',price(lo)+' to '+price(hi)])
- const vol=num(snap.volume);if(vol!==undefined)rows.push(['Volume',vol.toLocaleString()])
- const pe=num(snap.pe_ratio);if(pe!==undefined)rows.push(['Trailing P/E',pe.toFixed(2)])
- const fpe=num(snap.forward_pe_ratio);if(fpe!==undefined)rows.push(['Forward P/E',fpe.toFixed(2)])
- const big=(v:number)=>Intl.NumberFormat('en-US',{notation:'compact',maximumFractionDigits:2}).format(v)+(cur?' '+cur:'')
- const cap=num(snap.market_cap);if(cap!==undefined)rows.push(['Market cap',big(cap)])
- const rev=num(snap.revenue_ttm);if(rev!==undefined)rows.push(['Revenue, TTM',big(rev)])
- const eps=num(snap.eps);if(eps!==undefined)rows.push(['EPS, TTM',price(eps)])
- const dd=num(snap.drawdown_from_52_week_high_pct);if(dd!==undefined)rows.push(['Below 1Y high',dd+'%'])
- const ath=num(snap.all_time_high),add=num(snap.drawdown_from_all_time_high_pct)
- if(ath!==undefined)rows.push(['All-time high',price(ath)+(add!==undefined?', '+add+'% below':'')])
- const asOf=snap.fundamentals_as_of&&typeof snap.fundamentals_as_of==='object'?Object.values(snap.fundamentals_as_of as Record<string,{as_of?:string}>).map(v=>v?.as_of).filter((d):d is string=>typeof d==='string').sort():[]
- const fundamentalsLine=asOf.length?'fundamentals as of '+(asOf[0]===asOf[asOf.length-1]?asOf[0]:asOf[0]+' to '+asOf[asOf.length-1]):''
- const historyLine=ath!==undefined&&typeof snap.history_start==='string'?'all-time high from history since '+snap.history_start:''
- const noFundamentals=snap.fundamentals_status&&[pe,fpe,cap,rev,eps].every(v=>v===undefined)
- const vola=num(snap.annualized_daily_log_volatility_pct);if(vola!==undefined)rows.push(['Volatility, annualized',vola+'%'])
- const fg=num(snap.fear_greed_index);if(fg!==undefined)rows.push(['Fear & Greed',fg+(typeof snap.fear_greed_label==='string'?' '+snap.fear_greed_label:'')])
- const source=[typeof snap.source==='string'?snap.source:'',when(snap.price_as_of)?'price as of '+when(snap.price_as_of):'',fundamentalsLine,historyLine,noFundamentals?'fundamentals not available':''].filter(Boolean).join(', ')
- return <div className="facts"><div className="facts-asset"><strong>{ticker}</strong>{name&&<span>{name}</span>}{identity&&<span>{identity}</span>}</div>{receipt?.state&&freshness[receipt.state]&&<p className="facts-source" data-quote-state={receipt.state}>{freshness[receipt.state]}</p>}<dl className="facts-grid">{rows.map(([k,v])=><div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>{source&&<p className="facts-source">{source}</p>}</div>
+ const receipt=snap.quote_status as unknown as {state?:string;failure?:string}|undefined
+ const freshness:Record<string,string>={recent:'Recent quote, not live',delayed:'Delayed quote',last_session:'Last session',last_known:'Last known quote',stale:'Stale quote',timestamp_unknown:'Quote time unknown',timestamp_invalid:'Invalid quote time',unavailable:receipt?.failure==='provider_timeout'?'Quote timed out':'Quote unavailable'}
+ const state=receipt?.state||(p===undefined?'unavailable':'')
+ const exchange=typeof snap.exchange==='string'?snap.exchange:''
+ const securityType=typeof snap.quote_type==='string'?snap.quote_type:''
+ const unit=cur?' '+cur:''
+ const rows:[string,string,string][]=[]
+ const add=(field:string,label:string,format:(value:number)=>string)=>{const v=num(snap[field]);if(v!==undefined)rows.push([field,label,format(v)])}
+ const big=(v:number)=>Intl.NumberFormat('en-US',{notation:'compact',maximumFractionDigits:2}).format(v)+unit
+ add('previous_session_close','Previous close',v=>price(v)+unit+(typeof snap.previous_session_date==='string'?' on '+snap.previous_session_date:''))
+ add('market_cap','Market cap',big)
+ add('low_52_week','1Y low',v=>price(v)+unit);add('high_52_week','1Y high',v=>price(v)+unit)
+ add('volume','Volume',v=>v.toLocaleString())
+ add('pe_ratio','Trailing P/E',v=>v.toFixed(2));add('forward_pe_ratio','Forward P/E',v=>v.toFixed(2))
+ add('revenue_ttm','Revenue, TTM',big);add('eps','EPS, TTM',v=>price(v)+unit)
+ add('drawdown_from_52_week_high_pct','Below 1Y high',v=>v+'%')
+ add('all_time_high','All-time high',v=>price(v)+unit)
+ add('drawdown_from_all_time_high_pct','Below all-time high',v=>v+'%')
+ add('annualized_daily_log_volatility_pct','Volatility, annualized',v=>v+'%')
+ add('fear_greed_index','Fear & Greed',v=>v+(typeof snap.fear_greed_label==='string'?' '+snap.fear_greed_label:''))
+ const asOf=snap.fundamentals_as_of&&typeof snap.fundamentals_as_of==='object'?snap.fundamentals_as_of as Record<string,{as_of?:string}>:{}
+ const source=typeof snap.source==='string'?snap.source:''
+ const quoted=[freshness[state],when(snap.price_as_of),source].filter(Boolean).join(' ? ')
+ return <div className="facts"><div className="facts-asset"><strong>{ticker}</strong>{name&&<span>{name}</span>}{exchange&&<span className="facts-exchange">{exchange}</span>}</div>
+  {p!==undefined&&<div className="facts-quote" data-fact-field="price" tabIndex={-1}><strong>{price(p)}{unit}</strong></div>}
+  {quoted&&<p className="facts-source" data-quote-state={state||undefined}>{quoted}</p>}
+  {(rows.length>0||securityType)&&<details className="fact-details"><summary>Market details</summary>
+   {securityType&&<p className="facts-source">{securityType}</p>}
+   {rows.length>0&&<dl className="facts-grid">{rows.map(([field,label,value])=><div data-fact-field={field} tabIndex={-1} key={field}><dt>{label}</dt><dd>{value}</dd>{asOf[field]?.as_of&&<small>{asOf[field].as_of}</small>}{field==='all_time_high'&&typeof snap.history_start==='string'&&<small>History since {snap.history_start}</small>}</div>)}</dl>}
+   {snap.fundamentals_status&&['pe_ratio','forward_pe_ratio','market_cap','revenue_ttm','eps'].every(field=>num(snap[field])===undefined)&&<p className="facts-source">Fundamentals unavailable</p>}
+  </details>}
+ </div>
 }
-/** Says what conversation context the narrator saw. Context only: recalled numbers never pass the guard. */
 export const memoryLine=(m:Message['payload']['memory'])=>contextLine(m)
-const kind=(m:Message)=>m.payload.kind==='conversation'?'General chat (no live tools)':m.payload.kind!=='research'?'':m.payload.decision_assessment?'Evidence assessment':m.payload.mode==='facts'?'Tool-only':m.payload.faithful_synthesis===false?'Narrator output replaced':'Narrated locally'
+const kind=(m:Message)=>m.payload.kind==='conversation'?'General chat (no live tools)':m.payload.kind!=='research'||m.payload.decision_assessment?'':m.payload.mode==='facts'||m.payload.faithful_synthesis===false?'Source facts':''
 
-/** The answer text with a numbered chip after each number a tool value backs. Python chose the citations. */
 function Cited({message}:{message:Message}){
  const p=message.payload
- const jump=(id:string)=>{const el=document.getElementById(id);if(el){el.scrollIntoView({block:'nearest',behavior:'smooth'});el.focus({preventScroll:true})}}
+ const jump=(ref:CiteRef)=>{
+  const root=document.getElementById(targetId(message.id,ref))
+  if(!root)return
+  const el=ref.kind==='fact'?Array.from(root.querySelectorAll<HTMLElement>('[data-fact-field]')).find(node=>node.dataset.factField===ref.field)||root:root
+  for(let n=el.parentElement;n;n=n.parentElement)if(n instanceof HTMLDetailsElement)n.open=true
+  el.focus({preventScroll:true});el.scrollIntoView({block:'nearest'})
+ }
  return <>{segments(message.content,p.citations,p.evidence?.length||0).map((s,i)=>!s.refs?<span key={i}>{s.text}</span>:
   <span key={i} className="cited">{s.text}<Tooltip><TooltipTrigger asChild>
-   <button type="button" className="cite-chip" aria-label={'Source '+s.n+': '+s.refs.map(refText).join('; ')} onClick={()=>jump(targetId(message.id,s.refs![0]))}>{s.n}</button>
+   <button type="button" className="cite-chip" aria-label={'Source '+s.n+': '+s.refs.map(refText).join('; ')} onClick={()=>jump(s.refs![0])}>{s.n}</button>
   </TooltipTrigger><TooltipContent>{s.refs.map((r,j)=><div key={j}>{refText(r)}</div>)}</TooltipContent></Tooltip></span>)}</>
+}
+
+function Charts({charts}:{charts:NonNullable<Message['payload']['charts']>}){
+ const [open,setOpen]=useState(false)
+ return <details className="answer-history" onToggle={e=>setOpen(e.currentTarget.open)}><summary>Price history{charts.length>1?' ('+charts.length+')':''}</summary>
+  {open&&charts.map(chart=><PriceChart key={chart.ticker} data={chart}/>)}
+ </details>
 }
 
 function Answer({message,inspect,chat}:{message:Message;inspect:(id:string,spanId?:string)=>void;chat:ChatController}){
  const p=message.payload
  if(message.role==='user')return <article className="msg msg-user" aria-label="Your question"><div className="bubble">{message.content}</div></article>
- // When the synthesis was not narrated, show the accepted structure instead of the same facts twice.
  const structured=!!p.decision_assessment||(p.kind==='research'&&!!p.reports&&p.faithful_synthesis!==true&&!!(p.reports.data||p.reports.news))
  // Answers saved before 2026-11-08 stored the raw key=value fallback. Show their snapshot as facts instead;
  // the original text stays in the export and the execution trace.
  const legacy=p.kind==='research'&&!p.reports&&!!p.snapshots&&/\bticker=\S+.*\bfetched_at=/s.test(message.content)
  const legacyNews=legacy?(message.content.match(/News Researcher: (.*)$/s)?.[1]||'').trim():''
- const snaps=Object.entries(p.snapshots||{}),news=chat.workspace?.news,label=legacy?'Tool-only, saved before the fix':kind(message)
+ const snaps=Object.entries(p.snapshots||{}),news=chat.workspace?.news,label=legacy?'Source facts':kind(message)
  const mem=p.kind==='research'?itemFor(chat.memory,chat.conversation?.id,message.run_id):undefined
  return <article className="msg msg-answer" aria-label="Research response">
   <div className="msg-meta"><span>{new Date(message.created*1000).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}</span>{label&&<span className="answer-kind">{label}</span>}<DeepThinkNote use={p.deep_think}/></div>
@@ -90,16 +104,17 @@ function Answer({message,inspect,chat}:{message:Message;inspect:(id:string,spanI
   {snaps.map(([t,s])=><div key={t} id={'facts-'+message.id+'-'+t} tabIndex={-1} className="cite-target"><Facts ticker={t} snap={s}/></div>)}
   {structured&&p.reports?.news&&<p className="msg-body news-summary">{p.reports.news}</p>}
   {legacy&&legacyNews&&<p className="msg-body news-summary">{legacyNews}</p>}
-  {(p.charts||[]).map(chart=><PriceChart key={chart.ticker} data={chart}/>)}
+  {!!p.charts?.length&&<Charts charts={p.charts}/>}
   {p.headline_signal&&<HeadlineSignal signal={p.headline_signal}/>}
   {p.crowd_odds&&<CrowdOdds odds={p.crowd_odds}/>}
-  {!!p.evidence?.length&&<div className="sources" aria-label="Sources">{p.evidence.map((s,i)=>{const href=evidenceUrl(s.url),meta=[s.source,s.as_of==='Unknown'?'time unknown':when(s.as_of)].filter(Boolean).join(', ');return href?<a key={href+i} id={'source-'+message.id+'-'+i} href={href} target="_blank" rel="noreferrer noopener"><span className="source-name">{s.title}</span><span className="source-meta">{meta}</span><ArrowUpRight size={14} aria-hidden="true"/></a>:<p key={i} id={'source-'+message.id+'-'+i} tabIndex={-1} className="cite-target"><span className="source-name">{s.title}</span><span className="source-meta">link unavailable</span></p>})}</div>}
+  {!!p.evidence?.length&&<details className="answer-sources"><summary>Sources ({p.evidence.length})</summary><div className="sources" aria-label="Sources">{p.evidence.map((s,i)=>{const href=evidenceUrl(s.url),meta=[s.source,s.as_of==='Unknown'?'time unknown':when(s.as_of)].filter(Boolean).join(', ');return href?<a key={href+i} id={'source-'+message.id+'-'+i} href={href} target="_blank" rel="noreferrer noopener"><span className="source-name">{s.title}</span><span className="source-meta">{meta}</span><ArrowUpRight size={14} aria-hidden="true"/></a>:<p key={i} id={'source-'+message.id+'-'+i} tabIndex={-1} className="cite-target"><span className="source-name">{s.title}</span><span className="source-meta">link unavailable</span></p>})}</div></details>}
   <DocumentSources sources={p.document_sources}/>
   {p.coverage_note&&<div className="coverage"><Newspaper size={14} aria-hidden="true"/><span>{p.coverage_note}</span>{news&&!news.health.collected&&news.phase!=='running'&&<Button variant="ghost" size="sm" disabled={chat.busy||!!chat.workspace?.active_job} onClick={()=>{void chat.collectNews().catch(()=>{})}}>Collect news</Button>}{news?.phase==='running'&&<span className="quiet">Collecting news now</span>}</div>}
-  {memoryLine(p.memory)&&<div className="coverage" title={(p.memory?.recalled||[]).map(r=>'Recalled: '+r.question).join('\n')||undefined}><History size={14} aria-hidden="true"/><span>{memoryLine(p.memory)}</span></div>}
   {message.role==='assistant'&&(p.kind==='research'||message.run_id)&&<div className="msg-actions">{message.run_id&&<Button variant="ghost" size="sm" onClick={()=>inspect(message.run_id!)}><Activity size={14}/>Execution</Button>}{p.kind==='research'&&mem&&(canForget(mem)?<Button variant="ghost" size="sm" disabled={chat.busy||!!chat.workspace?.active_job} onClick={()=>{void chat.forget(message.run_id!).catch(()=>{})}}><Eraser size={14}/>Forget from memory</Button>:<Button variant="ghost" size="sm" disabled><Check size={14}/>{mem.state==='forgotten'?'Forgotten from memory':'Blocked from recall'}</Button>)}{p.kind==='research'&&(p.tickers||[]).map(ticker=>{const tracked=chat.workspace?.watchlist.some(w=>w.ticker===ticker);return <Button key={ticker} variant="ghost" size="sm" disabled={chat.busy} title={tracked?'Remove '+ticker+' from watchlist':'Add '+ticker+' to watchlist'} onClick={()=>{void chat.post(tracked?'/api/watchlist/remove':'/api/watchlist',{ticker}).catch(()=>{})}}>{tracked?<Check size={14}/>:<Plus size={14}/>}{tracked?'Tracking '+ticker:'Track '+ticker}</Button>})}</div>}
-  <TokenUsage usage={p.usage}/>
-  {message.run_id&&<AnswerProcess id={message.run_id} onInspect={inspect}/>}
+  {(!!p.usage||memoryLine(p.memory))&&<details className="answer-details"><summary>Answer details</summary>
+   {memoryLine(p.memory)&&<div className="coverage" title={(p.memory?.recalled||[]).map(r=>'Recalled: '+r.question).join('\n')||undefined}><History size={14} aria-hidden="true"/><span>{memoryLine(p.memory)}</span></div>}
+   <TokenUsage usage={p.usage}/>
+  </details>}
  </article>
 }
 
@@ -182,19 +197,19 @@ export function ChatWorkspace({chat,inspect,onOpenModels}:{chat:ChatController;i
  useEffect(()=>{textarea.current?.focus()},[chat.draftRevision])
  const send=async(retry=false)=>{if((!draft.trim()&&!retry)||blocked)return
   try{await chat.send(draft.trim(),retry,think&&!!thinkOf(model)?.qualified&&model?.selected!=='facts')}catch{}}
- const notice=!chat.workspace?'Connecting to the local workspace. Your question stays in the composer.':runningModel?(model?.stage||model?.phase)+'. Research can start when this finishes.':newsRunning?'News collection is running. Research can start when it finishes.':globalJob&&!ownJob?'A run in another conversation is active.':''
+ const notice=!chat.workspace?'Connecting. Draft kept.':runningModel?model?.stage||'Preparing model':newsRunning?'Collecting news':globalJob&&!ownJob?'Another chat is running':''
  return <div className="chat-view">
   <div className="chat-scroll" ref={scroller} role="log" aria-label="Conversation messages" aria-live="polite"><div className="chat-column">
    {chat.error&&<div role="alert" className="error-banner"><span>{chat.error}</span><Button variant="outline" onClick={chat.refresh}>Refresh</Button></div>}
    {conversation?.message_count&&conversation.message_count>100?<p className="quiet history-note">Showing the latest 100 messages.</p>:null}
    {conversation?.messages.length?conversation.messages.map(message=><Answer key={message.id} message={message} chat={chat} inspect={inspect}/>):<div className="chat-welcome"><h2>What should we research?</h2><div className="starter-questions">{['What is NVDA trading at?','Review the NVDA thesis','Compare Apple and Nvidia'].map(question=><Button key={question} variant="outline" size="sm" onClick={()=>{setDraft(question);textarea.current?.focus()}}>{question}</Button>)}</div></div>}
-   {ownJob&&<div className="live-job" role="status"><div className="live-head"><LoaderCircle size={15} className="animate-spin" aria-hidden="true"/><strong>{ownJob.status==='cancelling'?'Stopping run':ownJob.stage}</strong><Button variant="ghost" size="sm" onClick={()=>inspect(ownJob.id)}>Open execution<ArrowUpRight size={14}/></Button></div><TraceActivity key={ownJob.id} id={ownJob.id} onInspect={inspect}/></div>}
-   {failed&&<div className="job-error" role="alert"><strong>{statusLabel(failed.status)}</strong><span>{failed.error}</span><TraceActivity key={failed.id} id={failed.id} onInspect={inspect} usageOnly/><Button variant="ghost" size="sm" onClick={()=>inspect(failed.id)}>Inspect trace</Button></div>}
+   {ownJob&&<div className="live-job" role="status"><div className="live-head"><LoaderCircle size={15} className="animate-spin" aria-hidden="true"/><strong>{ownJob.status==='cancelling'?'Stopping run':ownJob.stage}</strong><Button variant="ghost" size="sm" onClick={()=>inspect(ownJob.id)}>Execution<ArrowUpRight size={14}/></Button></div></div>}
+   {failed&&<div className="job-error" role="alert"><strong>{statusLabel(failed.status)}</strong><span>{failed.error}</span><TraceActivity key={failed.id} id={failed.id}/><Button variant="ghost" size="sm" onClick={()=>inspect(failed.id)}>Execution</Button></div>}
   </div></div>
   <div className="chat-dock"><div className="chat-column">
    {notice&&<p className="dock-notice" role="status">{notice}</p>}
    <div className="composer"><AttachmentChips chat={chat} documents={docs} disabled={chat.busy||!!ownJob}/>
-    <Textarea ref={textarea} id="research-question" aria-label="Research question" value={draft} onChange={e=>setDraft(e.target.value)} maxLength={3000} rows={1} placeholder={docs.length?'Ask about the attached PDF or an asset':'Ask about a stock or crypto asset'} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();if(!blocked)void send()}}}/>
+    <Textarea ref={textarea} id="research-question" aria-label="Research question" value={draft} onChange={e=>setDraft(e.target.value)} maxLength={3000} rows={1} placeholder={docs.length?'Ask about the PDF':'Ask a question'} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();if(!blocked)void send()}}}/>
     <div className="composer-bar"><AttachButton chat={chat} disabled={chat.busy||!!ownJob}/><ModelPicker chat={chat} compact/><DeepThinkToggle chat={chat} on={think} onChange={v=>{setThink(v);saveDeepThink(v)}} disabled={chat.busy||!!ownJob} onOpenModels={onOpenModels}/>
      {ownJob&&<Button variant="ghost" size="sm" disabled={chat.busy||ownJob.status==='cancelling'} onClick={()=>{void chat.post('/api/jobs/cancel',{id:ownJob.id}).catch(()=>{})}}><Square size={13}/>Stop run</Button>}
      {chat.hasRetry&&<Button variant="ghost" size="sm" disabled={blocked} onClick={()=>void send(true)}><RotateCcw size={13}/>Retry submission</Button>}

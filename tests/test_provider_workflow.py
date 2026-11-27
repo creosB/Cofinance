@@ -48,6 +48,13 @@ VALUATION_REGRESSIONS = (
 )
 
 
+ISTANBUL_REGRESSION = (
+    ('istanbul', (
+        ('THY, Turkish stock. Should I buy now?', 'research', {'THYAO.IS': 'TRY'}, True),
+    )),
+)
+
+
 def stage_models(target):
     source = REPO / 'data' / 'local_models'
     target.mkdir()
@@ -64,7 +71,7 @@ def stage_models(target):
                      and os.environ.get('COFINANCE_NETWORK_TESTS') == '1', 'opt-in Yahoo and Chrome journey')
 class TestProviderWorkflow(unittest.TestCase):
     def test_frozen_journeys(self):
-        self.check_journeys(JOURNEYS + VALUATION_REGRESSIONS)
+        self.check_journeys(JOURNEYS + VALUATION_REGRESSIONS + ISTANBUL_REGRESSION)
 
     @unittest.skipUnless(os.environ.get('COFINANCE_SHOWCASE_DIR'), 'run dev.py showcase-preview explicitly')
     def test_showcase_preview(self):
@@ -83,6 +90,7 @@ class TestProviderWorkflow(unittest.TestCase):
         digest = hashlib.sha256(json.dumps(JOURNEYS, sort_keys=True).encode()).hexdigest()
         print(f'Provider journey protocol SHA-256: {digest}', flush=True)
         print('Valuation regression SHA-256: '+hashlib.sha256(json.dumps(VALUATION_REGRESSIONS, sort_keys=True).encode()).hexdigest(), flush=True)
+        print('Istanbul regression SHA-256: '+hashlib.sha256(json.dumps(ISTANBUL_REGRESSION, sort_keys=True).encode()).hexdigest(), flush=True)
         events = []
         images = {}
 
@@ -167,6 +175,10 @@ class TestProviderWorkflow(unittest.TestCase):
                                             self.assertRegex(payload.get('market_answer_note', ''), r'VOD\.L previous-session close: .+ GBp on \d{4}-\d{2}-\d{2}')
                                             self.assertIn(payload['market_answer_note'], answer['content'])
                                             self.assertFalse(any('/finance/search' in e['path'] for e in provider))
+                                        if name == 'istanbul':
+                                            self.assertIn('does not establish whether to buy', answer['content'])
+                                            self.assertTrue(any('/chart/THYAO.IS' in e['path'] for e in provider))
+                                            self.assertFalse(any(e['path'].endswith('/chart/THY') for e in provider))
                                         if name == 'valuation':
                                             if index == 0:
                                                 self.assertIn('Do you mean the share price', answer['content'])

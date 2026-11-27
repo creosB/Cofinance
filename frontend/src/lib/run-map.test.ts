@@ -127,7 +127,7 @@ describe('single-pass reuse, Document Reader, claim provenance, and guard teleme
   const lead=nodes.find(n=>n.id==='lead')!
   expect(lead.owner).toBe('Verified single-pass (Data Analyst)')
   expect(lead.state).toBe('complete')
-  expect(lead.detail).toContain('Reused verified Data Analyst report')
+  expect(lead.detail).toBe('Verified single-pass: reused Data Analyst report')
   expect(lead.owner).not.toContain('Python fallback')
   expect(nodes.find(n=>n.id==='guard')?.detail).toContain('Verified single-pass report accepted')
  })
