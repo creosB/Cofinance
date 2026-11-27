@@ -12,6 +12,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
+from .run_trace import trace_integrity_issue
 from .usage import counts as usage_counts
 
 SCHEMA_VERSION = 1
@@ -312,6 +313,7 @@ def summarize_guard_directory(
     non_chat_traces = 0
     chat_traces = 0
     incomplete_traces = 0
+    excluded_trace_integrity: Dict[str, int] = {}
     mode_counts: Dict[str, int] = {}
 
     by_actor: Dict[str, Dict[str, Any]] = {}
@@ -343,8 +345,11 @@ def summarize_guard_directory(
 
         chat_traces += 1
         mode_counts[trace_mode] = mode_counts.get(trace_mode, 0) + 1
-        dropped = int(data.get("dropped_spans") or 0)
-        summary = summarize_guards(data["spans"], dropped=dropped)
+        if issue := trace_integrity_issue(data):
+            excluded_trace_integrity[issue] = excluded_trace_integrity.get(issue, 0) + 1
+            incomplete_traces += 1
+            continue
+        summary = summarize_guards(data["spans"])
         if not summary["complete"]:
             incomplete_traces += 1
         unmatched_narrator_passes += summary["unmatched_narrator_passes"]
@@ -403,6 +408,8 @@ def summarize_guard_directory(
         "coverage": {
             "total_files": len(files),
             "chat_traces": chat_traces,
+            "included_traces": chat_traces - sum(excluded_trace_integrity.values()),
+            "excluded_trace_integrity": _sorted_counts(excluded_trace_integrity),
             "non_chat_traces": non_chat_traces,
             "skipped_by_mode": skipped_by_mode,
             "unreadable_files": unreadable_files,

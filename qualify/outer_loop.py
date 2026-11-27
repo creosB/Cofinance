@@ -25,7 +25,7 @@ from core.orchestrator import (
     NewsResearcherAgent,
     TeamLeadOrchestrator,
 )
-from core.run_trace import TraceRecorder
+from core.run_trace import TRACE_INTEGRITY_ISSUES, TraceRecorder, trace_integrity_issue
 from core.signals import Action, Item, Judgment, Outcome
 from qualify.parity_oracle import (
     STAGES,
@@ -41,7 +41,7 @@ from qualify.parity_oracle import (
     group_fingerprints,
 )
 
-INCOMPLETE_REASONS = frozenset({
+INCOMPLETE_REASONS = TRACE_INTEGRITY_ISSUES | frozenset({
     "invalid_json",
     "trace_not_object",
     "missing_spans",
@@ -157,6 +157,8 @@ def extract_replay_case(path: Path) -> Tuple[Optional[TraceReplayCase], Optional
     if not query:
         return None, "missing_chat_query"
 
+    if issue := trace_integrity_issue(data):
+        return None, issue
     if not rr or not isinstance(rr.get("outputs"), dict):
         return None, "missing_route"
     rout = rr["outputs"]
@@ -471,11 +473,21 @@ def replay_directory(
     }
 
 
+def replay_exit_code(report: Mapping[str, Any], *, fail_on_mismatch: bool) -> int:
+    coverage = report["coverage"]
+    return int(fail_on_mismatch and (
+        not coverage["replayable"]
+        or coverage["unapproved_mismatches"] > 0
+        or bool(TRACE_INTEGRITY_ISSUES.intersection(coverage["incomplete_by_reason"]))
+    ))
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     ap = argparse.ArgumentParser(prog="qualify.outer_loop")
     ap.add_argument("--traces", default="data/traces")
     ap.add_argument("--registry-in", default=None)
-    ap.add_argument("--fail-on-mismatch", action="store_true")
+    ap.add_argument("--fail-on-mismatch", action="store_true",
+                    help="Fail on an unapproved diff, unverified source trace, or no replayable cases.")
     args = ap.parse_args(argv)
 
     report = replay_directory(
@@ -483,9 +495,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         registry_in=Path(args.registry_in) if args.registry_in else None,
     )
     print(json.dumps(report, indent=2, sort_keys=True))
-    if args.fail_on_mismatch and report["coverage"]["unapproved_mismatches"] > 0:
-        return 1
-    return 0
+    return replay_exit_code(report, fail_on_mismatch=args.fail_on_mismatch)
 
 
 if __name__ == "__main__":

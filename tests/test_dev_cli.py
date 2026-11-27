@@ -28,6 +28,18 @@ class TestDevCli(unittest.TestCase):
         self.assertEqual(dev.FORWARD['record'][-2:], ['--publish', 'docs/benchmarks/forward-ledger.jsonl'])
         self.assertNotIn('--publish', dev.FORWARD['score'])
 
+    def test_verify_builds_the_frontend_before_chrome_and_stops_if_build_fails(self):
+        build = ['npm', 'run', 'build']
+        with mock.patch.object(dev.subprocess, 'call', side_effect=lambda cmd, **kw: 17 if cmd == build else 0) as run:
+            self.assertEqual(dev.verify_cmd(), 17, 'A failed build must not send Chrome to a stale bundle')
+            self.assertEqual(run.call_args.args[0], build)
+            self.assertFalse(any('tests.test_run_map_browser' in c.args[0] for c in run.call_args_list))
+        with mock.patch.object(dev.subprocess, 'call', return_value=0) as run:
+            self.assertEqual(dev.verify_cmd(), 0)
+            commands = [c.args[0] for c in run.call_args_list]
+            chrome = next(i for i, cmd in enumerate(commands) if 'tests.test_run_map_browser' in cmd)
+            self.assertLess(commands.index(build), chrome)
+
     def test_dashboard_restart_waits_for_idle(self):
         idle = {'active_job': None, 'news': {'phase': 'idle'}, 'models': {'phase': 'downloaded'}}
         self.assertFalse(dev.dashboard_busy(idle))

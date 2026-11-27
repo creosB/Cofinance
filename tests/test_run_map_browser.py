@@ -3,14 +3,17 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from core.run_trace import TraceRecorder,run_traced_team,run_traced_clock1
 from core.orchestrator import DataAnalystAgent,NewsResearcherAgent,TeamLeadOrchestrator
 from core.gliner_decide import GlinerQueryRouter
 from core.signals import Item,Judgment
 from core.collector import FetchResult
+from tests.execution_proof import capture_execution, expect_rendered_trace, require_clean_execution
 from tests.test_orchestrator import Stub1BLLM,StubGliner,StubTools,StubNewsStore
 from ui.dashboard import create_server,DIST
+from ui.workbench import read_trace
 
 
 @unittest.skipUnless(os.environ.get('COFINANCE_BROWSER_TESTS')=='1','installed Chrome browser tests are opt-in')
@@ -43,6 +46,62 @@ class TestRunMapBrowser(unittest.TestCase):
     def tearDown(self):
         self.page.close();self.server.shutdown();self.server.server_close();self.thread.join(timeout=2);self.temp.cleanup()
         self.assertEqual(self.errors,[])
+    def open_running_trace(self, title):
+        trace = TraceRecorder(title, directory=self.traces)
+        trace.event('Fetch quote', 'tool', {'price': 23.0})
+        self.page.get_by_role('button', name='Refresh local data').click()
+        self.page.locator('.run-entry').filter(has_text=title).click()
+        expect_rendered_trace(self.page, read_trace(self.traces, trace.run_id))
+        return trace
+
+    @unittest.skipUnless(os.name == 'nt', 'Windows readers can block atomic replacement')
+    def test_open_execution_reaches_the_saved_terminal_revision_after_windows_contention(self):
+        trace = self.open_running_trace('Windows reader contention')
+        before = read_trace(self.traces, trace.run_id)
+        destination = self.traces / (trace.run_id + '.json')
+        with destination.open('rb') as reader, patch('core.run_trace.time.sleep', side_effect=lambda _: reader.close()) as retry:
+            trace.finish(summary={'answer': 'Published after the reader released the file.'})
+        retry.assert_called_once()
+        saved = require_clean_execution(self.page, self.traces, trace.run_id, mode='live')
+        self.assertNotEqual(saved['revision'], before['revision'])
+        self.assertEqual(saved['status'], 'complete')
+
+    def test_capture_refuses_a_stale_trace_and_the_complete_view_shows_storage_loss(self):
+        from playwright.sync_api import expect
+
+        trace = self.open_running_trace('Final trace could not be written')
+        with patch('core.run_trace.replace_trace', side_effect=PermissionError('fixture replacement failed')):
+            trace.finish()
+        self.assertEqual(trace.data['status'], 'complete')
+        with self.assertRaisesRegex(AssertionError, 'trace_not_terminal'):
+            capture_execution(self.page, self.traces, trace.run_id)
+        trace.flush()
+        saved = read_trace(self.traces, trace.run_id)
+        self.assertEqual(saved['status'], 'complete')
+        expect_rendered_trace(self.page, saved)
+        expect(self.page.get_by_text('Trace incomplete: 0 omitted steps; 1 storage errors.')).to_be_visible()
+        expect(self.page.locator('.error-banner')).to_have_count(0)
+        with self.assertRaisesRegex(AssertionError, 'trace_storage_errors'):
+            capture_execution(self.page, self.traces, trace.run_id)
+
+    def test_capture_accepts_a_complete_degraded_trace_but_blocks_a_visible_warning(self):
+        saved = require_clean_execution(self.page, self.traces, self.trace.run_id, mode='fixture')
+        self.assertEqual(saved['status'], 'degraded')
+        image = capture_execution(self.page, self.traces, self.trace.run_id, mode='fixture')
+        self.assertTrue(image.startswith(b'\x89PNG\r\n\x1a\n'))
+        self.page.locator('.mode-notice').evaluate("el => el.append('Trace incomplete: simulated render-only warning')")
+        with self.assertRaisesRegex(AssertionError, 'Trace incomplete:'):
+            capture_execution(self.page, self.traces, self.trace.run_id, mode='fixture')
+
+    def test_capture_rejects_an_api_revision_that_disagrees_with_disk(self):
+        def stale_response(directory, run_id):
+            saved = read_trace(directory, run_id)
+            return {**saved, 'revision': saved['revision'] ^ 1}
+
+        with patch('ui.workbench.read_trace', side_effect=stale_response):
+            with self.assertRaisesRegex(AssertionError, 'Execution API disagrees with the saved trace: revision'):
+                capture_execution(self.page, self.traces, self.trace.run_id, mode='fixture')
+
     def test_map_links_route_model_call_and_rejected_synthesis(self):
         self.page.locator('[data-map-stage="router"]').click()
         self.assertIn('Routing decision',self.page.locator('.inspector').inner_text())

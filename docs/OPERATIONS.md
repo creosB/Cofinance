@@ -74,6 +74,11 @@ python dev.py spotcheck score
 ```
 
 - `parity_oracle self-check`: runs the 26-case pairwise inner-loop differential oracle with replayed model outputs, 6 ordered stage checkpoints, and privacy-preserving diff fingerprints.
-- `outer-loop`: replays saved local chat traces via fail-closed `StrictReplayLLM` with a socket network fence and privacy-preserving diff fingerprints.
+- `outer-loop`: replays recorded routes, tool facts, and model outputs. It is not a browser or Windows storage test. Unfinished traces or traces without explicit zero storage-error and omitted-step counters are reported as exclusions, never matches. `--fail-on-mismatch` also fails on those integrity exclusions or zero replayable cases.
+- `guard-stats`: read-only guard acceptance and timing over eligible traces. The report shows the included denominator and exclusions by trace integrity reason. It does not measure prediction accuracy.
 - `memory-eval`: checks whether `data/chat_v2.db` has reached 30 real follow-ups (`waiting_for_data` below 30), audits `shadow_keyword` trace agreement, and verifies `LocalKeywordMemory` vs `HybridMemory` synthetic plumbing.
 - `spotcheck`: draws a sealed, stratified 20-row blind CSV (`spotcheck_20_blind.csv`) without model labels for human review, then computes agreement, Cohen's kappa, balanced accuracy, and per-row disagreements once completed.
+
+## README image previews
+
+`python dev.py showcase-preview` builds the current frontend and opens an isolated Chrome session with the installed local models and Yahoo. It checks the terminal file, served revision, visible Execution state and absence of trace warnings before saving the pair to a fresh `data/_showcase_*` directory. It never overwrites or publishes the README images. `python dev.py verify` builds the frontend before Chrome and checks the same trace contract offline with a real Windows file lock and deliberate failure controls.

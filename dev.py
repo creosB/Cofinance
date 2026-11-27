@@ -309,16 +309,14 @@ def restore_cmd(backup_dir, data_dir=None, dry_run=False, force=False):
 
 def outer_loop_cmd(traces='data/traces', registry_in=None, fail_on_mismatch=False):
     import json
-    from qualify.outer_loop import replay_directory
+    from qualify.outer_loop import replay_directory, replay_exit_code
     printable_stdout()
     report = replay_directory(
         ROOT / traces if not Path(traces).is_absolute() else Path(traces),
         registry_in=Path(registry_in) if registry_in else None,
     )
     print(json.dumps(report, indent=2, sort_keys=True))
-    if fail_on_mismatch and report['coverage']['unapproved_mismatches'] > 0:
-        return 1
-    return 0
+    return replay_exit_code(report, fail_on_mismatch=fail_on_mismatch)
 
 
 def memory_eval_cmd(chat_db='data/chat_v2.db', traces='data/traces'):
@@ -359,13 +357,16 @@ def guard_stats_cmd(traces='data/traces', mode='all', as_json=False):
     w_share = report['wasted_ms_share']
     w_str = f'{w_share * 100:.1f}%' if w_share is not None else 'n/a'
     print(
-        f'Guard telemetry ({cov["chat_traces"]} chat traces / {cov["total_files"]} files, mode={report["mode_filter"]}): '
+        f'Guard telemetry ({cov["included_traces"]}/{cov["chat_traces"]} chat traces included; {cov["total_files"]} files, mode={report["mode_filter"]}): '
         f'pass-1 accepted {report["first_pass_accepted"]}/{report["narrated_checks"]} ({fpa_str}), '
         f'guard retries {report["guard_retries"]} (recovered {report["guard_retry_recovered"]}), '
         f'fallbacks {report["fallbacks"]}, '
         f'wasted passes {report["wasted_passes"]}/{report["total_narrator_passes"]} '
         f'({report["wasted_ms"]:.1f}/{report["total_narrator_ms"]:.1f} ms, {w_str})'
     )
+    if cov["excluded_trace_integrity"]:
+        excluded = ', '.join(f'{k}={v}' for k, v in cov["excluded_trace_integrity"].items())
+        print(f'  excluded from rates: {excluded}')
     if report['failure_reasons']:
         reasons = ', '.join(f'{k}={v}' for k, v in report['failure_reasons'].items())
         print(f'  failure_reasons: {reasons}')
@@ -382,6 +383,19 @@ def guard_stats_cmd(traces='data/traces', mode='all', as_json=False):
     return 0
 
 
+def showcase_preview_cmd():
+    from uuid import uuid4
+
+    build = subprocess.call(['npm', 'run', 'build'], cwd=ROOT / 'frontend', env=env(), shell=os.name == 'nt')
+    if build:
+        return build
+    preview_env = env()
+    preview_env.update(COFINANCE_PROVIDER_BROWSER_TESTS='1', COFINANCE_NETWORK_TESTS='1',
+                       COFINANCE_SHOWCASE_DIR=str(ROOT / 'data' / ('_showcase_' + uuid4().hex[:12])))
+    return subprocess.call([PY, '-m', 'unittest', 'tests.test_provider_workflow.TestProviderWorkflow.test_showcase_preview'],
+                           cwd=ROOT, env=preview_env)
+
+
 def verify_cmd(full=False, browser=True):
     printable_stdout()
     steps = [
@@ -396,6 +410,8 @@ def verify_cmd(full=False, browser=True):
                 'tests.test_feature_map',
                 'tests.test_events_stream',
                 'tests.test_trace',
+                'tests.test_guard_telemetry',
+                'tests.test_dev_cli',
                 'tests.test_open_chat',
                 'tests.test_research_acceptance',
                 'tests.test_evidence_status',
@@ -406,6 +422,7 @@ def verify_cmd(full=False, browser=True):
             env(),
         ),
         ('frontend_vitest', ['npm', 'test', '--', '--run'], ROOT / 'frontend', env()),
+        ('frontend_build', ['npm', 'run', 'build'], ROOT / 'frontend', env()),
     ]
     if browser:
         benv = env()
@@ -455,10 +472,12 @@ def main(argv=None):
     rs.add_argument('--data-dir', default=None)
     rs.add_argument('--dry-run', action='store_true')
     rs.add_argument('--force', action='store_true')
+    sub.add_parser('showcase-preview', help='Capture checked README previews with local models and Yahoo; never publish.')
     ol = sub.add_parser('outer-loop')
     ol.add_argument('--traces', default='data/traces')
     ol.add_argument('--registry-in', default=None)
-    ol.add_argument('--fail-on-mismatch', action='store_true')
+    ol.add_argument('--fail-on-mismatch', action='store_true',
+                    help='Fail on an unapproved diff, unverified source trace, or no replayable cases.')
     me = sub.add_parser('memory-eval')
     me.add_argument('--chat-db', default='data/chat_v2.db')
     me.add_argument('--traces', default='data/traces')
@@ -501,6 +520,8 @@ def main(argv=None):
         raise SystemExit(spotcheck_cmd(a.action, corpus=a.corpus, overwrite=a.overwrite))
     if a.cmd == 'guard-stats':
         raise SystemExit(guard_stats_cmd(traces=a.traces, mode=a.mode, as_json=a.json))
+    if a.cmd == 'showcase-preview':
+        raise SystemExit(showcase_preview_cmd())
     if a.cmd == 'verify':
         raise SystemExit(verify_cmd(full=a.full, browser=not a.no_browser))
     if a.cmd == 'dashboard':

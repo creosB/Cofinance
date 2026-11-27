@@ -20,7 +20,7 @@ import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 
 TRACE_FORMAT = "cofinance-trace/1"
 TRACE_REPLACE_BACKOFF = (0.005, 0.015, 0.035, 0.075)
@@ -34,6 +34,24 @@ SAFE_TRACE_KEYS = frozenset({
     "wasted_tokens",
 })
 THINK = re.compile(r"<think(?:ing)?>.*?(?:</think(?:ing)?>|$)", re.I | re.S)
+
+
+TRACE_INTEGRITY_ISSUES = frozenset({
+    "trace_not_terminal", "trace_unverified_counters", "trace_storage_errors", "trace_dropped_spans",
+})
+
+
+def trace_integrity_issue(trace: Mapping[str, Any]) -> str | None:
+    if trace.get("status") not in ("complete", "degraded"):
+        return "trace_not_terminal"
+    dropped, storage = trace.get("dropped_spans"), trace.get("storage_errors")
+    if any(type(value) is not int or value < 0 for value in (dropped, storage)):
+        return "trace_unverified_counters"
+    if storage:
+        return "trace_storage_errors"
+    if dropped:
+        return "trace_dropped_spans"
+    return None
 
 
 def safe(value: Any, depth: int = 0) -> Any:

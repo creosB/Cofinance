@@ -280,6 +280,8 @@ class TestGuardTelemetry(unittest.TestCase):
             }), encoding="utf-8")
             (tdir / "live_chat.json").write_text(json.dumps({
                 "mode": "live",
+                "status": "complete",
+                "storage_errors": 0,
                 "dropped_spans": 0,
                 "spans": [
                     {"kind": "run", "name": "Interactive research", "actor": "Python"},
@@ -293,6 +295,8 @@ class TestGuardTelemetry(unittest.TestCase):
             }), encoding="utf-8")
             (tdir / "fixture_chat.json").write_text(json.dumps({
                 "mode": "fixture",
+                "status": "degraded",
+                "storage_errors": 0,
                 "dropped_spans": 0,
                 "spans": [
                     {"kind": "run", "name": "Interactive research", "actor": "Python"},
@@ -327,6 +331,42 @@ class TestGuardTelemetry(unittest.TestCase):
             self.assertEqual(rc, 0)
             parsed = json.loads(buf.getvalue())
             self.assertEqual(parsed, live_rep)
+
+
+    def test_incomplete_disk_traces_are_counted_but_do_not_inflate_acceptance(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            trace = {
+                "mode": "live", "status": "complete", "dropped_spans": 0, "storage_errors": 0,
+                "spans": [
+                    {"kind": "model", "name": "Narrate evidence", "actor": "Data Analyst", "duration_ms": 500.0},
+                    {"kind": "gate", "name": "Number faithfulness", "actor": "Data Analyst",
+                     "outputs": {"passed": True, "fallback_used": False, "validation_reason": "numbers_matched"}},
+                ],
+            }
+            specimens = {
+                "eligible": {"status": "degraded"}, "storage": {"storage_errors": 1},
+                "omitted": {"dropped_spans": 1}, "stale": {"status": "running"},
+                "unverified": {"storage_errors": "0"},
+            }
+            for name, changes in specimens.items():
+                (root / (name + ".json")).write_text(json.dumps({**trace, **changes}), encoding="utf-8")
+            report = summarize_guard_directory(root, mode="live")
+            coverage = report["coverage"]
+            self.assertEqual((coverage["chat_traces"], coverage["included_traces"]), (5, 1))
+            self.assertEqual(coverage["incomplete_traces"], 4)
+            self.assertEqual(coverage["excluded_trace_integrity"], {
+                "trace_storage_errors": 1, "trace_dropped_spans": 1, "trace_not_terminal": 1,
+                "trace_unverified_counters": 1,
+            })
+            self.assertEqual((report["first_pass_accepted"], report["narrated_checks"]), (1, 1),
+                             "A trace with unverified storage must not add a successful guard check")
+            self.assertFalse(report["wasted_ms_complete"])
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(dev.guard_stats_cmd(str(root), mode="live"), 0)
+            self.assertIn("1/5 chat traces included", output.getvalue())
+            self.assertIn("trace_storage_errors=1", output.getvalue())
 
 
 if __name__ == "__main__":

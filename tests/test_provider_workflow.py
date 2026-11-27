@@ -11,6 +11,7 @@ from urllib.parse import urlsplit
 
 from core.chat_service import ChatService
 from core.market import MarketTools, fetch_json
+from tests.execution_proof import capture_execution, require_clean_execution, require_saved_trace
 from ui.dashboard import create_server
 
 REPO = Path(__file__).resolve().parents[1]
@@ -63,12 +64,27 @@ def stage_models(target):
                      and os.environ.get('COFINANCE_NETWORK_TESTS') == '1', 'opt-in Yahoo and Chrome journey')
 class TestProviderWorkflow(unittest.TestCase):
     def test_frozen_journeys(self):
-        from playwright.sync_api import sync_playwright
+        self.check_journeys(JOURNEYS + VALUATION_REGRESSIONS)
+
+    @unittest.skipUnless(os.environ.get('COFINANCE_SHOWCASE_DIR'), 'run dev.py showcase-preview explicitly')
+    def test_showcase_preview(self):
+        destination = Path(os.environ['COFINANCE_SHOWCASE_DIR'])
+        images = self.check_journeys(VALUATION_REGRESSIONS, capture=True)
+        if set(images) != {'chat.png', 'execution.png'}:
+            self.fail('Both verified showcase images are required before saving either image')
+        destination.mkdir()
+        for name, contents in images.items():
+            (destination / name).write_bytes(contents)
+        print(f'Preview only: {destination.relative_to(REPO)}', flush=True)
+
+    def check_journeys(self, journeys, *, capture=False):
+        from playwright.sync_api import expect, sync_playwright
 
         digest = hashlib.sha256(json.dumps(JOURNEYS, sort_keys=True).encode()).hexdigest()
         print(f'Provider journey protocol SHA-256: {digest}', flush=True)
         print('Valuation regression SHA-256: '+hashlib.sha256(json.dumps(VALUATION_REGRESSIONS, sort_keys=True).encode()).hexdigest(), flush=True)
         events = []
+        images = {}
 
         def yahoo(url):
             uri = urlsplit(url)
@@ -108,9 +124,11 @@ class TestProviderWorkflow(unittest.TestCase):
                 with sync_playwright() as pw:
                     browser = pw.chromium.launch(executable_path='C:/Program Files/Google/Chrome/Application/chrome.exe', headless=True)
                     try:
-                        for name, turns in JOURNEYS + VALUATION_REGRESSIONS:
-                            with browser.new_context(viewport={'width': 1440, 'height': 900}) as context:
+                        for name, turns in journeys:
+                            with browser.new_context(viewport={'width': 1440, 'height': 1000 if capture else 900}) as context:
                                 page = context.new_page()
+                                page_errors = []
+                                page.on('pageerror', lambda error: page_errors.append(str(error)))
                                 page.set_default_timeout(90000)
                                 page.goto(f'http://127.0.0.1:{server.server_port}', wait_until='domcontentloaded')
                                 existing = set(service.store.session_ids())
@@ -127,8 +145,8 @@ class TestProviderWorkflow(unittest.TestCase):
                                         session = service.store.session(next(iter(set(service.store.session_ids()) - existing)))
                                         answer = session['messages'][-1]
                                         payload = answer['payload']
-                                        trace = json.loads((root / 'traces' / (answer['run_id'] + '.json')).read_text(encoding='utf-8'))
-                                        self.assertEqual((trace['dropped_spans'], trace['storage_errors']), (0, 0), question)
+                                        traces = root / 'traces'
+                                        trace = require_saved_trace(traces, answer['run_id'], mode='live')
                                         card = page.locator('.msg-answer').nth(index)
                                         seen = {k: v.get('currency') for k, v in payload.get('snapshots', {}).items()}
                                         routes = [s.get('outputs') for s in trace['spans'] if s['name'] == 'Route conversational request']
@@ -163,6 +181,22 @@ class TestProviderWorkflow(unittest.TestCase):
                                             self.assertTrue(any('/chart/' in e['path'] and 'response' in e for e in provider))
                                         if kind != 'research':
                                             self.assertFalse(any('/chart/' in e['path'] for e in provider))
+                                        if capture and index == 1:
+                                            expect(page.locator('.msg-answer').first).to_contain_text('Do you mean the share price')
+                                            page.mouse.move(3, 3)
+                                            page.evaluate('document.fonts.ready')
+                                            page.locator('.chat-scroll').evaluate('el => el.scrollTop = 0')
+                                            images['chat.png'] = page.screenshot(animations='disabled')
+                                        card.get_by_role('button', name='Execution', exact=True).click()
+                                        require_clean_execution(page, traces, answer['run_id'], mode='live')
+                                        if capture and index == 1:
+                                            page.locator('[data-map-stage="result"]').wait_for()
+                                            page.locator('[data-map-stage="data"]').click()
+                                            page.locator('.inspector').wait_for()
+                                            page.mouse.move(3, 3)
+                                            images['execution.png'] = capture_execution(page, traces, answer['run_id'])
+                                        self.assertEqual(page_errors, [])
+                                        page.locator('.sidebar').get_by_role('button', name='Chat', exact=True).click()
                     finally:
                         browser.close()
             finally:
@@ -170,3 +204,4 @@ class TestProviderWorkflow(unittest.TestCase):
                 server.server_close()
                 worker.join(timeout=3)
                 service.close()
+        return images

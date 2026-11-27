@@ -1,11 +1,14 @@
 import hashlib
+import io
 import json
 import socket
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest import mock
 
+import dev
 from core.orchestrator import TeamLeadOrchestrator
 from qualify import outer_loop as ol
 
@@ -21,6 +24,8 @@ def _sample_trace(
         "id": "trace-demo",
         "mode": "live",
         "status": "complete",
+        "storage_errors": 0,
+        "dropped_spans": 0,
         "spans": [
             {
                 "name": "Interactive research",
@@ -122,6 +127,43 @@ class TestOuterLoop(unittest.TestCase):
             self.assertNotIn(secret_query, serialized)
             self.assertNotIn("SECRET_REPLY_MARKER_9911", serialized)
             self.assertNotIn("secret_filename_8822", serialized)
+
+    def test_unverified_sources_cannot_count_as_replay_matches(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cases = {
+                "healthy": ({}, None),
+                "degraded": ({"status": "degraded"}, None),
+                "storage": ({"storage_errors": 1}, "trace_storage_errors"),
+                "omitted": ({"dropped_spans": 1}, "trace_dropped_spans"),
+                "stale": ({"status": "running"}, "trace_not_terminal"),
+                "unknown": ({"storage_errors": None}, "trace_unverified_counters"),
+                "boolean": ({"dropped_spans": False}, "trace_unverified_counters"),
+                "clarification": ({"summary": {"flow": "clarification"}}, "non_research_flow"),
+            }
+            for name, (changes, reason) in cases.items():
+                path = root / (name + ".json")
+                trace = _sample_trace()
+                trace.update(changes)
+                path.write_text(json.dumps(trace), encoding="utf-8")
+                _, actual = ol.extract_replay_case(path)
+                self.assertEqual(actual, reason, f"{name}: a reconstructed trace cannot verify its source")
+            coverage = ol.replay_directory(root)["coverage"]
+            self.assertEqual((coverage["matched"], coverage["replayable"], coverage["total_traces"]), (2, 2, 8))
+            self.assertEqual(coverage["incomplete_by_reason"], {
+                "trace_storage_errors": 1, "trace_dropped_spans": 1, "trace_not_terminal": 1,
+                "trace_unverified_counters": 2, "non_research_flow": 1,
+            })
+            with redirect_stdout(io.StringIO()):
+                strict_args = ["--traces", str(root), "--fail-on-mismatch"]
+                self.assertEqual(dev.outer_loop_cmd(str(root), fail_on_mismatch=True), 1)
+                self.assertEqual(ol.main(strict_args), 1)
+                self.assertEqual(ol.main(strict_args[:-1]), 0)
+                healthy_only = root / "healthy-only"
+                healthy_only.mkdir()
+                self.assertEqual(ol.main(["--traces", str(healthy_only), "--fail-on-mismatch"]), 1)
+                (healthy_only / "healthy.json").write_text(json.dumps(_sample_trace()), encoding="utf-8")
+                self.assertEqual(ol.main(["--traces", str(healthy_only), "--fail-on-mismatch"]), 0)
 
     def test_grouped_diff_registry_human_approval_and_preserved_mismatch_count(self):
         with tempfile.TemporaryDirectory() as tmp:
