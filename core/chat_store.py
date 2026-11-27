@@ -240,3 +240,11 @@ class ChatStore:
         if changed:
             self._changed()
         return self.watchlist()
+
+    def remove_watch(self,ticker):
+        from .market import valid_symbol
+        valid_symbol(ticker)
+        with self.db() as db:changed=db.execute("DELETE FROM user_watchlist WHERE ticker=?",(ticker,)).rowcount
+        if changed:
+            self._changed()
+        return self.watchlist()

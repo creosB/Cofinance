@@ -65,7 +65,7 @@ async function request(path:string,signal:AbortSignal,body?:unknown,csrf=''){
  if(!response.ok)throw Error(text(object(result).error)||'Local action could not complete.')
  return result
 }
-export function useChat(){
+export function useChat(onMutation?:()=>void){
  const [workspace,setWorkspace]=useState<WorkspaceState|null>(null),[conversation,setConversation]=useState<Conversation|null>(null)
  const [selected,setSelected]=useState(()=>{try{return localStorage.getItem('cofinance.chat')||''}catch{return ''}})
  const selectedRef=useRef(selected),newDraft=useRef(!selected),[draftRevision,setDraftRevision]=useState(0),[error,setError]=useState(''),[busy,setBusy]=useState(false),[version,setVersion]=useState(0)
@@ -86,7 +86,7 @@ export function useChat(){
     let sid=selectedRef.current
     if(!sid&&!newDraft.current&&state.sessions[0]){sid=state.sessions[0].id;select(sid)}
     if(sid){
-     if(!state.sessions.some(s=>s.id===sid)){selectedRef.current='';setSelected('');setConversation(null);try{localStorage.removeItem('cofinance.chat')}catch{};throw Error('The selected conversation is no longer available.')}
+     if(!state.sessions.some(s=>s.id===sid)){selectedRef.current='';newDraft.current=true;setSelected('');setConversation(null);setMemory(null);try{localStorage.removeItem('cofinance.chat')}catch{};if(!disposed)setError('');return}
      const next=parseConversation(await request('/api/conversation?id='+sid,controller.signal))
      if(disposed||selectedRef.current!==sid)return
      setConversation(old=>JSON.stringify(old)===JSON.stringify(next)?old:next)
@@ -123,9 +123,9 @@ export function useChat(){
  const send=useCallback(async(query:string,retry=false,think=false)=>{
   try{
    if(!retry||!pending.current){const sid=selectedRef.current||await create();pending.current={session_id:sid,query,request_id:crypto.randomUUID().replaceAll('-',''),model:workspace?.models.selected||'facts',...(think?{think:true as const}:{})}}
-   const result=parseJob(await post('/api/chat',pending.current));pending.current=null;setHasRetry(false);refresh();return result
+   const result=parseJob(await post('/api/chat',pending.current));pending.current=null;setHasRetry(false);refresh();onMutation?.();return result
   }catch(e){setHasRetry(!!pending.current);throw e}
- },[create,post,refresh,workspace?.models.selected])
+ },[create,post,refresh,onMutation,workspace?.models.selected])
  // One request id per click, reused if the same click is retried after a timeout.
  const newsRequest=useRef<string|null>(null)
  const collectNews=useCallback(async()=>{
@@ -147,13 +147,16 @@ export function useChat(){
  // start the local embedder. Same request id on a retried click, so a timeout never deletes twice or reports wrongly.
  const removeConversation=useCallback(async(sessionId:string)=>{
   const key='delete:'+sessionId,result=await post('/api/sessions/delete',{session_id:sessionId,request_id:once(key)},120000);delete memoryRequests.current[key]
-  if(selectedRef.current===sessionId)select('')  // the poll then opens the newest remaining conversation
+  if(selectedRef.current===sessionId)select('')
+  onMutation?.()
   return result
- },[post,select])
+ },[post,select,onMutation])
  const clearConversations=useCallback(async()=>{
   const result=await post('/api/sessions/clear',{request_id:once('clear')},300000);delete memoryRequests.current.clear
-  select('');return result
- },[post,select])
+  select('')
+  onMutation?.()
+  return result
+ },[post,select,onMutation])
  // PDFs: the raw file is the request body (application/pdf); the server parses it in a child process with a time limit.
  // A blank New chat is created first, so the file always belongs to one saved conversation.
  const attach=useCallback(async(file:File)=>{

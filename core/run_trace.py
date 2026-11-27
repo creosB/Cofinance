@@ -115,7 +115,7 @@ class TraceRecorder:
                 if node["status"] != "error":
                     node["status"] = "fallback" if result.get("fallback") else "complete"
                 node["outputs"] = safe(result.get("output"))
-                if name == "Narrate evidence" and kind == "model":
+                if name in {"Narrate evidence", "Answer open conversation"} and kind == "model":
                     from .usage import counts, summarize
                     node["usage"] = counts(result.get("usage"))
                     self.data["usage"] = summarize(self.data["spans"], self.data["dropped_spans"])

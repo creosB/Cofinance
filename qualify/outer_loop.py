@@ -49,7 +49,9 @@ INCOMPLETE_REASONS = frozenset({
     "missing_route",
     "missing_specialist_facts",
     "missing_model_transcript",
+    "non_research_flow",
 })
+NON_RESEARCH_FLOWS = frozenset({"open_conversation", "clarification", "cancelled", "error"})
 
 REGISTRY_STATUSES = frozenset({"bug", "intentional_change", "waived"})
 
@@ -137,8 +139,13 @@ def extract_replay_case(path: Path) -> Tuple[Optional[TraceReplayCase], Optional
     if not isinstance(spans, list) or not spans:
         return None, "missing_spans"
 
+    summary = data.get("summary") if isinstance(data.get("summary"), dict) else {}
+    recorded_flow = str(summary.get("flow") or "")
+    if recorded_flow in NON_RESEARCH_FLOWS:
+        return None, "non_research_flow"
+
     ir = next((s for s in spans if isinstance(s, dict) and s.get("name") == "Interactive research"), None)
-    rr = next((s for s in spans if isinstance(s, dict) and s.get("name") == "Route request"), None)
+    rr = next((s for s in spans if isinstance(s, dict) and s.get("name") in ("Route request", "Route conversational request")), None)
 
     query = ""
     context = ""
@@ -363,8 +370,17 @@ def replay_directory(
     files = sorted(p for p in root.glob("*.json") if p.is_file())
 
     incomplete_by_reason: Dict[str, int] = {}
+    flow_counts: Dict[str, int] = {}
     replayable_cases: List[TraceReplayCase] = []
     for fp in files:
+        try:
+            raw_obj = json.loads(fp.read_bytes().decode("utf-8"))
+            if isinstance(raw_obj, dict) and isinstance(raw_obj.get("summary"), dict):
+                f = raw_obj["summary"].get("flow")
+                if isinstance(f, str) and f:
+                    flow_counts[f] = flow_counts.get(f, 0) + 1
+        except (OSError, UnicodeDecodeError, ValueError):
+            pass
         case, reason = extract_replay_case(fp)
         if case is None:
             key = reason if reason in INCOMPLETE_REASONS else "invalid_json"
@@ -444,6 +460,7 @@ def replay_directory(
             "total_traces": len(files),
             "replayable": len(replayable_cases),
             "incomplete_by_reason": dict(sorted(incomplete_by_reason.items())),
+            "flow_counts": dict(sorted(flow_counts.items())),
             "matched": matched,
             "mismatched": mismatched,
             "unapproved_mismatches": unapproved_mismatches,

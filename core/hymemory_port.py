@@ -73,10 +73,107 @@ class HyMemoryLite:
     def _db(self) -> Iterator[sqlite3.Connection]:
         db = sqlite3.connect(self.base / "links.db", timeout=5)
         try:
+            db.execute("PRAGMA journal_mode=WAL")
+            db.execute("PRAGMA secure_delete=ON")
             with db:
                 yield db
         finally:
             db.close()
+
+    def _vacuum_sqlite(self, path: Path) -> None:
+        if not path.is_file():
+            return
+        db = sqlite3.connect(path, timeout=5)
+        try:
+            db.execute("PRAGMA secure_delete=ON")
+            db.execute("VACUUM")
+            db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        except sqlite3.Error:
+            pass
+        finally:
+            db.close()
+
+    def _scrub_internal_stores(self, *, session_id: Optional[str] = None, memory_ids: tuple[str, ...] = (), clear_all: bool = False) -> None:
+        store_dir = self.base / "store" / "data"
+        if not store_dir.is_dir():
+            return
+        self.close()
+        cache_db = store_dir / "cache.db"
+        if cache_db.is_file():
+            db = sqlite3.connect(cache_db, timeout=5)
+            try:
+                db.execute("PRAGMA secure_delete=ON")
+                with db:
+                    if clear_all:
+                        for tbl in ("memory_operations_v2", "pipeline_logs_v2", "write_outcomes", "episode_state"):
+                            db.execute(f"DELETE FROM {tbl}")
+                    else:
+                        if session_id:
+                            for tbl in ("pipeline_logs_v2", "write_outcomes", "episode_state"):
+                                db.execute(f"DELETE FROM {tbl} WHERE session_id=?", (session_id,))
+                        for mid in memory_ids:
+                            db.execute("DELETE FROM memory_operations_v2 WHERE memory_id=? OR old_memory_id=?", (mid, mid))
+                db.execute("VACUUM")
+                db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            except sqlite3.Error:
+                pass
+            finally:
+                db.close()
+        hist_db = store_dir / "history.db"
+        if hist_db.is_file():
+            db = sqlite3.connect(hist_db, timeout=5)
+            try:
+                db.execute("PRAGMA secure_delete=ON")
+                with db:
+                    if clear_all:
+                        db.execute("DELETE FROM memory_history")
+                    else:
+                        if session_id:
+                            db.execute("DELETE FROM memory_history WHERE isolation_key LIKE ?", (f"%{session_id}%",))
+                        for mid in memory_ids:
+                            db.execute("DELETE FROM memory_history WHERE memory_id=?", (mid,))
+                db.execute("VACUUM")
+                db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            except sqlite3.Error:
+                pass
+            finally:
+                db.close()
+        chroma_db = store_dir / "vector_db" / "chroma.sqlite3"
+        if chroma_db.is_file():
+            db = sqlite3.connect(chroma_db, timeout=5)
+            try:
+                db.execute("PRAGMA secure_delete=ON")
+                with db:
+                    if clear_all:
+                        db.execute("DELETE FROM embeddings_queue")
+                        if db.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0] == 0:
+                            db.execute("DELETE FROM embedding_metadata")
+                            db.execute("DELETE FROM embedding_metadata_array")
+                    else:
+                        for mid in memory_ids:
+                            db.execute("DELETE FROM embeddings_queue WHERE id=?", (mid,))
+                        if session_id:
+                            db.execute("DELETE FROM embeddings_queue WHERE metadata LIKE ?", (f"%{session_id}%",))
+                    db.execute("INSERT INTO embedding_fulltext_search(embedding_fulltext_search) VALUES('rebuild')")
+                db.execute("VACUUM")
+                db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            except sqlite3.Error:
+                pass
+            finally:
+                db.close()
+        if clear_all:
+            default_logs = self.base / "logs" / "default"
+            if default_logs.is_dir():
+                for log_file in default_logs.glob("*.log*"):
+                    try:
+                        log_file.unlink()
+                    except OSError:
+                        pass
+
+    def scrub_all(self) -> None:
+        with self.write_lock:
+            self._scrub_internal_stores(clear_all=True)
+            self._vacuum_sqlite(self.base / "links.db")
 
     # -- processes -------------------------------------------------------------------------------------------------
     def start(self) -> None:
@@ -219,12 +316,16 @@ class HyMemoryLite:
         if not session_id:
             raise ValueError("A conversation id is required.")
         with self.write_lock:
+            with self._db() as db:
+                mids = tuple(r[0] for r in db.execute("SELECT memory_id FROM links WHERE namespace=? AND session_id=?", (namespace, session_id)))
             reply = self._call({"op": "delete_session", "session_id": session_id})
             result = reply.get("result") or {}
             if not result.get("success", True):
                 raise HyMemoryError("Hy-Memory session delete reported failure.")
             with self._db() as db:
                 db.execute("DELETE FROM links WHERE namespace=? AND session_id=?", (namespace, session_id))
+            self._vacuum_sqlite(self.base / "links.db")
+            self._scrub_internal_stores(session_id=session_id, memory_ids=mids)
             return int(result.get("deleted_count", 0) or 0)
 
     def session_links(self, namespace: str, session_id: str) -> list:
@@ -254,6 +355,8 @@ class HyMemoryLite:
                 result = {"deleted_count": 0}
             with self._db() as db:
                 db.execute("DELETE FROM links WHERE memory_id=?", (memory_id,))
+            self._vacuum_sqlite(self.base / "links.db")
+            self._scrub_internal_stores(session_id=session_id, memory_ids=(memory_id,))
             return int(result.get("deleted_count", 1) or 0)
 
     def backfill(self, namespace: str, session: dict) -> int:

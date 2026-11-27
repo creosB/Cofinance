@@ -89,6 +89,19 @@ class TestBoundaries(unittest.TestCase):
         self.assertEqual(bad, [], 'v1 lives under v1/ as history. '
                          'v2 must not depend on it; copy what you need into core/ and test it there.')
 
+    def test_chat_flows_stay_synced_between_python_and_frontend_run_map(self):
+        from core.chat_service import CHAT_FLOWS
+        run_map = (ROOT / "frontend" / "src" / "lib" / "run-map.ts").read_text(encoding="utf-8")
+        m = re.search(r"export const CHAT_FLOWS\s*=\s*\[([^\]]+)\]", run_map)
+        self.assertIsNotNone(m, "frontend/src/lib/run-map.ts must export CHAT_FLOWS matching core.chat_service.CHAT_FLOWS.")
+        ts_flows = tuple(re.findall(r"'([a-z_]+)'", m.group(1)))
+        self.assertEqual(
+            ts_flows,
+            CHAT_FLOWS,
+            f"Chat flow drift between Python {CHAT_FLOWS} and frontend/src/lib/run-map.ts {ts_flows}. "
+            "Every ChatService execution flow must be mapped in run-map.ts and proved in tests/test_system_integration.py.",
+        )
+
     def test_v1_files_stay_under_v1_folder(self):
         leaked = [rel for rel in V1_ROOT_PATHS if (ROOT / rel).exists()]
         self.assertEqual(leaked, [], 'Archived v1 files belong under v1/ so they stay separated from v2.')

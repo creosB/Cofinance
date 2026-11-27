@@ -42,11 +42,14 @@ def capture_usage():
         _receipts.reset(token)
 
 
+NARRATOR_SPAN_NAMES = frozenset({'Narrate evidence', 'Answer open conversation'})
+
+
 def summarize(spans, dropped=0):
     """Every narrator attempt, including rejected output and retries, once. Other model kinds never count."""
     roles = {}
     for span in spans:
-        if span.get('kind') != 'model' or span.get('name') != 'Narrate evidence':
+        if span.get('kind') != 'model' or span.get('name') not in NARRATOR_SPAN_NAMES:
             continue
         key = (str(span.get('actor', 'Narrator')), str(span.get('model', 'Unknown model')))
         row = roles.setdefault(key, {'actor': key[0], 'model': key[1], 'attempts': 0, 'reported': 0,

@@ -235,4 +235,88 @@ class TestChatShellBrowser(unittest.TestCase):
             dt_thread.join(timeout=3)
             dt_service.close()
 
+    def test_open_chat_run_map_and_clear_all_removes_run_from_execution(self):
+        from core.chat_service import ChatService
+        from core.gliner_decide import RoutedQuery
+        from core.run_trace import TraceRecorder
+        from tests.test_chat import FakeMarket
+        from tests.test_system_integration import _FlowModels
+
+        REPO = Path(__file__).resolve().parents[1]
+        oc_data = self.root / 'oc_data'
+        models = _FlowModels(oc_data / 'local_models')
+        models.state['selected'] = 'lfm3-1.7b-atomic-ad-q4km'
+
+        class _OpenRouter:
+            def route(self, q):
+                return RoutedQuery('open_conversation', 0.88, 'swing_week', [])
+
+        oc_service = ChatService(
+            REPO, oc_data, models=models, market_factory=FakeMarket,
+            router_factory=lambda: _OpenRouter(),
+        )
+        fix = TraceRecorder('Fixture baseline run', mode='fixture', directory=oc_data / 'traces')
+        fix.finish(summary={'answer': 'Fixture summary.'})
+        oc_server = create_server(port=0, trace_dir=oc_data / 'traces', corpus_dir=self.root / 'none', service=oc_service)
+        oc_thread = threading.Thread(target=oc_server.serve_forever, daemon=True)
+        oc_thread.start()
+        page = self.context.new_page()
+        page.set_default_timeout(8000)
+        page.on('pageerror', lambda e: self.errors.append(str(e)))
+        try:
+            origin = 'http://127.0.0.1:' + str(oc_server.server_port)
+            page.goto(origin, wait_until='domcontentloaded')
+            page.locator('.deep-think-toggle').wait_for(timeout=8000)
+            box = page.get_by_role('textbox', name='Research question')
+            box.wait_for()
+            box.fill("I've $100. Now make a suggestion")
+            box.press('Enter')
+            page.get_by_text('General chat (no live tools)', exact=True).wait_for(timeout=8000)
+
+            page.locator('.msg-actions').get_by_role('button', name='Execution', exact=True).click()
+            page.locator('[data-map-stage="assistant"]').wait_for(timeout=8000)
+            map_text = page.locator('.run-map').inner_text()
+            self.assertIn('General chat (no live tools)', map_text)
+            self.assertIn('Local assistant', map_text)
+            self.assertIn('Observed', page.locator('[data-map-stage="assistant"]').inner_text())
+            self.assertIn('Observed', page.locator('[data-map-stage="result"]').inner_text())
+            self.assertNotIn('Not observed', map_text)
+            self.assertNotIn('Python fallback', map_text)
+            self.assertNotIn('No accepted final answer recorded', map_text)
+            self.assertIn("I've $100", page.locator('[data-run-group="chat"]').inner_text())
+            self.assertIn('Fixture baseline run', page.locator('[data-run-group="system"]').inner_text())
+
+            page.locator('[data-map-stage="assistant"]').click()
+            self.assertIn('Direct local chat (no live tools)', page.locator('.inspector').inner_text())
+
+            page.locator('[data-run-group="system"]').get_by_text('Fixture baseline run', exact=False).click()
+            self.assertIn('Execution', page.locator('.breadcrumb').inner_text())
+
+            page.locator('.sidebar').get_by_role('button', name='Chat', exact=True).click()
+            hist = page.locator('details.history-options')
+            if not hist.evaluate('e => e.open'):
+                hist.locator('summary').click()
+            page.get_by_role('button', name='Clear all conversations', exact=True).click()
+            page.get_by_role('dialog').get_by_role('button', name='Delete all', exact=True).click()
+            page.get_by_text('Deleted 1 conversation.', exact=False).wait_for(timeout=8000)
+
+            tools = page.locator('.workspace-tools')
+            if not tools.evaluate('e => e.open'):
+                tools.locator('summary').click()
+            page.locator('.sidebar nav').get_by_role('button', name='Execution', exact=False).click()
+            page.locator('[data-run-group="chat"]').get_by_text('No chat runs.', exact=True).wait_for(timeout=8000)
+            self.assertEqual(page.locator('.error-banner').count(), 0)
+            self.assertNotIn("I've $100", page.locator('.main-area').inner_text())
+            self.assertIn('Fixture baseline run', page.locator('[data-run-group="system"]').inner_text())
+
+            page.reload(wait_until='domcontentloaded')
+            page.locator('.deep-think-toggle').wait_for(timeout=8000)
+            self.assertEqual(page.locator('.error-banner').count(), 0)
+        finally:
+            page.close()
+            oc_server.shutdown()
+            oc_server.server_close()
+            oc_thread.join(timeout=3)
+            oc_service.close()
+
 if __name__=='__main__': unittest.main()

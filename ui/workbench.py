@@ -128,7 +128,8 @@ def read_trace(directory: Path, run_id: str) -> dict:
     path = directory / (run_id + ".json")
     if path.is_symlink() or path.stat().st_size > MAX_TRACE_BYTES:
         raise ValueError("invalid trace size or link")
-    run = json.loads(path.read_text(encoding="utf-8"))
+    raw = path.read_bytes()
+    run = json.loads(raw.decode("utf-8"))
     if (not isinstance(run, dict) or run.get("format") != TRACE_FORMAT or run.get("id") != run_id
             or not isinstance(run.get("spans"), list) or not isinstance(run.get("title"), str)
             or run.get("mode") not in {"live", "fixture", "replay"}
@@ -150,8 +151,28 @@ def read_trace(directory: Path, run_id: str) -> dict:
     # Sanitize again at the read boundary; a file is data, never trusted HTML.
     result = {key: safe(value) for key, value in run.items() if key != "spans"}
     result["spans"] = [{k: safe(v) for k, v in span.items()} for span in run["spans"][:2000] if isinstance(span, dict)]
-    result["revision"] = path.stat().st_mtime_ns
+    result["revision"] = int.from_bytes(hashlib.sha256(raw).digest()[:6], "big")
     return result
+
+
+def _trace_category(run: dict) -> str:
+    mode = run.get("mode")
+    if mode in ("fixture", "replay"):
+        return mode
+    summary = run.get("summary")
+    if isinstance(summary, dict) and summary.get("origin") == "chat":
+        return "chat"
+    spans = run.get("spans") if isinstance(run.get("spans"), list) else []
+    if any(
+        isinstance(s, dict)
+        and (
+            str(s.get("name") or "").startswith("Clock 1")
+            or s.get("name") in ("Judge headline", "Judge served headlines", "Signal gate: DIGEST", "Signal gate: IGNORE", "Signal gate: ALERT")
+        )
+        for s in spans
+    ):
+        return "news"
+    return "chat"
 
 
 def list_runs(directory: Path) -> list[dict]:
@@ -161,7 +182,9 @@ def list_runs(directory: Path) -> list[dict]:
             run = read_trace(directory, path.stem)
         except (OSError, ValueError, TypeError):
             continue
-        runs.append({key: run.get(key) for key in ("id", "title", "status", "mode", "started_at", "duration_ms", "revision")})
+        item = {key: run.get(key) for key in ("id", "title", "status", "mode", "started_at", "duration_ms", "revision")}
+        item["category"] = _trace_category(run)
+        runs.append(item)
     return runs
 
 

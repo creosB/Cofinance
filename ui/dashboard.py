@@ -13,6 +13,7 @@ import argparse
 import hashlib
 import json
 import re
+import threading
 import time
 from http.server import ThreadingHTTPServer
 from pathlib import Path
@@ -33,14 +34,47 @@ EVENT_KEEPALIVE_S = 15.0
 EVENT_LIFE_S = 600.0    # one stream per connection lifetime; the browser's EventSource reconnects by itself
 
 
-def event_mark(service, session_id: str) -> str:
-    """Short fingerprint of what the chat view shows: workspace state plus the selected conversation."""
-    parts = [service.snapshot()]
+def _traces_fingerprint(trace_dir: Path | None) -> list:
+    if trace_dir is None or not trace_dir.is_dir():
+        return []
+    out = []
+    try:
+        for p in sorted(trace_dir.glob("*.json")):
+            try:
+                st = p.stat()
+                out.append((p.name, st.st_mtime_ns, st.st_size))
+            except OSError:
+                continue
+    except OSError:
+        return []
+    return out
+
+
+def event_mark(service, session_id: str, trace_dir: Path | None = None, labels=None) -> str:
+    """Short fingerprint of workspace state, selected conversation + memory, traces, and labels."""
+    if getattr(service, 'closed', False):
+        return ''
+    parts: list = [service.snapshot()]
     if session_id:
         try:
             parts.append(service.store.session(session_id))
         except (ValueError, KeyError):
             parts.append(None)
+        if hasattr(service, 'memory_view'):
+            try:
+                parts.append(service.memory_view(session_id))
+            except (ValueError, KeyError, OSError):
+                parts.append(None)
+    if trace_dir is not None:
+        parts.append(_traces_fingerprint(trace_dir))
+    if labels is not None:
+        label_path = getattr(labels, 'path', None)
+        if label_path is not None:
+            try:
+                st = Path(label_path).stat()
+                parts.append((st.st_mtime_ns, st.st_size))
+            except OSError:
+                parts.append(None)
     return hashlib.sha256(json.dumps(parts, sort_keys=True, default=str).encode()).hexdigest()[:16]
 
 
@@ -107,7 +141,7 @@ def make_dashboard_handler(dist: Path, trace_dir: Path, corpus_dir: Path, servic
                 self.wfile.write(b'retry: 3000\n\n')
                 while not getattr(service, 'closed', False) and time.monotonic() - started < EVENT_LIFE_S:
                     seq = getattr(service, 'change_seq', 0) if callable(wait_change) else 0
-                    mark = event_mark(service, session_id)
+                    mark = event_mark(service, session_id, trace_dir=trace_dir, labels=labels)
                     now = time.monotonic()
                     if mark != last:
                         last, last_write = mark, now
@@ -122,7 +156,7 @@ def make_dashboard_handler(dist: Path, trace_dir: Path, corpus_dir: Path, servic
                         break
                     if callable(wait_change):
                         remaining_ka = max(0.0, EVENT_KEEPALIVE_S - (time.monotonic() - last_write))
-                        wait_change(seq, min(remaining_life, remaining_ka))
+                        wait_change(seq, min(remaining_life, remaining_ka, EVENT_TICK_S))
                     else:
                         time.sleep(min(EVENT_TICK_S, remaining_life))
             except OSError:
@@ -198,13 +232,16 @@ def make_dashboard_handler(dist: Path, trace_dir: Path, corpus_dir: Path, servic
                 if not isinstance(body,dict):raise ValueError('A JSON object is required.')
                 routes = {'/api/sessions':{'request_id'}, '/api/chat':{'session_id','query','request_id','model'},
                           '/api/jobs/cancel':{'id'}, '/api/models/action':{'action'}, '/api/models/select':{'model'},
-                          '/api/watchlist':{'ticker'}, '/api/news/collect':{'request_id'},
+                          '/api/watchlist':{'ticker'}, '/api/watchlist/remove':{'ticker'}, '/api/news/collect':{'request_id'},
                           '/api/labels':{'id','material','urgent','direction','trap','event_group','notes'},
                           '/api/memory/note':{'session_id','text','request_id'}, '/api/memory/forget':{'session_id','item_id','request_id'},
                           '/api/sessions/delete':{'session_id','request_id'}, '/api/sessions/clear':{'request_id'},
                           '/api/documents/remove':{'session_id','document_id'}}
                 if self.path == '/api/labels' and set(body) == routes['/api/labels']:
-                    self.reply(200, labels.save(body));return  # human labels only; no model call, no service lock
+                    saved = labels.save(body)
+                    if hasattr(service, 'notify_change'):
+                        service.notify_change()
+                    self.reply(200, saved);return
                 if self.path not in routes:
                     self.reply(404, {'error':'Unknown local action.'});return
                 # A model action may name one catalog narrator (download or qualify it); every other route is exact.
@@ -233,6 +270,7 @@ def make_dashboard_handler(dist: Path, trace_dir: Path, corpus_dir: Path, servic
                     elif self.path=='/api/models/action':value=service.models.launch_task(body['action'],body.get('model'))
                     elif self.path=='/api/models/select':value=service.models.select(body['model'])
                     elif self.path=='/api/news/collect':value=service.collect_news(body['request_id'])
+                    elif self.path=='/api/watchlist/remove':value=service.store.remove_watch(body['ticker'])
                     else:value=service.store.add_watch(body['ticker'])
                 self.reply(202 if self.path in {'/api/chat','/api/models/action','/api/news/collect'} else 200,value)
             except ModelError as exc:
@@ -298,10 +336,41 @@ def make_dashboard_handler(dist: Path, trace_dir: Path, corpus_dir: Path, servic
     return Handler
 
 
+class _DashboardServer(ThreadingHTTPServer):
+    def __init__(self, server_address, RequestHandlerClass, service=None):
+        self._service = service
+        self._handlers_lock = threading.Lock()
+        self._active_handlers: set[threading.Thread] = set()
+        super().__init__(server_address, RequestHandlerClass)
+
+    def process_request_thread(self, request, client_address):
+        current = threading.current_thread()
+        with self._handlers_lock:
+            self._active_handlers.add(current)
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            with self._handlers_lock:
+                self._active_handlers.discard(current)
+
+    def server_close(self):
+        if self._service is not None:
+            self._service.closed = True
+            notify = getattr(self._service, "notify_change", None)
+            if callable(notify):
+                notify()
+        super().server_close()
+        with self._handlers_lock:
+            threads = list(self._active_handlers)
+        for thread in threads:
+            if thread.is_alive() and thread is not threading.current_thread():
+                thread.join(timeout=2)
+
+
 def create_server(*, port: int = 8878, dist: Path | None = None, trace_dir: Path | None = None,
                   corpus_dir: Path | None = None, service=None):
-    return ThreadingHTTPServer(("127.0.0.1", port), make_dashboard_handler(
-        dist or DIST, trace_dir or ROOT / "data/traces", corpus_dir or latest_corpus(ROOT / "data"), service))
+    return _DashboardServer(("127.0.0.1", port), make_dashboard_handler(
+        dist or DIST, trace_dir or ROOT / "data/traces", corpus_dir or latest_corpus(ROOT / "data"), service), service=service)
 
 
 def latest_corpus(data: Path) -> Path:

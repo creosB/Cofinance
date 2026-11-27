@@ -113,7 +113,23 @@ class LocalKeywordMemory:
         with self.write_lock, self._db() as db:
             cur = db.execute("DELETE FROM memory WHERE namespace=? AND session_id=? AND (id=? OR (?<>'' AND run_id=?))",
                              (namespace, session_id, keyword_id or "", run_id or "", run_id or ""))
-            return cur.rowcount
+            removed = cur.rowcount
+            if removed:
+                db.execute("INSERT INTO memory(memory) VALUES('rebuild')")
+                empty = db.execute("SELECT COUNT(*) FROM memory").fetchone()[0] == 0
+            else:
+                empty = False
+        if removed:
+            with self.write_lock:
+                for _ in range(5):
+                    with self._db() as db:
+                        if empty:
+                            db.execute("VACUUM")
+                        row = db.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+                    if not row or row[0] == 0:
+                        break
+                    time.sleep(0.02)
+        return removed
 
     def remember_turn(self, namespace, session_id, question, answer, *, run_id, tickers=(), item_id=None):
         namespace = _namespace(namespace)

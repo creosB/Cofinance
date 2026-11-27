@@ -30,6 +30,15 @@ QUERIES: List[Dict[str, Any]] = [
     {"query": "Is Amazon a good long-term hold? Full thesis please", "intent": "thesis_review", "tickers": ["AMZN"]},
 ]
 
+EXTENDED_QUERIES: List[Dict[str, Any]] = [
+    *QUERIES,
+    {"query": "I've $100. Now make a suggestion", "intent": "open_conversation", "tickers": []},
+    {"query": "What's the capital of France?", "intent": "open_conversation", "tickers": []},
+    {"query": "What is Palantir trading at?", "intent": "price_snapshot", "tickers": [], "expect_candidates": True},
+    {"query": "Track gold and Netflix", "intent": "watchlist_add", "tickers": ["NFLX"], "expect_candidates": True},
+    {"query": "How do US 10Y yields affect tech stocks?", "intent": "open_conversation", "tickers": []},
+]
+
 
 def run(router: GlinerQueryRouter, queries: List[Dict[str, Any]],
         clock: Callable[[], float] = time.perf_counter) -> Dict[str, Any]:
@@ -40,10 +49,11 @@ def run(router: GlinerQueryRouter, queries: List[Dict[str, Any]],
         ms = (clock() - t0) * 1000
         intent_ok = r.intent == q["intent"]
         tickers_ok = sorted(r.tickers) == sorted(q["tickers"])
+        cand_ok = (not q.get("expect_candidates")) or bool(getattr(r, "entity_candidates", ()))
         rows.append({"query": q["query"], "intent": r.intent, "intent_confidence": r.intent_confidence,
                      "horizon": r.horizon, "tickers": r.tickers, "expected_intent": q["intent"],
                      "expected_tickers": q["tickers"], "intent_ok": intent_ok, "tickers_ok": tickers_ok,
-                     "ok": intent_ok and tickers_ok, "ms": round(ms, 1)})
+                     "candidates_ok": cand_ok, "ok": intent_ok and tickers_ok and cand_ok, "ms": round(ms, 1)})
     ms_all = [row["ms"] for row in rows]
     return {"n": len(rows), "passed": sum(row["ok"] for row in rows),
             "intent_correct": sum(row["intent_ok"] for row in rows),
@@ -56,15 +66,16 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="fastino/GLiNER2.5-Decide")
     ap.add_argument("--out", default="")
+    ap.add_argument("--extended", action="store_true")
     a = ap.parse_args()
     from gliner2 import AutoExtractor  # heavy import kept out of module import time
 
     t0 = time.perf_counter()
     backend = AutoExtractor.from_pretrained(a.model)
     load_s = time.perf_counter() - t0
-    router = GlinerQueryRouter(backend, universe=set(DEFAULT_ALIASES.values()))
+    router = GlinerQueryRouter(backend, universe=set(DEFAULT_ALIASES.values()) | {"NFLX"})
     router.route("warm-up: price of NVDA")
-    report = run(router, QUERIES)
+    report = run(router, EXTENDED_QUERIES if a.extended else QUERIES)
     report.update({"model": a.model, "load_s": round(load_s, 2)})
     if a.out:
         import os

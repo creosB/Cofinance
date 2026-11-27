@@ -30,7 +30,45 @@ from .signals import Item, Outcome, Judgment, Action
 from .run_trace import TraceRecorder, run_traced_team
 
 GLINER_REVISION="9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90"
+CHAT_FLOWS=(
+    "open_conversation",
+    "clarification",
+    "single_pass_data_answer",
+    "python_news_answer",
+    "multi_agent_research",
+    "document_research",
+    "watchlist_add",
+    "cancelled",
+    "error",
+)
 UNIVERSE=set(DEFAULT_ALIASES.values())|{"SPY","QQQ","NFLX","INTC","COIN","PLTR","SOFI","F","BABA","RIVN","ADBE","ORCL","AVAX","ADA","DOGE","XRP","BNB","DOT","LINK"}
+
+
+def _is_live_chat_trace(data):
+    if not isinstance(data,dict) or data.get('mode')!='live':
+        return False
+    summary=data.get('summary')
+    if isinstance(summary,dict) and summary.get('origin')=='chat':
+        return True
+    spans=data.get('spans') if isinstance(data.get('spans'),list) else []
+    if any(isinstance(s,dict) and (str(s.get('name') or '').startswith('Clock 1') or s.get('name') in ('Judge headline','Judge served headlines')) for s in spans):
+        return False
+    return any(isinstance(s,dict) and (s.get('kind')=='route' or s.get('actor') in ('Local assistant','Routing executive','Data Analyst','Market Team Lead')) for s in spans)
+
+
+def _research_flow(routed,result,trace):
+    if routed.intent=='watchlist_add':
+        return 'watchlist_add'
+    if getattr(result,'document_report',None) is not None:
+        return 'document_research'
+    gates=[s for s in trace.data.get('spans',[]) if s.get('name')=='Synthesis faithfulness']
+    out=gates[-1].get('outputs') if gates and isinstance(gates[-1].get('outputs'),dict) else {}
+    method=out.get('method') or out.get('validation_reason')
+    if method=='single_pass_data_answer':
+        return 'single_pass_data_answer'
+    if method in ('python_news_answer','python_digest','no_news') and getattr(result,'data_report',None) is None:
+        return 'python_news_answer'
+    return 'multi_agent_research'
 OPEN_CHAT_SYSTEM=(
     "You are Cofinance, a concise, helpful local assistant running on the user's machine. "
     "Answer greetings, general questions, finance concepts, strategy ideas, and portfolio or tracker questions naturally in the user's language. "
@@ -123,6 +161,7 @@ class ChatService:
         self.router_lock=threading.Lock();self.warm_thread=None;self.warm_cancel=threading.Event();self.warm={'state':'idle','seconds':None,'error':''}
         self.narrator_lock=threading.Lock();self.narrator_warm_thread=None;self.narrator_warm={'state':'idle','seconds':None,'error':''}
         self.deleting=set()  # conversations being deleted: no run, note or forget may start in them
+        self._clearing=False
         # One explicit Clock 1 collection at a time. No scheduler: a person starts every run.
         self.news={'phase':'idle','stage':'','run_id':None,'error':'','started':None,'finished':None,'request_id':None}
         self.news_cancel=None;self.news_thread=None
@@ -260,9 +299,12 @@ class ChatService:
         return UNIVERSE|watchlist|{c.upper() for c in cashtags}
 
     @staticmethod
-    def _open_chat_messages(session,query,max_turns=6,max_chars=2400):
+    def _open_chat_messages(session,query,max_turns=6,max_chars=2400,inactive_runs=()):
+        blocked=set(inactive_runs or ())
         history=[]
         for msg in (session.get('messages') or []):
+            if blocked and msg.get('run_id') in blocked:
+                continue
             role=msg.get('role')
             content=(msg.get('content') or '').strip()
             if role in {'user','assistant'} and content:
@@ -297,7 +339,7 @@ class ChatService:
             existing=self.store.by_request(request_id,session_id,query,model)
             if existing:return existing
             if self.closed:raise ModelError('Server is stopping.')
-            if session_id in self.deleting:raise ModelError('This conversation is being deleted.')
+            if self._clearing or session_id in self.deleting:raise ModelError('This conversation is being deleted.')
             if self.active:raise ModelError('One research run is already active. Wait or stop it first.')
             if self.news['phase']=='running':raise ModelError('News collection is running. Wait for it to finish, then ask again.')
             if self.models.thread and self.models.thread.is_alive():raise ModelError('Wait for the model operation to finish.')
@@ -355,13 +397,21 @@ class ChatService:
                     tickers=list(dict.fromkeys(session_tickers+tickers))
                 if 'watchlist' in job['query'].lower() and not resolved_tickers:
                     tickers=[r['ticker'] for r in self.store.watchlist()]
+                    if not tickers and not doc_match:
+                        answer='Your watchlist is empty. Name an asset (such as NVDA, Apple, or BTC) to research it, or click Track on any answer to add one.'
+                        trace.event('Asset clarification required','decision',{'reason':'empty_watchlist'},actor='Python')
+                        trace.finish(summary={'origin':'chat','conversation_id':job['session_id'],'flow':'clarification','answer_kind':'clarification','answer':answer,'risk_mode':'not_resolved','model_choice':job['model']})
+                        with self.lock:
+                            check()
+                            self.store.finish(job['id'],answer,{'kind':'clarification','charts':[],'evidence':[],'tickers':session_tickers,'mode':job['model'],'usage':trace.data.get('usage')},session_tickers,'complete')
+                        return
             if len(tickers)>6:raise ValueError('Limit a research run to six assets.')
             is_open_chat=(routed.intent=='open_conversation' and not doc_match) or (not tickers and not doc_match)
             if is_open_chat:
                 if job['model']=='facts':
                     answer='Tool-only mode needs a stock, ETF, crypto asset, or attached PDF. Name an asset (such as NVDA, Palantir, or BTC), or select a local model in Models for general chat.'
                     trace.event('Asset clarification required','decision',{'reason':'facts_only_no_asset_or_document'},actor='Python')
-                    trace.finish(summary={'answer':answer,'risk_mode':'not_resolved'})
+                    trace.finish(summary={'origin':'chat','conversation_id':job['session_id'],'flow':'clarification','answer_kind':'clarification','answer':answer,'risk_mode':'not_resolved','model_choice':job['model']})
                     with self.lock:
                         check()
                         self.store.finish(job['id'],answer,{'kind':'clarification','charts':[],'evidence':[],'tickers':session_tickers,'mode':job['model'],'usage':trace.data.get('usage')},session_tickers,'complete')
@@ -378,19 +428,22 @@ class ChatService:
                     check()
                 elif self.models.thinker_loaded():self.models.stop_thinker()
                 self.store.progress(job['id'],'Answering locally')
-                chat_messages=self._open_chat_messages(session,job['query'])
-                def run_open_chat():
+                inactive=self.ledger.inactive_runs(session['id'])
+                chat_messages=self._open_chat_messages(session,job['query'],inactive_runs=inactive)
+                from .usage import capture_usage
+                with trace.span('Answer open conversation','model',actor='Local assistant',model=self.models.model_id,
+                                inputs={'intent':routed.intent,'history_messages':len(chat_messages),'live_tools':False}) as span_res:
+                    with capture_usage() as receipts:
+                        check()
+                        raw=self.models.complete(OPEN_CHAT_SYSTEM,job['query'],max_tokens=280,think=deep['used'],
+                                                 messages=chat_messages,temperature=0.2,allow_truncated=True)
+                    span_res['usage']=receipts[-1] if receipts else None
                     check()
-                    raw=self.models.complete(OPEN_CHAT_SYSTEM,job['query'],max_tokens=280,think=deep['used'],
-                                             messages=chat_messages,temperature=0.2,allow_truncated=True)
-                    check()
-                    cleaned=plain_text(raw).strip()
-                    if not cleaned:
+                    answer=plain_text(raw).strip()
+                    if not answer:
                         raise ModelError('Empty conversational output.')
-                    return cleaned
-                answer=trace.call('Answer open conversation','model',run_open_chat,actor='Local assistant',
-                                  model=self.models.model_id,inputs={'intent':routed.intent,'history_messages':len(chat_messages),'live_tools':False})
-                trace.finish(summary={'answer':answer[:2500],'risk_mode':'open_conversation','model_choice':job['model']})
+                    span_res['output']=answer
+                trace.finish(summary={'origin':'chat','conversation_id':job['session_id'],'flow':'open_conversation','answer_kind':'conversation','answer':answer[:2500],'risk_mode':'open_conversation','model_choice':job['model']})
                 with self.lock:
                     check()
                     self.store.finish(job['id'],answer,{'kind':'conversation','unverified_chat':True,'charts':[],'evidence':[],
@@ -502,18 +555,19 @@ class ChatService:
                                          for e in result.document_report.raw_facts.get('excerpts',[])] if result.document_report else [],
                      'memory':{'backend':self.memory.backend,'used_previous':bool(previous),
                                'recalled':[{'question':h.question[:160],'run_id':h.run_id,'item_id':h.item_id,'kind':h.kind,'score':h.score,**({'found_by':h.sources} if h.sources else {})} for h in hits]}}
-            trace.data['summary'].update({'answer':answer[:2500],'model_choice':job['model']});trace.flush()
+            flow=_research_flow(routed,result,trace)
+            trace.data['summary'].update({'origin':'chat','conversation_id':job['session_id'],'flow':flow,'answer_kind':'research','answer':answer[:2500],'model_choice':job['model']});trace.flush()
             with self.lock:
                 check()
                 self.store.finish(job['id'],answer,payload,tickers,trace.data['status'])
             remember=(job['session_id'],job['query'],answer,job['id'],tickers)
         except Cancelled:
             trace.event('Run cancelled','decision',{'reason':'user_cancelled'},fallback=True)
-            trace.finish(error=True)
+            trace.finish(error=True,summary={'origin':'chat','conversation_id':job['session_id'],'flow':'cancelled','answer_kind':'none'})
             self.store.progress(job['id'],'Stopped','cancelled','Stopped by user. Partial tool observations remain in the trace; no final answer was accepted.')
         except Exception as exc:
             trace.event('Run failed','decision',{'error_type':type(exc).__name__},fallback=True)
-            trace.finish(error=True)
+            trace.finish(error=True,summary={'origin':'chat','conversation_id':job['session_id'],'flow':'error','answer_kind':'none','error_type':type(exc).__name__})
             self.store.progress(job['id'],'Could not complete research','error',f'{type(exc).__name__}: {str(exc)[:200]}')
         finally:
             with self.lock,self.models.lock:
@@ -527,6 +581,7 @@ class ChatService:
             if not self.closed:self.remember(*remember)
         finally:
             with self.lock:self.threads.pop(job['id'],None)  # tracked until memory is written, so close() waits for it
+            self.notify_change()
 
     # -- memory items (spec: docs/designs/remember_forget.md, review round 1) ---------------------------------
     def backends(self):
@@ -666,7 +721,7 @@ class ChatService:
     def _refuse_during_run(self,session_id):
         with self.lock:
             if self.closed:raise ModelError('Server is stopping.')
-            if session_id in self.deleting:raise ModelError('This conversation is being deleted.')
+            if self._clearing or session_id in self.deleting:raise ModelError('This conversation is being deleted.')
             if self.active and self.store.job(self.active).get('session_id')==session_id:
                 raise ModelError('Wait for the current research run in this conversation to finish.')
 
@@ -694,7 +749,9 @@ class ChatService:
             same=next((i for i in self.ledger.items(session_id) if i['kind']=='note' and i['state']==ITEM_ACTIVE and i['text']==text),None)
             if same:return same  # the same note twice is one note
             if self.ledger.active_notes(session_id)>=NOTE_LIMIT:raise ValueError(f'This conversation already has {NOTE_LIMIT} notes. Forget one first.')
-            return self.ledger.ensure(uuid.uuid4().hex,session_id,'note',text=text,tickers=self.note_tickers(text),request_id=request_id)
+            created=self.ledger.ensure(uuid.uuid4().hex,session_id,'note',text=text,tickers=self.note_tickers(text),request_id=request_id)
+        self.notify_change()
+        return created
 
     # -- attached PDFs (asked by Baris 2026-11-19). Parsed in a child process with a time limit; text only, no OCR. ----
     def add_document(self,session_id,name,data):
@@ -737,7 +794,8 @@ class ChatService:
             if item['state']==ITEM_ACTIVE:self.ledger.update(item_id,state=ITEM_PENDING)  # tombstone before any delete
             result=self._purge(self.ledger.get(item_id))
             if request_id:self.ledger.record_op(request_id,'forget',session_id,result)
-            return result
+        self.notify_change()
+        return result
 
     def forget_all(self,session_id,request_id=None):
         """Forget every turn and note of ONE conversation (others are never touched). Same order as forget(): every item is
@@ -769,7 +827,8 @@ class ChatService:
                     'vector_copy_pending':pending>0 or bool(sweep_error),'sweep_pending':bool(sweep_error),
                     'error':next((r['error'] for r in results if r['error']),sweep_error)}
             if request_id:self.ledger.record_op(request_id,'forget_all',session_id,result)
-            return result
+        self.notify_change()
+        return result
 
     # -- delete conversations (asked by Baris 2026-11-08: delete and clear buttons on the Conversations panel) -----------
     def _refuse_busy(self,session_id):
@@ -794,11 +853,25 @@ class ChatService:
             self._refuse_busy(session_id)
             removed=self.store.delete_session(session_id)
         traces,trace_errors=0,0
+        trace_dir=self.root/'traces'
+        seen_runs=set()
         for run_id in removed['runs']:
+            seen_runs.add(run_id)
             try:
-                (self.root/'traces'/(valid_id(run_id)+'.json')).unlink();traces+=1
+                (trace_dir/(valid_id(run_id)+'.json')).unlink();traces+=1
             except FileNotFoundError:pass
             except (OSError,ValueError):trace_errors+=1
+        if trace_dir.is_dir():
+            for path in trace_dir.glob('*.json'):
+                if path.stem in seen_runs:continue
+                try:
+                    data=json.loads(path.read_text(encoding='utf-8'))
+                    summary=data.get('summary') if isinstance(data,dict) else None
+                    if isinstance(summary,dict) and summary.get('conversation_id')==session_id:
+                        path.unlink();traces+=1
+                except FileNotFoundError:pass
+                except (OSError,ValueError,TypeError):continue
+        self.notify_change()
         return {'session_id':session_id,'deleted':True,'messages':removed['messages'],'runs':len(removed['runs']),
                 'traces_deleted':traces,'trace_errors':trace_errors,'memory_forgotten':memory.get('forgotten',0),
                 'memory_pending':memory.get('pending',0),'sweep_pending':bool(memory.get('sweep_pending')),'error':memory.get('error') or ''}
@@ -828,18 +901,39 @@ class ChatService:
         if prior is not None:return prior
         with self.lock:
             if self.closed:raise ModelError('Server is stopping.')
-            if self.active or self.threads:raise ModelError('Wait for the current research run, including its memory write, to finish.')
+            if self._clearing:raise ModelError('Conversations are already being cleared.')
+            if self.active or self.threads or self._semantic_inflight:raise ModelError('Wait for the current research run, including its memory write, to finish.')
+            if self.news['phase']=='running':raise ModelError('Wait for news collection to finish before clearing conversations.')
             ids=[s for s in self.store.session_ids() if s not in self.deleting]
             self.deleting.update(ids)
+            self._clearing=True
         results=[]
+        orphan_traces=0
         try:
             for sid in ids:
                 try:results.append(self._delete_one(sid))
-                except KeyError:continue  # deleted by another request meanwhile
+                except KeyError:continue
+            trace_dir=self.root/'traces'
+            if trace_dir.is_dir():
+                for path in trace_dir.glob('*.json'):
+                    try:
+                        data=json.loads(path.read_text(encoding='utf-8'))
+                        if _is_live_chat_trace(data):
+                            path.unlink();orphan_traces+=1
+                    except FileNotFoundError:pass
+                    except (OSError,ValueError,TypeError):continue
+            _,semantic=self.backends()
+            if semantic is not None and hasattr(semantic,'scrub_all') and not self.store.session_ids():
+                try:semantic.scrub_all()
+                except Exception:pass
         finally:
-            with self.lock:self.deleting.difference_update(ids)
+            with self.lock:
+                self.deleting.difference_update(ids)
+                self._clearing=False
+        if orphan_traces or results:
+            self.notify_change()
         result={'deleted':len(results),'messages':sum(r['messages'] for r in results),
-                'traces_deleted':sum(r['traces_deleted'] for r in results),
+                'traces_deleted':sum(r['traces_deleted'] for r in results)+orphan_traces,
                 'memory_pending':sum(r['memory_pending'] for r in results),
                 'sweep_pending':sum(1 for r in results if r['sweep_pending']),
                 'error':next((r['error'] for r in results if r['error']),'')}
@@ -958,11 +1052,13 @@ class ChatService:
     def collect_news(self,request_id):
         """Start one explicit collection over the registered official feeds. Idempotent per request id."""
         valid_id(request_id)
-        with self.lock:
+        with self.lock,self.models.lock:
             if self.news['request_id']==request_id:return self.news_snapshot()
             if self.closed:raise ModelError('Server is stopping.')
+            if self._clearing or self.deleting:raise ModelError('Wait for conversation deletion to finish before collecting news.')
             if self.news['phase']=='running':raise ModelError('News collection is already running.')
-            if self.active:raise ModelError('Wait for the active research run to finish before collecting news.')
+            if self.active or self.threads:raise ModelError('Wait for the active research run to finish before collecting news.')
+            if self.models.thread and self.models.thread.is_alive():raise ModelError('Wait for the model operation to finish before collecting news.')
             if not self.news_backend_factory and not self.gliner_path().exists():
                 raise ModelError('The pinned GLiNER cache is missing. No unapproved download was attempted.')
             trace=LiveTrace('News collection: official company feeds',directory=self.root/'traces',progress=self.news_progress)
@@ -1016,23 +1112,33 @@ class ChatService:
         version=version_for(self.models.narrator_id)
         proc=getattr(self.models,'process',None)
         was_loaded=bool(getattr(self.models,'ready',False) and proc and proc.poll() is None)
+        import contextlib
         trace=LiveTrace('Headline judgments: '+VERSION+' (experimental)',directory=self.root/'traces',progress=self.news_progress)
-        try:
-            self.news_progress('Judging served headlines')
-            self.models.load()
-            result=trace.call('Judge served headlines','model',lambda:judge_pending(store.conn,self.models.choice,model=self.models.model_id+' '+self.models.active_backend,check=check,version=version),
-                              actor='Headline Judge',model=self.models.model_id,inputs={'version':version,'inputs':'asset and title only','gate_label_hidden':True})
-            trace.finish(summary=result)
-            return {**result,'status':'complete' if not result['failed'] else 'partial','backend':self.models.active_backend}
-        except Cancelled:
-            trace.finish(error=True);raise
-        except Exception as exc:
-            trace.finish(error=True)
-            return {'version':VERSION,'status':'error','error':f'{type(exc).__name__}: {str(exc)[:160]}'}
-        finally:
-            if not was_loaded and not getattr(self.models,'busy',False):
-                try:self.models.unload(keep_choice=True)
-                except Exception:pass
+        n_lock=getattr(self,'narrator_lock',None)
+        if not hasattr(n_lock,'__enter__'):n_lock=contextlib.nullcontext()
+        m_lock=getattr(self.models,'lock',None)
+        if not hasattr(m_lock,'__enter__'):m_lock=contextlib.nullcontext()
+        with n_lock:
+            with m_lock:
+                self.models.busy=True
+            try:
+                self.news_progress('Judging served headlines')
+                self.models.load()
+                result=trace.call('Judge served headlines','model',lambda:judge_pending(store.conn,self.models.choice,model=self.models.model_id+' '+self.models.active_backend,check=check,version=version),
+                                  actor='Headline Judge',model=self.models.model_id,inputs={'version':version,'inputs':'asset and title only','gate_label_hidden':True})
+                trace.finish(summary=result)
+                return {**result,'status':'complete' if not result['failed'] else 'partial','backend':self.models.active_backend}
+            except Cancelled:
+                trace.finish(error=True);raise
+            except Exception as exc:
+                trace.finish(error=True)
+                return {'version':VERSION,'status':'error','error':f'{type(exc).__name__}: {str(exc)[:160]}'}
+            finally:
+                with m_lock:
+                    self.models.busy=False
+                if not was_loaded and not getattr(self.models,'busy',False):
+                    try:self.models.unload(keep_choice=True)
+                    except Exception:pass
 
     def close(self):
         self.closed=True;self.warm_cancel.set()

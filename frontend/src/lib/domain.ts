@@ -6,9 +6,11 @@ export interface Span {
   status: 'running'|'complete'|'fallback'|'error'; start_ms: number|null; duration_ms: number|null;
   inputs: Json; outputs: Json; error_type?: string;
 }
+export type RunCategory = 'chat'|'news'|'fixture'|'replay'
 export interface RunMeta {
   id: string; title: string; mode: 'live'|'fixture'|'replay'; started_at: string;
   status: 'running'|'complete'|'degraded'|'error'; duration_ms: number|null; revision: number;
+  category?: RunCategory;
 }
 export interface GuardTelemetry {
   version: number; narrated_checks: number; first_pass_accepted: number; first_pass_acceptance_rate: number|null;
@@ -44,7 +46,8 @@ export function parseMeta(value: unknown): RunMeta {
   const r=object(value)
   if(!/^[0-9a-f]{32}$/.test(text(r.id)) || typeof r.title!=='string' || !['live','fixture','replay'].includes(text(r.mode)) ||
     !['running','complete','degraded','error'].includes(text(r.status)) || typeof r.started_at!=='string' || numeric(r.revision)===undefined ||
-    (r.duration_ms!==null && numeric(r.duration_ms)===undefined))throw new Error('Local server returned an invalid run record.')
+    (r.duration_ms!==null && numeric(r.duration_ms)===undefined) ||
+    (r.category!==undefined && !['chat','news','fixture','replay'].includes(text(r.category))))throw new Error('Local server returned an invalid run record.')
   return r as unknown as RunMeta
 }
 export function parseGuardTelemetry(value: unknown): GuardTelemetry|null {

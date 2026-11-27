@@ -32,9 +32,63 @@ export function formatProvenanceConflict(c:ProvenanceConflict):string{
  const detail=c.violations.length?'wrong '+c.violations.join('/'):c.kind.replaceAll('_',' ')
  return (c.text||'value')+(claimed?' as '+claimed:'')+' ('+detail+')'
 }
+export const CHAT_FLOWS=['open_conversation','clarification','single_pass_data_answer','python_news_answer','multi_agent_research','document_research','watchlist_add','cancelled','error'] as const
+export type ChatFlow=typeof CHAT_FLOWS[number]
+function formatNarrator(modelIds:string[]){
+ return modelIds.length===1?(modelIds[0].includes('LiquidAI/LFM3')?'LFM3 1.7B / shared narrator':modelIds[0].includes('AtomicChat/LFM3')?'LFM3 1.7B Uncensored (AtomicChat) / shared narrator':modelIds[0]):modelIds.length?'Multiple recorded backends':'No narrator inference observed'
+}
+export function detectFlow(run:Run):ChatFlow{
+ const summary=object(run.summary),recorded=text(summary.flow)
+ if((CHAT_FLOWS as readonly string[]).includes(recorded))return recorded as ChatFlow
+ const spans=run.spans
+ if(spans.some(s=>s.name==='Run cancelled'))return 'cancelled'
+ if(run.status==='error'||spans.some(s=>s.name==='Run failed'))return 'error'
+ if(spans.some(s=>s.actor==='Local assistant'||s.name==='Answer open conversation')||text(summary.risk_mode)==='open_conversation')return 'open_conversation'
+ if(spans.some(s=>s.name==='Asset clarification required'))return 'clarification'
+ const routeOut=object(spans.find(s=>s.kind==='route'&&text(object(s.outputs).intent))?.outputs)
+ if(text(routeOut.intent)==='watchlist_add')return 'watchlist_add'
+ if(spans.some(s=>s.actor==='Document Reader'))return 'document_research'
+ const finalGate=spans.find(s=>s.name==='Synthesis faithfulness')
+ const gateMethod=text(object(finalGate?.outputs).method)||text(object(finalGate?.outputs).validation_reason)
+ if(gateMethod==='single_pass_data_answer')return 'single_pass_data_answer'
+ if(['python_news_answer','python_digest','no_news'].includes(gateMethod)&&!spans.some(s=>s.actor==='Data Analyst'&&s.kind!=='handoff'))return 'python_news_answer'
+ return 'multi_agent_research'
+}
 export function interactiveStages(run:Run):MapStage[]{
- const spans=run.spans,route=spans.filter(s=>s.kind==='route'),routeOutput=object(route.find(s=>text(object(s.outputs).intent))?.outputs)
+ const spans=run.spans,summary=object(run.summary),flow=detectFlow(run)
+ const route=spans.filter(s=>s.kind==='route'),routeOutput=object(route.find(s=>text(object(s.outputs).intent))?.outputs)
  const routerCalls=spans.filter(s=>s.kind==='model'&&s.actor==='Routing executive')
+ const intentText=text(routeOutput.intent).replaceAll('_',' ')
+ const tickerList=Array.isArray(routeOutput.tickers)?routeOutput.tickers.map(t=>String(t).trim()).filter(Boolean):[]
+ const routeDetail=intentText?(tickerList.length?intentText+' / '+tickerList.join(', '):intentText+' · no assets'):'Waiting for a recorded route'
+ const root=spans.filter(s=>s.kind==='run')
+ const requestSpans=route.slice(0,1).length?route.slice(0,1):root
+ const requestStage=stage('request','Your question','User input','A question enters the local job runner. Follow-ups can reuse assets from this conversation only.',requestSpans,run,text(object(route[0]?.inputs).query)||run.title)
+ const routerStage=stage('router','Decision model','GLiNER2.5-Decide','Classifies intent and horizon, then resolves entities. It does not generate the answer or call tools.',[...route,...routerCalls],run,routeDetail)
+ const summaryAnswer=text(summary.answer),rootAnswers=root.filter(s=>text(object(s.outputs).answer))
+ const answerAccepted=(run.status==='complete'||run.status==='degraded')&&(Boolean(summaryAnswer)||rootAnswers.length>0)
+ const modelIds=[...new Set(spans.filter(s=>s.kind==='model'&&s.actor!=='Routing executive').map(s=>s.model).filter(Boolean))]
+ const narrator=formatNarrator(modelIds)
+
+ if(flow==='open_conversation'){
+  const assistantSpans=spans.filter(s=>s.actor==='Local assistant'||s.name==='Answer open conversation')
+  const assistantOwner=assistantSpans[0]?.model?formatNarrator([assistantSpans[0].model]):narrator
+  const assistantStage=stage('assistant','Local assistant',assistantOwner,'Direct local conversation without market tools, news fetchers, or faithfulness guards.',assistantSpans,run,assistantSpans.length?'Direct local chat (no live tools)':'No local assistant call recorded')
+  const resultStage=stage('result','Accepted result','Local conversation','Saved as general chat (no live tools) while keeping active conversation tickers intact.',assistantSpans,run,answerAccepted?'Recorded general chat reply (not tool-verified)':'No accepted final answer recorded')
+  if(answerAccepted&&resultStage.state==='not_observed')resultStage.state='complete'
+  if(!answerAccepted)resultStage.state=run.status==='running'?'running':'not_reached'
+  return [requestStage,routerStage,assistantStage,resultStage]
+ }
+
+ if(flow==='clarification'){
+  const clarifySpans=spans.filter(s=>s.name==='Asset clarification required')
+  const dispatchStage=stage('dispatch','Dispatch policy','Python coordinator','Tool-only mode requires a ticker, company, or attached PDF before running research tools.',clarifySpans,run,'Asset clarification required (tool-only mode)')
+  const resultStage=stage('result','Accepted result','Local conversation','Saved clarification prompt without calling a local narrator or market tools.',clarifySpans,run,answerAccepted?'Clarification recorded (no model call)':'No accepted final answer recorded')
+  if(answerAccepted&&resultStage.state==='not_observed')resultStage.state='complete'
+  if(!answerAccepted)resultStage.state=run.status==='running'?'running':'not_reached'
+  return [requestStage,routerStage,dispatchStage,resultStage]
+ }
+
  const handoffs=spans.filter(s=>s.kind==='handoff'),dispatch=handoffs.find(s=>s.name==='Executive Route')
  const delegated=object(dispatch?.outputs).delegated_agents
  const workers=(actor:string)=>spans.filter(s=>s.actor===actor&&s.kind!=='handoff')
@@ -46,26 +100,27 @@ export function interactiveStages(run:Run):MapStage[]{
  const gateOut=object(finalGate[0]?.outputs),gateMethod=text(gateOut.method)||text(gateOut.validation_reason)
  const singlePass=lead.length===0&&gateMethod==='single_pass_data_answer'
  const pythonNews=lead.length===0&&['python_news_answer','python_digest','no_news'].includes(gateMethod)
- const leadOwner=lead[0]?.model||(singlePass?'Verified single-pass (Data Analyst)':pythonNews?'Python news synthesis':'Python fallback')
- const leadDetail=[lead.length?lead.length+' synthesis call'+(lead.length===1?'':'s'):singlePass?'Reused verified Data Analyst report, no second synthesis pass':pythonNews?'Deterministic news answer, no synthesis pass needed':'No synthesis model call recorded',memoryDetail(memory)].filter(Boolean).join(' / ')
+ const leadOwner=lead[0]?.model||(singlePass?'Verified single-pass (Data Analyst)':pythonNews?'Python news synthesis':run.status==='error'?'Not reached':'Python fallback')
+ const leadDetail=[lead.length?lead.length+' synthesis call'+(lead.length===1?'':'s'):singlePass?'Reused verified Data Analyst report, no second synthesis pass':pythonNews?'Deterministic news answer, no synthesis pass needed':run.status==='error'?'Run stopped before synthesis':'No synthesis model call recorded',memoryDetail(memory)].filter(Boolean).join(' / ')
  const leadStage=stage('lead','Team Lead synthesis',leadOwner,'The same selected narrator combines accepted reports in a separate role call, or Python reuses a single verified specialist report directly. Conversation memory is passed as context only; its numbers never pass the guard.',[...lead,...memory],run,leadDetail)
  if((singlePass||pythonNews)&&leadStage.state==='not_observed')leadStage.state='complete'
- const root=spans.filter(s=>s.kind==='run'),results=root.filter(s=>text(object(s.outputs).answer))
- const modelIds=[...new Set(spans.filter(s=>s.kind==='model'&&s.actor!=='Routing executive').map(s=>s.model).filter(Boolean))]
- const narrator=modelIds.length===1?(modelIds[0].includes('LiquidAI/LFM3')?'LFM3 1.7B / shared narrator':modelIds[0].includes('AtomicChat/LFM3')?'LFM3 1.7B Uncensored (AtomicChat) / shared narrator':modelIds[0]):modelIds.length?'Multiple recorded backends':'No narrator inference observed'
  const workerStages:MapStage[]=[
   stage('data','Data Analyst',workers('Data Analyst').some(s=>s.kind==='model')?narrator:'No narrator inference observed','Python fetches market data and chart series first. The narrator receives evidence; a number check accepts it or replaces it.',workers('Data Analyst'),run,workerDetail('Data Analyst'),run.status==='running'?'not_observed':'not_dispatched'),
   stage('news','News Researcher',workers('News Researcher').some(s=>s.kind==='model')?narrator:'No narrator inference observed','Reads accepted local news, not a fresh web search. A missing store is a coverage gap, never proof of no catalysts.',workers('News Researcher'),run,workerDetail('News Researcher'),run.status==='running'?'not_observed':'not_dispatched'),
  ]
  if(showDocs)workerStages.push(stage('document','Document Reader',docSpans.some(s=>s.kind==='model')?narrator:'Python PDF reader','Reads page text from PDFs attached to this conversation. Quoted pages stay linked to their source file.',docSpans,run,workerDetail('Document Reader'),run.status==='running'?'not_observed':'not_dispatched'))
+ const resultSpans=rootAnswers.length?rootAnswers:finalGate
+ const resultStage=stage('result','Accepted result','Local conversation','Only the accepted result is saved to this conversation. Tool evidence and execution traces remain inspectable.',resultSpans,run,answerAccepted?(run.status==='degraded'?'Saved with a visible fallback':'Recorded final answer'):run.status==='running'?'No final answer yet':flow==='cancelled'?'Stopped before an answer was accepted':'No accepted final answer recorded')
+ if(answerAccepted&&resultStage.state==='not_observed')resultStage.state='complete'
+ if(!answerAccepted&&run.status!=='running')resultStage.state='not_reached'
  return [
-  stage('request','Your question','User input','A question enters the local job runner. Follow-ups can reuse assets from this conversation only.',route.slice(0,1).length?route.slice(0,1):root,run,text(object(route[0]?.inputs).query)||run.title),
-  stage('router','Decision model','GLiNER2.5-Decide','Classifies intent and horizon, then resolves entities. It does not generate the answer or call tools.',[...route,...routerCalls],run,text(routeOutput.intent)?text(routeOutput.intent).replaceAll('_',' ')+' / '+(Array.isArray(routeOutput.tickers)?routeOutput.tickers.join(', '):'No assets'):'Waiting for a recorded route'),
+  requestStage,
+  routerStage,
   stage('dispatch','Dispatch policy','Python coordinator','Python maps the classified intent to specialist roles. A model label is not permission to write user data.',handoffs,run,Array.isArray(delegated)?delegated.join(' + ')||'No specialist dispatched':'No dispatch recorded'),
   ...workerStages,
   leadStage,
   stage('guard','Accept or replace','Python faithfulness guard','Checks numbers, claim provenance, direction, terms, and risks against evidence. A failed narration uses the deterministic specialist output.',finalGate,run,finalGate.length?(gateOut.faithful_synthesis===true?(singlePass?'Verified single-pass report accepted':pythonNews?'Deterministic news answer accepted':'Synthesis passed the recorded guard checks'):'Synthesis rejected; fallback used'):'No final validation recorded'),
-  stage('result','Accepted result','Local conversation','Only the accepted result is saved to this conversation. Tool evidence and execution traces remain inspectable.',results,run,results.length?(run.status==='degraded'?'Saved with a visible fallback':'Recorded final answer'):run.status==='running'?'No final answer yet':'No accepted final answer recorded'),
+  resultStage,
  ]
 }
 /** Live Clock 1 collection that wrote the real store, identified by its recorded run input. */

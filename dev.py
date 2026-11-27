@@ -378,6 +378,47 @@ def guard_stats_cmd(traces='data/traces', mode='all', as_json=False):
     return 0
 
 
+def verify_cmd(full=False, browser=True):
+    printable_stdout()
+    steps = [
+        ('preflight', [PY, 'dev.py', 'preflight'], ROOT, env()),
+        (
+            'backend_full' if full else 'backend_contracts',
+            SUITE if full else [
+                PY, '-m', 'unittest',
+                'tests.test_system_integration',
+                'tests.test_delete_conversations',
+                'tests.test_invariants',
+                'tests.test_feature_map',
+                'tests.test_events_stream',
+                'tests.test_open_chat',
+                'tests.test_outer_loop',
+                'tests.test_route_smoke',
+            ],
+            ROOT,
+            env(),
+        ),
+        ('frontend_vitest', ['npm', 'test', '--', '--run'], ROOT / 'frontend', env()),
+    ]
+    if browser:
+        benv = env()
+        benv['COFINANCE_BROWSER_TESTS'] = '1'
+        steps.append((
+            'chrome_journeys',
+            [PY, '-m', 'unittest', 'tests.test_chat_shell_browser', 'tests.test_run_map_browser'],
+            ROOT,
+            benv,
+        ))
+    for label, cmd, cwd, run_env in steps:
+        print(f'=== verify: {label} ===', flush=True)
+        code = subprocess.call(cmd, cwd=cwd, env=run_env, shell=(os.name == 'nt' and cmd[0] == 'npm'))
+        if code != 0:
+            print(f'verify FAILED at {label} (exit {code})', flush=True)
+            return code
+    print('verify: ALL GATES PASSED', flush=True)
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog='dev.py')
     sub = ap.add_subparsers(dest='cmd', required=True)
@@ -422,6 +463,9 @@ def main(argv=None):
     gs.add_argument('--traces', default='data/traces')
     gs.add_argument('--mode', default='all', choices=('all', 'live', 'fixture', 'replay'))
     gs.add_argument('--json', action='store_true')
+    vf = sub.add_parser('verify')
+    vf.add_argument('--full', action='store_true')
+    vf.add_argument('--no-browser', action='store_true')
     w = sub.add_parser('wait')
     w.add_argument('name')
     w.add_argument('--max', type=float, default=WAIT_DEFAULT)
@@ -450,6 +494,8 @@ def main(argv=None):
         raise SystemExit(spotcheck_cmd(a.action, corpus=a.corpus, overwrite=a.overwrite))
     if a.cmd == 'guard-stats':
         raise SystemExit(guard_stats_cmd(traces=a.traces, mode=a.mode, as_json=a.json))
+    if a.cmd == 'verify':
+        raise SystemExit(verify_cmd(full=a.full, browser=not a.no_browser))
     if a.cmd == 'dashboard':
         return restart_dashboard()
     if a.cmd in ('news', 'forward'):
