@@ -450,10 +450,12 @@ def check_claim_provenance(
         claimed_fields, cue_label = _local_cues(text, start, end, sub_lo, sub_hi, raw_span_coords, claimed_unit)
         claimed_asset = _asset_for_span(text, sent_lo, sent_hi, sub_lo, sub_hi, start, aliases)
 
-        if not claimed_fields and not claimed_unit and (len(aliases) <= 1 or not claimed_asset):
+        clause = text[sub_lo:sub_hi].strip()
+        current_price = claims_current_price(clause)
+        if not current_price and not claimed_fields and not claimed_unit and (len(aliases) <= 1 or not claimed_asset):
             continue
 
-        if any(matches(value, ov) for ov in other_vals) and not claimed_fields:
+        if not current_price and any(matches(value, ov) for ov in other_vals) and not claimed_fields:
             continue
 
         def denomination_ok(r: Mapping[str, Any]) -> bool:
@@ -473,8 +475,7 @@ def check_claim_provenance(
         if supported:
             price_rows = [r for r in supported if r["field"] == "price"]
             states = [(raw_facts[r["asset"]].get("quote_status") or {}).get("state") for r in price_rows]
-            clause = text[sub_lo:sub_hi].strip()
-            if price_rows and any(states) and claims_current_price(clause):
+            if price_rows and any(states) and current_price:
                 conflicts.append({"kind":"quote_freshness", "span":[start,end], "text":text[start:end],
                                   "claim":{"asset":claimed_asset,"fields":["price"],"clause":clause[:200]},
                                   "matches":[{"asset":r["asset"],"field":"price","state":state}

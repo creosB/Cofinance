@@ -10,7 +10,7 @@ CLOSING_TOLERANCE = timedelta(minutes=5)
 LAST_KNOWN_LIMIT = timedelta(days=4)
 _DECISION = re.compile(r'\b(?:should\s+(?:i|we)\s+(?:buy|sell|hold|invest)|(?:buy|sell|hold)\s+(?:now|today)\b|worth\s+(?:buying|selling|investing))', re.I)
 _CURRENT_PRICE = re.compile(r'\b(?:now|currently|at\s+present|live|real[- ]time|right\s+now|current\s+(?:quote|price)|(?:is|are)\s+trading\s+at)\b', re.I)
-_NOT_REALTIME = re.compile(r'\b(?:last\s+(?:known|traded)|as\s+of|delay(?:ed)?|not\s+(?:current|live|real[- ]time))\b', re.I)
+_NEGATED_REALTIME = re.compile(r'\bnot\s+(?:a\s+)?(?:now|currently|current(?:\s+(?:quote|price))?|live|real[- ]time)\b', re.I)
 
 
 def provider_time(value):
@@ -83,13 +83,15 @@ def previous_close_answer(tickers, snapshots) -> str:
 
 
 def claims_current_price(clause: str) -> bool:
-    return bool(_CURRENT_PRICE.search(clause) and not _NOT_REALTIME.search(clause))
+    return bool(_CURRENT_PRICE.search(_NEGATED_REALTIME.sub('', clause)))
 
 
 def decision_assessment(tickers, snapshots, *, news_items: int, news_complete: bool, news_error: bool = False, news_collected: bool = True) -> dict:
     states = {ticker: (snapshots.get(ticker, {}).get('quote_status') or {}).get('state', 'timestamp_unknown')
               for ticker in tickers}
-    limitations = [f'{ticker}: {QUOTE_LABEL.get(state, "Quote freshness not confirmed").lower()}'
+    failures = {ticker: (snapshots.get(ticker, {}).get('quote_status') or {}).get('failure') for ticker in tickers}
+    limitations = [f'{ticker}: '+('market-data provider timed out' if failures[ticker] == 'provider_timeout'
+                   else QUOTE_LABEL.get(state, 'Quote freshness not confirmed').lower())
                    for ticker, state in states.items() if state != 'recent']
     if news_error:
         news_state, news = 'unavailable', 'Local news store unavailable'

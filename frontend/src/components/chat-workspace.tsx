@@ -171,7 +171,7 @@ export function ChatActions({chat,onRefresh}:{chat:ChatController;onRefresh:()=>
 }
 
 export function ChatWorkspace({chat,inspect,onOpenModels}:{chat:ChatController;inspect:(id:string,spanId?:string)=>void;onOpenModels?:()=>void}){
- const [draft,setDraft]=useState(''),scroller=useRef<HTMLDivElement>(null),textarea=useRef<HTMLTextAreaElement>(null)
+ const draft=chat.questionDraft?.text||'',setDraft=chat.setQuestionDraft,scroller=useRef<HTMLDivElement>(null),textarea=useRef<HTMLTextAreaElement>(null)
  const [think,setThink]=useState(savedDeepThink)  // off unless the user turned it on; stays a per-answer request
  const conversation=chat.conversation,ownJob=conversation?.jobs.find(j=>activeStatuses.includes(j.status)),globalJob=chat.workspace?.active_job
  const model=chat.workspace?.models,newsRunning=chat.workspace?.news?.phase==='running',docs=conversation?.documents||[]
@@ -179,8 +179,9 @@ export function ChatWorkspace({chat,inspect,onOpenModels}:{chat:ChatController;i
  const blocked=!chat.workspace||chat.busy||!!globalJob||runningModel||newsRunning
  const lastJob=conversation?.jobs[0],failed=!ownJob&&lastJob&&['error','interrupted','cancelled'].includes(lastJob.status)?lastJob:null
  useEffect(()=>{const el=scroller.current;if(el)el.scrollTop=el.scrollHeight},[conversation?.id,conversation?.messages.length,ownJob?.id])
- useEffect(()=>{setDraft('');textarea.current?.focus()},[chat.draftRevision])
- const send=async(retry=false)=>{if((!draft.trim()&&!retry)||blocked)return;try{await chat.send(draft.trim(),retry,think&&!!thinkOf(model)?.qualified&&model?.selected!=='facts');setDraft('');textarea.current?.focus()}catch{}}
+ useEffect(()=>{textarea.current?.focus()},[chat.draftRevision])
+ const send=async(retry=false)=>{if((!draft.trim()&&!retry)||blocked)return
+  try{await chat.send(draft.trim(),retry,think&&!!thinkOf(model)?.qualified&&model?.selected!=='facts')}catch{}}
  const notice=!chat.workspace?'Connecting to the local workspace. Your question stays in the composer.':runningModel?(model?.stage||model?.phase)+'. Research can start when this finishes.':newsRunning?'News collection is running. Research can start when it finishes.':globalJob&&!ownJob?'A run in another conversation is active.':''
  return <div className="chat-view">
   <div className="chat-scroll" ref={scroller} role="log" aria-label="Conversation messages" aria-live="polite"><div className="chat-column">

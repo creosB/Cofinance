@@ -319,6 +319,63 @@ class TestChatShellBrowser(unittest.TestCase):
             oc_thread.join(timeout=3)
             oc_service.close()
 
+    def test_late_submit_acknowledgment_does_not_clear_a_newer_draft(self):
+        from playwright.sync_api import expect
+
+        self.choose()
+        page = self.page
+        pending = []
+        page.route('**/api/chat', lambda route: pending.append(route))
+        box = page.get_by_role('textbox', name='Research question')
+        box.fill('Review NVDA with a delayed acknowledgment')
+        box.evaluate("e => { for(let i=0;i<2;i++) e.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true})) }")
+        page.wait_for_function("document.querySelector('.send-button').disabled")
+        self.assertEqual(len(pending), 1)
+        box.fill('A newer draft in NVDA')
+        box.press('Enter')
+        self.assertEqual(len(pending), 1)
+        self.choose('Review TSLA')
+        self.assertEqual(box.input_value(), '')
+        box.fill('Unsent question in another conversation')
+        with page.expect_response(lambda response: response.url.endswith('/api/chat')):
+            pending.pop().continue_()
+        page.unroute('**/api/chat')
+        expect(page.get_by_role('button', name='Send question')).to_be_enabled()
+        self.assertEqual(box.input_value(), 'Unsent question in another conversation')
+        a, b = (self.service.store.session(s['id']) for s in self.sessions)
+        self.assertEqual(len(a['jobs']), 2)
+        self.assertEqual(len(b['jobs']), 1)
+        self.assertNotIn('delayed acknowledgment', page.locator('.bubble').first.inner_text())
+        page.locator('.msg-actions').get_by_role('button', name='Execution', exact=True).first.click()
+        page.locator('.sidebar').get_by_role('button', name='Chat', exact=True).click()
+        self.assertEqual(page.get_by_role('textbox', name='Research question').input_value(), 'Unsent question in another conversation')
+        self.choose()
+        self.assertEqual(box.input_value(), 'A newer draft in NVDA')
+
+    def test_delayed_conversation_creation_does_not_override_a_new_selection(self):
+        from playwright.sync_api import expect
+
+        page = self.page
+        pending = []
+        page.route('**/api/sessions', lambda route: pending.append(route) if route.request.method=='POST' else route.continue_())
+        page.get_by_role('button', name='New chat', exact=True).click()
+        box = page.get_by_role('textbox', name='Research question')
+        box.fill('Review NVDA in a brand new conversation')
+        page.get_by_role('button', name='Send question').click()
+        self.choose('Review TSLA')
+        box.fill('Draft for the already selected chat')
+        self.assertEqual(len(pending), 1)
+        with page.expect_response(lambda response: response.url.endswith('/api/chat')):
+            pending.pop().continue_()
+        page.unroute('**/api/sessions')
+        expect(page.get_by_role('button', name='Send question')).to_be_enabled()
+        self.assertEqual(box.input_value(), 'Draft for the already selected chat')
+        self.assertIn('Review TSLA', page.locator('.bubble').first.inner_text())
+        latest_id = next(iter(set(self.service.store.session_ids()) - {s['id'] for s in self.sessions}))
+        created = self.service.store.session(latest_id)
+        self.assertEqual(len(created['jobs']), 1)
+        self.assertEqual(created['jobs'][0]['query'], 'Review NVDA in a brand new conversation')
+
     def test_early_enter_keeps_the_draft_until_workspace_connects(self):
         page = self.context.new_page()
         pending = []

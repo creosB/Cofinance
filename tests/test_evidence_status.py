@@ -37,6 +37,37 @@ class TestQuoteClock(unittest.TestCase):
                 self.assertEqual(r['state'], expected)
                 self.assertEqual(r['observed_at'], OBSERVED.isoformat())
 
+    def test_provider_early_close_does_not_assume_a_normal_close(self):
+        end = datetime(2026, 11, 27, 18, 0, tzinfo=timezone.utc)
+        start = end - timedelta(hours=3, minutes=30)
+        seen = end + timedelta(minutes=12)
+        meta = {'regularMarketTime': (end - timedelta(seconds=30)).timestamp(),
+                'currentTradingPeriod': {'regular': {'start': start.timestamp(), 'end': end.timestamp()}}}
+        shortened = quote_status(meta, seen)
+        self.assertEqual((shortened['state'], shortened['session']), ('last_session', 'outside_regular'))
+        self.assertEqual((seen - datetime.fromisoformat(shortened['as_of'])).total_seconds(), 750)
+        meta['currentTradingPeriod']['regular']['end'] = (end + timedelta(hours=3)).timestamp()
+        self.assertEqual(quote_status(meta, seen)['state'], 'stale')
+
+    def test_next_session_metadata_on_dst_weekend_goes_stale_only_at_the_open(self):
+        stamp = datetime(2026, 3, 6, 20, 59, 30, tzinfo=timezone.utc)
+        opens = datetime(2026, 3, 9, 13, 30, tzinfo=timezone.utc)
+        closes = datetime(2026, 3, 9, 20, 0, tzinfo=timezone.utc)
+        meta = {'regularMarketTime': stamp.timestamp(), 'exchangeDataDelayedBy': 0,
+                'currentTradingPeriod': {'regular': {'start': opens.timestamp(), 'end': closes.timestamp()}}}
+        for seen, state in [(datetime(2026, 3, 8, 23, tzinfo=timezone.utc), 'last_known'),
+                            (opens - timedelta(seconds=1), 'last_known'), (opens, 'stale')]:
+            self.assertEqual(quote_status(meta, seen)['state'], state)
+
+    def test_delayed_quote_within_five_minutes_of_completed_period_boundary(self):
+        seen = OBSERVED + timedelta(minutes=10)
+        meta = provider_meta(5, start=-210, end=0, delay=15)
+        current = quote_status(meta, seen)
+        self.assertEqual(current['state'], 'last_session')
+        self.assertEqual(current['provider_delay_minutes'], 15)
+        meta['regularMarketTime'] -= 1
+        self.assertEqual(quote_status(meta, seen)['state'], 'last_known')
+
     def test_current_price_claim_does_not_pass_on_stale_quote(self):
         facts = {'VOD.L': {'price': 80.12, 'currency': 'GBp', 'status': 'available',
                            'quote_status': quote_status(provider_meta(90), OBSERVED)}}
@@ -45,6 +76,12 @@ class TestQuoteClock(unittest.TestCase):
         self.assertEqual(check_claim_provenance('VOD.L last traded at 80.12 GBp.', facts), [])
         self.assertTrue(claims_current_price('The current quote is 80.12 GBp.'))
         self.assertFalse(claims_current_price('This quote is not live.'))
+        for mixed in ('VOD.L is trading at 80.12 GBp now as of yesterday.',
+                      'VOD.L is currently trading at 80.12 GBp (delayed).',
+                      'Current price: 80.12 GBp (not live).',
+                      'VOD.L is at 80.12 now.', 'It is now 80.12.', '80.12 is the current quote.'):
+            with self.subTest(mixed=mixed):
+                self.assertEqual([c['kind'] for c in check_claim_provenance(mixed, facts)], ['quote_freshness'])
 
     def test_market_tool_rejects_a_different_instrument_from_the_provider(self):
         def fetch(url):

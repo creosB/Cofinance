@@ -70,10 +70,19 @@ export function useChat(onMutation?:()=>void){
  const [selected,setSelected]=useState(()=>{try{return localStorage.getItem('cofinance.chat')||''}catch{return ''}})
  const selectedRef=useRef(selected),newDraft=useRef(!selected),[draftRevision,setDraftRevision]=useState(0),[error,setError]=useState(''),[busy,setBusy]=useState(false),[version,setVersion]=useState(0)
  const alive=useRef(true),pending=useRef<{session_id:string;query:string;request_id:string;model:string;think?:true}|null>(null)
- const newId=useRef<string|null>(null),[hasRetry,setHasRetry]=useState(false),[memory,setMemory]=useState<MemoryState|null>(null)
+ const submitting=useRef(false),newId=useRef<string|null>(null),[hasRetry,setHasRetry]=useState(false),[memory,setMemory]=useState<MemoryState|null>(null)
+ const selectionVersion=useRef(0),draftVersion=useRef(0),[questionDrafts,setQuestionDrafts]=useState<Record<string,{text:string;revision:number}>>({})
+ const pendingDraft=useRef<{owner:string;revision:number}|null>(null)
+ const questionDraft=questionDrafts[selected]||{text:'',revision:0}
+ const setQuestionDraft=(value:string)=>{const owner=selectedRef.current,revision=++draftVersion.current
+  setQuestionDrafts(old=>({...old,[owner]:{text:value,revision}}))}
+ const clearQuestionDraft=(owner:string,revision?:number)=>setQuestionDrafts(old=>{
+  if(!old[owner]||(revision!==undefined&&old[owner].revision!==revision))return old
+  const next={...old};delete next[owner];return next
+ })
  useEffect(()=>{alive.current=true;return()=>{alive.current=false}},[])
  const refresh=useCallback(()=>setVersion(v=>v+1),[])
- const select=useCallback((value:string)=>{if(value&&selectedRef.current===value)return;newDraft.current=!value;selectedRef.current=value;setSelected(value);setConversation(null);setMemory(null);try{localStorage.setItem('cofinance.chat',value)}catch{}},[])
+ const select=useCallback((value:string)=>{if(value&&selectedRef.current===value)return;selectionVersion.current++;newDraft.current=!value;selectedRef.current=value;setSelected(value);setConversation(null);setMemory(null);try{localStorage.setItem('cofinance.chat',value)}catch{}},[])
  useEffect(()=>{
   let disposed=false
   const stop=new AbortController()
@@ -118,14 +127,25 @@ export function useChat(onMutation?:()=>void){
  },[workspace,refresh])
  const create=useCallback(async()=>{
   newId.current ||= crypto.randomUUID().replaceAll('-','')
-  const value=parseConversation(await post('/api/sessions',{request_id:newId.current}));newId.current=null;select(value.id);setConversation(value);return value.id
+  const revision=selectionVersion.current
+  const value=parseConversation(await post('/api/sessions',{request_id:newId.current}));newId.current=null
+  if(selectionVersion.current===revision){select(value.id);setConversation(value)}
+  return value.id
  },[post,select])
  const send=useCallback(async(query:string,retry=false,think=false)=>{
+  if(submitting.current)throw Error('A question is already being sent.')
+  if(retry&&(!pending.current||pending.current.session_id!==selectedRef.current))throw Error('Open the original conversation to retry.')
+  submitting.current=true
   try{
-   if(!retry||!pending.current){const sid=selectedRef.current||await create();pending.current={session_id:sid,query,request_id:crypto.randomUUID().replaceAll('-',''),model:workspace?.models.selected||'facts',...(think?{think:true as const}:{})}}
-   const result=parseJob(await post('/api/chat',pending.current));pending.current=null;setHasRetry(false);refresh();onMutation?.();return result
+   if(!retry){const owner=selectedRef.current,revision=questionDrafts[owner]?.revision||0,sid=owner||await create()
+    pendingDraft.current={owner,revision}
+    pending.current={session_id:sid,query,request_id:crypto.randomUUID().replaceAll('-',''),model:workspace?.models.selected||'facts',...(think?{think:true as const}:{})}}
+   const sent=pendingDraft.current,result=parseJob(await post('/api/chat',pending.current))
+   if(sent)clearQuestionDraft(sent.owner,sent.revision)
+   pending.current=null;pendingDraft.current=null;setHasRetry(false);refresh();onMutation?.();return result
   }catch(e){setHasRetry(!!pending.current);throw e}
- },[create,post,refresh,onMutation,workspace?.models.selected])
+  finally{submitting.current=false}
+ },[create,post,refresh,onMutation,workspace?.models.selected,questionDrafts])
  // One request id per click, reused if the same click is retried after a timeout.
  const newsRequest=useRef<string|null>(null)
  const collectNews=useCallback(async()=>{
@@ -179,7 +199,7 @@ export function useChat(onMutation?:()=>void){
   const sid=selectedRef.current;if(!sid)throw Error('Open a conversation first.')
   return post('/api/documents/remove',{session_id:sid,document_id:documentId})
  },[post])
- const startNew=()=>{pending.current=null;setHasRetry(false);select('');setDraftRevision(v=>v+1)}
- return {workspace,conversation,memory,selected,error,busy,hasRetry,select,create,startNew,draftRevision,send,post,refresh,collectNews,rememberNote,forget,removeConversation,clearConversations,attach,detach}
+ const startNew=()=>{pending.current=null;setHasRetry(false);clearQuestionDraft('');select('');setDraftRevision(v=>v+1)}
+ return {workspace,conversation,memory,selected,error,busy,hasRetry:hasRetry&&pending.current?.session_id===selected,select,create,startNew,draftRevision,questionDraft,setQuestionDraft,send,post,refresh,collectNews,rememberNote,forget,removeConversation,clearConversations,attach,detach}
 }
 export type ChatController=ReturnType<typeof useChat>

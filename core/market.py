@@ -9,6 +9,7 @@ import re
 import statistics
 import time
 import urllib.request
+from urllib.error import URLError
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote, urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -392,8 +393,13 @@ class MarketTools:
                 snap.update(fund_out)
                 snap.update(ath_out)
             self.evidence.append({"title":ticker+" market data","url":"https://finance.yahoo.com/quote/"+quote(symbol,safe=""),"source":"Yahoo Finance","as_of":snap["price_as_of"]})
-        except (OSError,ValueError,KeyError,IndexError,TypeError,OverflowError):
-            snap["error"]="Source request failed or returned invalid market data. No values were substituted."
+        except (OSError,ValueError,KeyError,IndexError,TypeError,OverflowError) as exc:
+            timeout=isinstance(exc,TimeoutError) or isinstance(exc,URLError) and isinstance(exc.reason,TimeoutError)
+            if timeout:
+                snap['quote_status']['failure']='provider_timeout'
+                snap['error']='Market-data provider timed out. No values were substituted.'
+            else:
+                snap['error']='Source request failed or returned invalid market data. No values were substituted.'
         self.snapshots[ticker]=snap
         return snap
 

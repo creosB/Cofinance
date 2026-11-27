@@ -2,6 +2,7 @@ import json
 import os
 import sqlite3
 import tempfile
+import threading
 import unittest
 import uuid
 from pathlib import Path
@@ -122,6 +123,58 @@ class TestResearchAcceptance(unittest.TestCase):
         self.assertEqual(msg['payload']['kind'], 'clarification')
         self.assertIn('KANDOB.L', msg['content'])
         self.assertEqual(self.quotes_read, [])
+
+    def test_cancelled_slow_provider_cannot_save_a_reply_or_seed_another_session(self):
+        begun, release = threading.Event(), threading.Event()
+        calls = []
+        original = self.svc.market_factory
+        market_fixture = original()
+
+        def provider(url):
+            calls.append(url)
+            begun.set()
+            if not release.wait(5):
+                raise AssertionError('The test did not release the provider')
+            return {}
+
+        def market(cancel=None):
+            return MarketTools(fetch=provider, cancel=cancel)
+
+        self.svc.market_factory = market
+        job = self.svc.submit(self.sid, 'Review NVDA', uuid.uuid4().hex, 'facts')
+        second = self.svc.store.create_session(uuid.uuid4().hex)['id']
+        try:
+            self.assertTrue(begun.wait(4))
+            self.assertEqual(self.svc.stop(job['id'])['status'], 'cancelling')
+            with self.assertRaisesRegex(ModelError, 'already active'):
+                self.svc.submit(second, 'Review MSFT', uuid.uuid4().hex, 'facts')
+        finally:
+            release.set()
+        self.assertEqual(wait(self.svc, job)['status'], 'cancelled')
+        self.assertEqual(len(calls), 1)
+        self.assertFalse(any(m['role']=='assistant' for m in self.svc.store.session(self.sid)['messages']))
+        self.assertEqual(self.svc.store.session(second)['messages'], [])
+        self.svc.market_factory = lambda cancel=None: market_fixture
+        next_job = self.svc.submit(second, 'Review MSFT', uuid.uuid4().hex, 'facts')
+        wait(self.svc, next_job)
+        self.assertEqual(self.svc.store.session(second)['messages'][-1]['payload']['tickers'], ['MSFT'])
+
+    def test_a_timed_out_quote_cannot_reuse_yesterdays_number_in_a_decision(self):
+        self.ask('What is NVDA trading at?')
+
+        def timeout(_url):
+            raise TimeoutError('test transport details')
+
+        self.svc.market_factory = lambda cancel=None: MarketTools(fetch=timeout, cancel=cancel)
+        msg, trace, _ = self.ask('Should I buy NVDA now?')
+        self.assertEqual(trace['status'], 'degraded')
+        self.assertIn('does not establish whether to buy', msg['content'])
+        self.assertIn('market-data provider timed out', msg['content'])
+        self.assertNotIn('test transport details', msg['content'])
+        self.assertNotIn('138.5', msg['content'])
+        self.assertEqual(msg['payload']['snapshots']['NVDA']['quote_status']['failure'], 'provider_timeout')
+        self.assertNotIn('price', msg['payload']['snapshots']['NVDA'])
+        self.assertEqual(msg['payload']['charts'], [])
 
     def test_comparison_binds_market_and_type_per_mention(self):
         msg, _, _ = self.ask('Compare Hoku Japanese stock and Beck UK ETF')
