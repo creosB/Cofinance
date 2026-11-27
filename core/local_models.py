@@ -622,15 +622,20 @@ class LocalModels:
                 time.sleep(.5)
         raise ModelError("Local narrator did not become ready within 90 seconds.")
 
-    def complete(self, system, prompt, *, max_tokens=256, stop=None, think=False):
+    def complete(self, system, prompt, *, max_tokens=256, stop=None, think=False, messages=None, temperature=0, allow_truncated=False):
         """think=True (deep think, Lead answer only) goes to the deep-think server with THINK_BUDGET more tokens; the
         reasoning text stays in reasoning_content and is never returned, stored or shown. Same rejection rules."""
         if not self.ready or not self.process or self.process.poll() is not None:
             raise ModelError("Local narrator is not loaded.")
         self.check_cancel()
+        chat_messages = [{"role": "system", "content": system}]
+        if messages:
+            chat_messages.extend(messages)
+        else:
+            chat_messages.append({"role": "user", "content": prompt})
         body = {
-            "model": self.loaded_model, "messages": [{"role":"system","content":system},{"role":"user","content":prompt}],
-            "temperature": 0, "max_tokens": min(512,max_tokens), "stream": False,
+            "model": self.loaded_model, "messages": chat_messages,
+            "temperature": temperature, "max_tokens": min(512,max_tokens), "stream": False,
             "chat_template_kwargs": {"enable_thinking": False}}
         if stop:
             body["stop"] = list(stop)
@@ -646,7 +651,8 @@ class LocalModels:
         record_usage(response.get("usage"))  # include generated text even if a guard or cancellation rejects it
         self.check_cancel()
         choices = response.get("choices", [])
-        if not choices or choices[0].get("finish_reason") != "stop":
+        finish_reason = choices[0].get("finish_reason") if choices else None
+        if not choices or (finish_reason != "stop" and not (allow_truncated and finish_reason == "length")):
             raise ModelError("Narration was incomplete; rejected.")
         content = choices[0].get("message",{}).get("content")
         if not isinstance(content,str) or len(content)>16000:

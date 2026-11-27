@@ -13,13 +13,68 @@ from datetime import datetime, timezone
 from urllib.parse import quote, urlsplit
 
 CRYPTO = {"BTC","ETH","SOL","ADA","DOGE","XRP","BNB","AVAX","DOT","LINK"}
-SYMBOL = re.compile(r"[A-Z][A-Z0-9.\-]{0,11}")
+SYMBOL = re.compile(r"[A-Z^][A-Z0-9.\-=]{0,14}")
+SEARCH_QUOTE_TYPES = frozenset({"EQUITY", "ETF", "INDEX", "CRYPTOCURRENCY", "FUTURE", "CURRENCY", "MUTUALFUND"})
+_SYMBOL_CACHE: dict[str, tuple[float, dict | None]] = {}
+_SYMBOL_CACHE_TTL = 300.0
 
 
 def valid_symbol(symbol):
-    if not isinstance(symbol,str) or not SYMBOL.fullmatch(symbol):
+    if not isinstance(symbol,str) or ".." in symbol or not SYMBOL.fullmatch(symbol):
         raise ValueError("Invalid ticker symbol.")
     return symbol
+
+
+def resolve_yahoo_symbol(term: str, fetch=None) -> dict | None:
+    query = " ".join((term or "").strip().split())
+    if not query or len(query) > 80:
+        return None
+    key = query.lower()
+    use_cache = fetch is None or fetch is fetch_json
+    now = time.monotonic()
+    if use_cache:
+        cached = _SYMBOL_CACHE.get(key)
+        if cached and now - cached[0] < _SYMBOL_CACHE_TTL:
+            return dict(cached[1]) if cached[1] is not None else None
+    fn = fetch or fetch_json
+    url = "https://query1.finance.yahoo.com/v1/finance/search?q=" + quote(query, safe="") + "&quotesCount=6&newsCount=0"
+    found = None
+    try:
+        raw = fn(url)
+        quotes = raw.get("quotes") if isinstance(raw, dict) else None
+        candidates = []
+        for idx, item in enumerate(quotes or []):
+            if not isinstance(item, dict):
+                continue
+            qtype = str(item.get("quoteType") or "").upper()
+            if qtype not in SEARCH_QUOTE_TYPES:
+                continue
+            raw_sym = str(item.get("symbol") or "").strip().upper()
+            name = str(item.get("shortname") or item.get("longname") or "").strip()
+            if not raw_sym or not name:
+                continue
+            sym = raw_sym[:-4] if qtype == "CRYPTOCURRENCY" and raw_sym.endswith("-USD") and raw_sym[:-4] in CRYPTO else raw_sym
+            try:
+                valid_symbol(sym)
+            except ValueError:
+                continue
+            exact = 0 if (sym.lower() == key or raw_sym.lower() == key or name.lower() == key) else 1
+            type_rank = {"EQUITY": 0, "ETF": 1, "CRYPTOCURRENCY": 2, "INDEX": 3, "FUTURE": 4, "CURRENCY": 5, "MUTUALFUND": 6}[qtype]
+            candidates.append((exact, type_rank, idx, {
+                "symbol": sym,
+                "name": name,
+                "quote_type": qtype,
+                "exchange": str(item.get("exchange") or ""),
+                "source": "Yahoo Finance search",
+            }))
+        if candidates:
+            candidates.sort(key=lambda row: (row[0], row[1], row[2]))
+            found = candidates[0][3]
+    except (OSError, ValueError, KeyError, IndexError, TypeError, OverflowError, AttributeError):
+        found = None
+    if use_cache:
+        _SYMBOL_CACHE[key] = (now, dict(found) if found is not None else None)
+    return found
 
 
 def finite(value):
@@ -191,6 +246,12 @@ class MarketTools:
             snap["error"]="Source request failed or returned invalid market data. No values were substituted."
         self.snapshots[ticker]=snap
         return snap
+
+    def resolve_symbol(self, term):
+        self.check()
+        out = resolve_yahoo_symbol(term, fetch=self.fetch)
+        self.check()
+        return out
 
     def plot_history(self,ticker):
         self.check()

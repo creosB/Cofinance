@@ -74,6 +74,7 @@ USER_QUERY_SCHEMA: Dict[str, Any] = {
             "compare_assets": "Side-by-side comparison of two or more tickers or crypto assets",
             "watchlist_add": "Track, follow, or add an asset to the user's watchlist",
             "thesis_review": "Full bull vs bear thesis combining price fundamentals, recent news, and memory",
+            "open_conversation": "Greeting, casual chat, general knowledge, finance concepts or definitions, or open questions not asking for live data on a specific asset",
         },
     },
     "horizon": ["intraday", "swing_week", "long_term"],
@@ -110,6 +111,7 @@ class RoutedQuery:
     intent_confidence: float
     horizon: str
     tickers: List[str]
+    entity_candidates: Tuple[str, ...] = ()
 
 
 class GlinerDecideClassifier(Classifier):
@@ -239,8 +241,11 @@ class GlinerQueryRouter:
 
         tickers = extract_known_tickers(query, self.universe, self.aliases)
         seen = set(tickers)
+        candidates: List[str] = []
+        seen_candidates: Set[str] = set()
 
-        needs_ner = not tickers or (intent == "compare_assets" and len(tickers) < 2)
+        skip_ner = intent == "open_conversation" and not tickers and intent_conf >= 0.50
+        needs_ner = not skip_ner and (not tickers or (intent == "compare_assets" and len(tickers) < 2))
         if needs_ner:
             try:
                 ner = self.backend.extract_entities(query, ["company", "cryptocurrency", "ticker"])
@@ -251,17 +256,27 @@ class GlinerQueryRouter:
             for span_list in entities.values() if isinstance(entities, Mapping) else []:
                 for span in span_list or []:
                     norm = str(span).strip().lstrip("$")
+                    if not norm:
+                        continue
                     upper = norm.upper()
                     mapped = self.aliases.get(norm.lower()) or (upper if upper in self.universe else None)
-                    if mapped and mapped in self.universe and mapped not in seen:
-                        tickers.append(mapped)
-                        seen.add(mapped)
+                    if mapped and mapped in self.universe:
+                        if mapped not in seen:
+                            tickers.append(mapped)
+                            seen.add(mapped)
+                    elif norm.lower() not in seen_candidates and len(candidates) < 6:
+                        candidates.append(norm)
+                        seen_candidates.add(norm.lower())
+
+        if intent == "open_conversation" and tickers and intent_conf < 0.55:
+            intent = "price_snapshot"
 
         return RoutedQuery(
             intent=intent,
             intent_confidence=round(intent_conf, 4),
             horizon=horizon,
             tickers=tickers,
+            entity_candidates=tuple(candidates),
         )
 
 

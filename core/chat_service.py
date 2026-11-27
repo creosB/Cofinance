@@ -14,9 +14,9 @@ import uuid
 from pathlib import Path
 from datetime import datetime, timezone
 
-from .chat_fastpath import conversational_reply, fast_route
 from .chat_store import ChatStore, ACTIVE, valid_id
 from .citations import cite
+from .documents import select_excerpts
 from .entities import extract_tickers
 from .gliner_decide import DEFAULT_ALIASES, GlinerQueryRouter, GlinerOutputError
 from .local_models import LocalModels, MODEL_ID, ModelError, Cancelled, narrators
@@ -25,12 +25,19 @@ from .news_service import coverage_note, feed_tickers, news_health
 from .memory import HybridMemory, LocalKeywordMemory, MemoryHit, context_from
 # Aliased: chat_store.ACTIVE (job statuses) is a different thing; shadowing it broke Stop once (caught by tests).
 from .memory_items import ACTIVE as ITEM_ACTIVE, FORGOTTEN as ITEM_FORGOTTEN, NOTE_LIMIT, PENDING as ITEM_PENDING, MemoryLedger
-from .orchestrator import DataAnalystAgent, NewsResearcherAgent, TeamLeadOrchestrator
+from .orchestrator import DataAnalystAgent, NewsResearcherAgent, TeamLeadOrchestrator, plain_text
 from .signals import Item, Outcome, Judgment, Action
 from .run_trace import TraceRecorder, run_traced_team
 
 GLINER_REVISION="9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90"
 UNIVERSE=set(DEFAULT_ALIASES.values())|{"SPY","QQQ","NFLX","INTC","COIN","PLTR","SOFI","F","BABA","RIVN","ADBE","ORCL","AVAX","ADA","DOGE","XRP","BNB","DOT","LINK"}
+OPEN_CHAT_SYSTEM=(
+    "You are Cofinance, a concise, helpful local assistant running on the user's machine. "
+    "Answer greetings, general questions, finance concepts, strategy ideas, and portfolio or tracker questions naturally in the user's language. "
+    "Never invent live market prices, current quotes, dates, or recent breaking news. "
+    "When the user wants live verified market data, charts, fundamentals, or news for a specific asset, tell them to name the company, ticker, ETF, index, commodity, or crypto and Cofinance will fetch it with live tools. "
+    "Write plain concise prose with no markdown bloat, no reasoning tags, and no em dashes or en dashes."
+)
 
 
 class FactsOnly:
@@ -248,9 +255,30 @@ class ChatService:
         return self.narrator_warm_thread
 
     def _query_universe(self,query):
-        explicit=set(re.findall(r'(?<![A-Za-z])\$?([A-Z][A-Z0-9.\-]{0,9})(?![A-Za-z])',query))
-        explicit-={'I','A','THE','AND','OR','USD','PE','EPS','ATH','CEO','API','AI'}
-        return UNIVERSE|explicit
+        cashtags=set(re.findall(r'(?<![A-Za-z0-9])\$([A-Za-z][A-Za-z0-9.\-]{0,11})(?![A-Za-z0-9])',query))
+        watchlist={r['ticker'].upper() for r in self.store.watchlist() if r.get('ticker')}
+        return UNIVERSE|watchlist|{c.upper() for c in cashtags}
+
+    @staticmethod
+    def _open_chat_messages(session,query,max_turns=6,max_chars=2400):
+        history=[]
+        for msg in (session.get('messages') or []):
+            role=msg.get('role')
+            content=(msg.get('content') or '').strip()
+            if role in {'user','assistant'} and content:
+                history.append({'role':role,'content':content[:600]})
+        if history and history[-1]['role']=='user' and history[-1]['content']==query.strip()[:600]:
+            history=history[:-1]
+        trimmed=[]
+        used=0
+        for msg in reversed(history[-max_turns:]):
+            if used+len(msg['content'])>max_chars and trimmed:
+                break
+            trimmed.append(msg)
+            used+=len(msg['content'])
+        trimmed.reverse()
+        trimmed.append({'role':'user','content':query})
+        return trimmed
 
     def router(self,query,trace,cancel):
         if self.router_factory:return self.router_factory()
@@ -295,57 +323,82 @@ class ChatService:
             check()
             think=job['id'] in self.think_runs;deep={'requested':think,'used':False}
             session_tickers=list(session.get('tickers',[]))
+            router=self.router(job['query'],trace,cancel)
+            from .run_trace import TracedExtractor
+            if isinstance(router,GlinerQueryRouter):
+                router=GlinerQueryRouter(TracedExtractor(router.backend,trace,'fastino/GLiNER2.5-Decide','Routing executive'),router.universe,router.aliases)
+            routed=trace.call('Route conversational request','route',lambda:router.route(job['query']),actor='Routing executive',inputs={'query':job['query']})
+            check()
+            if routed.intent not in {'price_snapshot','news_catalysts','compare_assets','watchlist_add','thesis_review','open_conversation'}:
+                raise GlinerOutputError('Unsupported router intent.')
+            tools=self.market_factory(cancel=cancel)
+            resolved_tickers=list(dict.fromkeys(routed.tickers))
+            candidates=tuple(getattr(routed,'entity_candidates',()) or ())
+            if routed.intent!='open_conversation' and candidates and hasattr(tools,'resolve_symbol') and (not resolved_tickers or (routed.intent=='compare_assets' and len(resolved_tickers)<2)):
+                for term in candidates:
+                    if len(resolved_tickers)>=6:break
+                    self.store.progress(job['id'],f'Resolving {term}')
+                    found=trace.call('Resolve asset symbol','tool',lambda t=term:tools.resolve_symbol(t),actor='Yahoo Finance search',inputs={'term':term})
+                    check()
+                    if isinstance(found,dict) and found.get('symbol') and found['symbol'] not in resolved_tickers:
+                        resolved_tickers.append(found['symbol'])
             documents=self.store.documents(session['id'])
-            conv=conversational_reply(job['query'],session_tickers=session_tickers,has_documents=bool(documents),
-                                      universe=UNIVERSE,aliases=DEFAULT_ALIASES)
-            if conv is not None:
-                conv_kind,answer=conv
+            doc_match=bool(documents) and (routed.intent!='open_conversation' or any(e.get('matched') for e in select_excerpts(documents,job['query'],top=1)))
+            if routed.intent=='open_conversation':
+                tickers=[]
+            else:
+                tickers=list(dict.fromkeys(resolved_tickers or session_tickers))
+                if not resolved_tickers and tickers:
+                    trace.event('Reuse conversation assets','decision',{'reason':'no_asset_in_query','tickers':tickers,
+                                'note':'The question named no asset, so the assets of this conversation are reused.'},actor='Python')
+                if routed.intent=='compare_assets' and len(tickers)==1:
+                    tickers=list(dict.fromkeys(session_tickers+tickers))
+                if 'watchlist' in job['query'].lower() and not resolved_tickers:
+                    tickers=[r['ticker'] for r in self.store.watchlist()]
+            if len(tickers)>6:raise ValueError('Limit a research run to six assets.')
+            is_open_chat=(routed.intent=='open_conversation' and not doc_match) or (not tickers and not doc_match)
+            if is_open_chat:
+                if job['model']=='facts':
+                    answer='Tool-only mode needs a stock, ETF, crypto asset, or attached PDF. Name an asset (such as NVDA, Palantir, or BTC), or select a local model in Models for general chat.'
+                    trace.event('Asset clarification required','decision',{'reason':'facts_only_no_asset_or_document'},actor='Python')
+                    trace.finish(summary={'answer':answer,'risk_mode':'not_resolved'})
+                    with self.lock:
+                        check()
+                        self.store.finish(job['id'],answer,{'kind':'clarification','charts':[],'evidence':[],'tickers':session_tickers,'mode':job['model'],'usage':trace.data.get('usage')},session_tickers,'complete')
+                    return
+                if not self.models.is_loaded():
+                    self.store.progress(job['id'],'Loading the selected narrator')
+                self._load_narrator_locked()
                 if think:
-                    deep['note']='Direct conversational reply; no research narration needed.'
-                trace.event('Direct conversational reply','decision',{'reason':conv_kind,'preserved_tickers':session_tickers},actor='Python')
-                trace.finish(summary={'answer':answer,'risk_mode':'conversational'})
+                    self.store.progress(job['id'],'Starting deep think')
+                    try:self.models.load_thinker();deep['used']=True
+                    except (ModelError,OSError) as exc:
+                        deep['note']='Deep think could not start ('+str(exc)[:120]+'), so this answer was written without it.'
+                        trace.event('Deep think unavailable','decision',{'reason':'start_failed','note':deep['note']},actor='Python')
+                    check()
+                elif self.models.thinker_loaded():self.models.stop_thinker()
+                self.store.progress(job['id'],'Answering locally')
+                chat_messages=self._open_chat_messages(session,job['query'])
+                def run_open_chat():
+                    check()
+                    raw=self.models.complete(OPEN_CHAT_SYSTEM,job['query'],max_tokens=280,think=deep['used'],
+                                             messages=chat_messages,temperature=0.2,allow_truncated=True)
+                    check()
+                    cleaned=plain_text(raw).strip()
+                    if not cleaned:
+                        raise ModelError('Empty conversational output.')
+                    return cleaned
+                answer=trace.call('Answer open conversation','model',run_open_chat,actor='Local assistant',
+                                  model=self.models.model_id,inputs={'intent':routed.intent,'history_messages':len(chat_messages),'live_tools':False})
+                trace.finish(summary={'answer':answer[:2500],'risk_mode':'open_conversation','model_choice':job['model']})
                 with self.lock:
                     check()
-                    self.store.finish(job['id'],answer,{'kind':'conversation','charts':[],'evidence':[],'tickers':session_tickers,
-                                      'mode':job['model'],'usage':trace.data.get('usage'),'deep_think':deep},session_tickers,'complete')
+                    self.store.finish(job['id'],answer,{'kind':'conversation','unverified_chat':True,'charts':[],'evidence':[],
+                                      'tickers':session_tickers,'mode':job['model'],'usage':trace.data.get('usage'),'deep_think':deep},session_tickers,'complete')
                 return
-            fast=None
-            if self.router_factory is None and os.environ.get('COFINANCE_FAST_ROUTE','on').strip().lower()!='off':
-                known_universe=UNIVERSE|{r['ticker'].upper() for r in self.store.watchlist() if r.get('ticker')}
-                fast=fast_route(job['query'],known_universe,DEFAULT_ALIASES,has_documents=bool(documents))
-            if fast is not None:
-                routed=trace.call('Route conversational request','route',lambda:fast,actor='Fast router (Python)',
-                                  inputs={'query':job['query'],'fast_path':True})
-            else:
-                router=self.router(job['query'],trace,cancel)
-                from .run_trace import TracedExtractor
-                if isinstance(router,GlinerQueryRouter):
-                    router=GlinerQueryRouter(TracedExtractor(router.backend,trace,'fastino/GLiNER2.5-Decide','Routing executive'),router.universe,router.aliases)
-                routed=trace.call('Route conversational request','route',lambda:router.route(job['query']),actor='Routing executive',inputs={'query':job['query']})
-            check()
-            if routed.intent not in {'price_snapshot','news_catalysts','compare_assets','watchlist_add','thesis_review'}:
-                raise GlinerOutputError('Unsupported router intent.')
-            tickers=list(dict.fromkeys(routed.tickers or session_tickers))
-            if not routed.tickers and tickers:
-                trace.event('Reuse conversation assets','decision',{'reason':'no_asset_in_query','tickers':tickers,
-                            'note':'The question named no asset, so the assets of this conversation are reused.'},actor='Python')
-            if routed.intent=='compare_assets' and len(tickers)==1:
-                tickers=list(dict.fromkeys(session_tickers+tickers))
-            if 'watchlist' in job['query'].lower() and not routed.tickers:
-                tickers=[r['ticker'] for r in self.store.watchlist()]
-            if len(tickers)>6:raise ValueError('Limit a research run to six assets.')
-            documents=self.store.documents(session['id'])
             if documents and not tickers:
                 trace.event('Answer from attached files','decision',{'reason':'no_asset_but_documents','documents':len(documents),
                             'note':'The question named no asset and the conversation has attached PDFs, so they are the evidence.'},actor='Python')
-            if not tickers and not documents:
-                answer='Which stock or crypto asset should I research? Name a ticker or company, such as NVDA or Nvidia.'
-                trace.event('Asset clarification required','decision',{'reason':'no_asset_in_query_or_session'},actor='Python')
-                trace.finish(summary={'answer':answer,'risk_mode':'not_resolved'})
-                with self.lock:
-                    check()
-                    self.store.finish(job['id'],answer,{'kind':'clarification','charts':[],'evidence':[],'tickers':[],'mode':job['model'],'usage':trace.data.get('usage')},[], 'complete')
-                return
             needs_narrator=job['model']!='facts' and not (routed.intent=='news_catalysts' and not documents)
             if needs_narrator:
                 if not self.models.is_loaded():
@@ -366,7 +419,6 @@ class ChatService:
                 else:
                     deep['note']='News-only answers use the verified Python digest, so Deep think was not needed.'
                     trace.event('Deep think skipped','decision',{'reason':'python_news_only','note':deep['note']},actor='Python')
-            tools=self.market_factory(cancel=cancel)
             news=NewsReader(self.root/'news.db')
             narrator=self.models if job['model']!= 'facts' else FactsOnly()
             # Routing is already recorded. Reuse the validated result without a second inference.

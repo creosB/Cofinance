@@ -57,7 +57,7 @@ function Facts({ticker,snap}:{ticker:string;snap:Snapshot}){
 }
 /** Says what conversation context the narrator saw. Context only: recalled numbers never pass the guard. */
 export const memoryLine=(m:Message['payload']['memory'])=>contextLine(m)
-const kind=(m:Message)=>m.payload.kind!=='research'?'':m.payload.mode==='facts'?'Tool-only':m.payload.faithful_synthesis===false?'Narrator output replaced':'Narrated locally'
+const kind=(m:Message)=>m.payload.kind==='conversation'?'General chat (no live tools)':m.payload.kind!=='research'?'':m.payload.mode==='facts'?'Tool-only':m.payload.faithful_synthesis===false?'Narrator output replaced':'Narrated locally'
 
 /** The answer text with a numbered chip after each number a tool value backs. Python chose the citations. */
 function Cited({message}:{message:Message}){
