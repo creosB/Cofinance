@@ -238,6 +238,23 @@ class TestClaimProvenance(unittest.TestCase):
         agent.run(["NVDA", "AAPL"], "fundamental_equity", EventBus(), "s2")
         self.assertEqual(seen_budgets, [256, 384])
 
+    def test_asset_name_numbers_allowed_for_futures_and_indices(self):
+        from core.orchestrator import EventBus, market_fact_numbers
+        gold_snap = {
+            "ticker": "GC=F",
+            "name": "Gold Dec 26",
+            "currency": "USD",
+            "status": "available",
+            "price": 2650.5,
+            "previous_session_close": 2640.0,
+            "change_from_previous_session_pct": 0.3977,
+        }
+        self.assertIn(26.0, market_fact_numbers("GC=F", gold_snap))
+        tools = _StubTools({"GC=F": gold_snap})
+        llm = _ScriptLLM(["Gold Dec 26 (GC=F) last traded at 2650.5 USD, up 0.40 percent from its previous session close of 2640 USD."])
+        rep = DataAnalystAgent(llm, tools).run(["GC=F"], "fundamental_equity", EventBus(), "s3")
+        self.assertTrue(rep.faithful_numbers, rep.validation)
+
 
 if __name__ == "__main__":
     unittest.main()

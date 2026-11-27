@@ -259,17 +259,23 @@ def _numeric(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
+def _asset_header(ticker: str, snap: Mapping[str, Any]) -> str:
+    name = str(snap.get("name") or ticker)
+    return f"{name} ({ticker})" if name != ticker else ticker
+
+
 def market_fact_numbers(ticker: str, snap: Mapping[str, Any]) -> List[float]:
     """Exactly the numbers market_fact_lines shows, in the meaning shown (scale included). The narrator allowlist."""
     if snap.get("error") or snap.get("status") == "unavailable" or not any(_numeric(v) for v in snap.values()):
         return []
-    return [display_value(key, value)[1] for key, value in snap.items() if key not in NOT_NARRATED and _numeric(value)]
+    vals = [display_value(key, value)[1] for key, value in snap.items() if key not in NOT_NARRATED and _numeric(value)]
+    vals.extend(numbers_in(_asset_header(ticker, snap)))
+    return vals
 
 
 def market_fact_lines(ticker: str, snap: Mapping[str, Any]) -> List[str]:
     """Labelled facts for one asset, without dates, sources or status strings."""
-    name = str(snap.get("name") or ticker)
-    head = f"{name} ({ticker})" if name != ticker else ticker
+    head = _asset_header(ticker, snap)
     if snap.get("error") or snap.get("status") == "unavailable" or not any(
             isinstance(v, (int, float)) and not isinstance(v, bool) for v in snap.values()):
         return [f"{head}: market data unavailable. No values were substituted."]

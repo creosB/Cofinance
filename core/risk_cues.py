@@ -26,9 +26,12 @@ _NO_RISK_GENERIC_SCOPE = re.compile(
     r"(?:either|both|these)\s+(?:company|companies|asset|assets|stock|stocks))|here)\s*[.,]?$",
     re.I,
 )
+_ENTITY_PART = (
+    r"(?:[A-Z][A-Za-z0-9.&'-]*(?:\s+[A-Z][A-Za-z0-9.&'-]*){0,2}(?:\s*\([A-Z^][A-Z0-9.\-=]{0,14}\))?"
+    r"|[a-z][a-z0-9.&'-]{1,20}\s*\([A-Z^][A-Z0-9.\-=]{0,14}\))"
+)
 _NO_RISK_ENTITY_SCOPE = re.compile(
-    r"^for\s+(?P<entities>[A-Z][A-Za-z0-9.&'-]*(?:\s+[A-Z][A-Za-z0-9.&'-]*){0,2}"
-    r"(?:\s+(?:or|and)\s+[A-Z][A-Za-z0-9.&'-]*(?:\s+[A-Z][A-Za-z0-9.&'-]*){0,2})?)\s*[.,]?$"
+    rf"^for\s+(?P<entities>{_ENTITY_PART}(?:\s+(?:or|and)\s+{_ENTITY_PART})?)\s*[.,]?$"
 )
 _NO_RISK_FORBIDDEN_ENTITY_WORDS = frozenset({
     "beyond", "except", "only", "supply", "execution", "earnings", "regulatory", "short",

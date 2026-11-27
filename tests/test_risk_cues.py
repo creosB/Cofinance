@@ -55,6 +55,7 @@ class TestUnsupportedRisks(unittest.TestCase):
                      "The reports do not identify a specific risk for this question.",
                      "The reports do not identify a specific risk for either company.",
                      "The reports do not identify a specific risk for Netflix or Gold.com.",
+                     "The reports do not identify a specific risk for Netflix (NFLX) or gold (GC=F).",
                      "NVIDIA trades at 186.64 USD with bullish headlines."):  # no risk statement at all
             self.assertEqual(unsupported_risks(text, self.CUES), [], text)
 
