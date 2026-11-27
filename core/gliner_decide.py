@@ -214,6 +214,41 @@ class GlinerDecideClassifier(Classifier):
         return out
 
 
+_ASSET_QUERY_RE = re.compile(
+    r"\b(?:stocks?|shares?|tickers?|etfs?|equit(?:y|ies)|crypto|cryptocurrenc(?:y|ies)|futures?|"
+    r"market\s+cap|quotes?|trading\s+at|buy|sell|invest|watchlist|bist|nasdaq|nyse)\b",
+    re.I,
+)
+_PRE_ASSET_TOKEN_RE = re.compile(
+    r"\b(\$?[A-Za-z][A-Za-z0-9.\-=]{1,9})\s+(?:stocks?|shares?|etfs?|tickers?)\b",
+    re.I,
+)
+_THESIS_CUE_RE = re.compile(r"\b(?:should\s+i\s+buy|buy\s+now|worth\s+buying|thesis|bull|bear|invest\s+in)\b", re.I)
+_GENERIC_ASSET_ADJECTIVES = frozenset({
+    "a", "an", "the", "my", "your", "our", "their", "this", "that", "these", "those", "some", "any",
+    "good", "best", "top", "new", "big", "cheap", "hot", "high", "low", "small", "large", "mid",
+    "us", "usa", "american", "turkish", "german", "british", "uk", "japanese", "chinese", "indian",
+    "european", "global", "foreign", "local", "international", "tech", "dividend", "growth", "value",
+    "penny", "blue", "common", "preferred", "energy", "bank", "oil", "ai", "ev", "public", "private",
+    "individual", "single", "specific", "which", "what", "about", "info", "another", "other", "one",
+})
+
+
+def _fallback_asset_candidates(query: str) -> List[str]:
+    out: List[str] = []
+    seen: Set[str] = set()
+    for match in _PRE_ASSET_TOKEN_RE.finditer(query or ""):
+        token = match.group(1).lstrip("$")
+        low = token.lower()
+        if low in _GENERIC_ASSET_ADJECTIVES or low in seen:
+            continue
+        seen.add(low)
+        out.append(token)
+        if len(out) >= 4:
+            break
+    return out
+
+
 class GlinerQueryRouter:
     """Routes a user question + resolves both explicit tickers (`NVDA`, `$sol`) and company names (`Tesla` -> `TSLA`)."""
 
@@ -243,8 +278,9 @@ class GlinerQueryRouter:
         seen = set(tickers)
         candidates: List[str] = []
         seen_candidates: Set[str] = set()
+        has_asset_cue = bool(_ASSET_QUERY_RE.search(query or ""))
 
-        skip_ner = intent == "open_conversation" and not tickers and intent_conf >= 0.50
+        skip_ner = intent == "open_conversation" and not tickers and intent_conf >= 0.50 and not has_asset_cue
         needs_ner = not skip_ner and (not tickers or (intent == "compare_assets" and len(tickers) < 2))
         if needs_ner:
             try:
@@ -268,8 +304,23 @@ class GlinerQueryRouter:
                         candidates.append(norm)
                         seen_candidates.add(norm.lower())
 
-        if intent == "open_conversation" and tickers and intent_conf < 0.55:
-            intent = "price_snapshot"
+        if not tickers and not candidates and has_asset_cue:
+            for cand in _fallback_asset_candidates(query):
+                upper = cand.upper()
+                mapped = self.aliases.get(cand.lower()) or (upper if upper in self.universe else None)
+                if mapped and mapped in self.universe:
+                    if mapped not in seen:
+                        tickers.append(mapped)
+                        seen.add(mapped)
+                elif cand.lower() not in seen_candidates:
+                    candidates.append(cand)
+                    seen_candidates.add(cand.lower())
+
+        if intent == "open_conversation":
+            if tickers and intent_conf < 0.55:
+                intent = "price_snapshot"
+            elif has_asset_cue and candidates:
+                intent = "thesis_review" if _THESIS_CUE_RE.search(query or "") else "price_snapshot"
 
         return RoutedQuery(
             intent=intent,

@@ -552,6 +552,8 @@ class LocalModels:
         with (self.root / "llama-server-think.log").open("a", encoding="utf-8") as log:
             process = subprocess.Popen(command, cwd=self.backend_dir(backend), env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
                                        creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
+        from .process_guard import bind_child
+        bind_child(process)
         self.thinker = {"process": process, "url": url, "key": key, "model": model, "backend": backend}
         try:
             for _ in range(180):
@@ -607,6 +609,8 @@ class LocalModels:
         with (self.root / "llama-server.log").open("a", encoding="utf-8") as log:
             self.process = subprocess.Popen(command, cwd=self.backend_dir(backend), env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
                                             creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
+        from .process_guard import bind_child
+        bind_child(self.process)
         for _ in range(180):
             self.check_cancel()
             if self.process.poll() is not None: raise ModelError("Local narrator exited. See the managed runtime log.")

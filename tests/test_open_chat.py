@@ -344,6 +344,215 @@ class TestOpenChatAndDynamicResolution(unittest.TestCase):
             finally:
                 svc.close()
 
+    def test_context_aware_yahoo_resolution_prefers_turkish_equity_and_flags_ambiguity(self):
+        thy_quotes = {"quotes": [
+            {"symbol": "THY", "shortname": "Toews Agility Shares Dynamic Ta", "quoteType": "ETF", "exchange": "PCX", "score": 10009500.0},
+            {"symbol": "TKA.DE", "shortname": "thyssenkrupp AG", "quoteType": "EQUITY", "exchange": "GER", "score": 20410.0},
+            {"symbol": "THYAO.IS", "shortname": "TURK HAVA YOLLARI", "quoteType": "EQUITY", "exchange": "IST", "score": 20162.0},
+            {"symbol": "THYP", "shortname": "21shares Hyperliquid Staking ET", "quoteType": "ETF", "exchange": "NGM", "score": 20040.0},
+        ]}
+        fetch = lambda url: thy_quotes
+
+        tr = resolve_yahoo_symbol("THY", fetch=fetch, context_query="THY, turkish stock. Should I buy now?")
+        self.assertIsNotNone(tr)
+        self.assertEqual(tr["symbol"], "THYAO.IS")
+        self.assertEqual(tr["exchange"], "IST")
+        self.assertFalse(tr.get("ambiguous", False))
+
+        etf = resolve_yahoo_symbol("THY", fetch=fetch, context_query="Check THY ETF performance")
+        self.assertIsNotNone(etf)
+        self.assertEqual(etf["symbol"], "THY")
+        self.assertEqual(etf["quote_type"], "ETF")
+        self.assertFalse(etf.get("ambiguous", False))
+
+        de = resolve_yahoo_symbol("THY", fetch=fetch, context_query="german stock TKA")
+        self.assertIsNotNone(de)
+        self.assertEqual(de["symbol"], "TKA.DE")
+
+        amb = resolve_yahoo_symbol("thy", fetch=fetch, context_query="give info about thy stock")
+        self.assertIsNotNone(amb)
+        self.assertTrue(amb.get("ambiguous"))
+        alt_syms = [a["symbol"] for a in amb["alternatives"]]
+        self.assertIn("THYAO.IS", alt_syms)
+        self.assertIn("TKA.DE", alt_syms)
+        self.assertNotEqual(amb["symbol"], "THY")
+
+    def test_gliner_router_extracts_fallback_asset_before_stock_and_keeps_generic_chat_open(self):
+        class EmptyNerBackend:
+            def __init__(self, intent, conf):
+                self.intent, self.conf, self.ner_calls = intent, conf, 0
+
+            def classify_text(self, text, schema, *, include_confidence=False):
+                return {"intent": {"label": self.intent, "confidence": self.conf}, "horizon": {"label": "intraday", "confidence": 0.5}}
+
+            def extract_entities(self, text, entity_types):
+                self.ner_calls += 1
+                return {"entities": {"company": [], "cryptocurrency": [], "ticker": []}}
+
+        b_thy = EmptyNerBackend("open_conversation", 0.785)
+        r_thy = GlinerQueryRouter(b_thy, UNIVERSE).route("give info about thy stock")
+        self.assertEqual(b_thy.ner_calls, 1)
+        self.assertEqual(r_thy.intent, "price_snapshot")
+        self.assertEqual(r_thy.entity_candidates, ("thy",))
+
+        b_edu = EmptyNerBackend("open_conversation", 0.85)
+        r_edu = GlinerQueryRouter(b_edu, UNIVERSE).route("what is a dividend stock?")
+        self.assertEqual(r_edu.intent, "open_conversation")
+        self.assertEqual(r_edu.entity_candidates, ())
+
+    def test_ambiguous_symbol_clarifies_and_open_chat_skips_deep_think(self):
+        class AmbiguousMarket(FakeMarket):
+            def resolve_symbol(self, term, context_query=""):
+                return {
+                    "symbol": "TKA.DE",
+                    "name": "thyssenkrupp AG",
+                    "quote_type": "EQUITY",
+                    "exchange": "GER",
+                    "ambiguous": True,
+                    "alternatives": [
+                        {"symbol": "TKA.DE", "name": "thyssenkrupp AG", "quote_type": "EQUITY", "exchange": "GER"},
+                        {"symbol": "THYAO.IS", "name": "TURK HAVA YOLLARI", "quote_type": "EQUITY", "exchange": "IST"},
+                    ],
+                }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            models = RecordingNarratorModels()
+
+            def route_fn(q):
+                if "thy" in q.lower():
+                    return RoutedQuery("price_snapshot", 0.78, "intraday", [], entity_candidates=("thy",))
+                return RoutedQuery("open_conversation", 0.9, "intraday", [])
+
+            svc = ChatService(REPO, tmp, models=models, market_factory=AmbiguousMarket, router_factory=lambda: ScriptedRouter(route_fn))
+            try:
+                sess = svc.store.create_session(uuid.uuid4().hex)
+                j_amb = svc.submit(sess["id"], "give info about thy stock", uuid.uuid4().hex, models.narrator_id)
+                done_amb = wait(svc, j_amb)
+                self.assertEqual(done_amb["status"], "complete")
+                msg = svc.store.session(sess["id"])["messages"][-1]
+                self.assertEqual(msg["payload"]["kind"], "clarification")
+                self.assertIn("THYAO.IS", msg["content"])
+                self.assertIn("TKA.DE", msg["content"])
+                self.assertEqual(models.complete_calls, [])
+
+                j_open = svc.submit(sess["id"], "what's the capital of Turkey", uuid.uuid4().hex, models.narrator_id, think=True)
+                done_open = wait(svc, j_open)
+                self.assertEqual(done_open["status"], "complete")
+                self.assertEqual(models.think_load_calls, 0)
+                self.assertEqual(len(models.complete_calls), 1)
+                self.assertFalse(models.complete_calls[0]["think"])
+                open_msg = svc.store.session(sess["id"])["messages"][-1]
+                self.assertFalse(open_msg["payload"]["deep_think"]["used"])
+                self.assertIn("general chat", open_msg["payload"]["deep_think"]["note"].lower())
+            finally:
+                svc.close()
+
+    def test_no_news_keeps_faithful_research_complete_and_preserves_safe_trace_fields(self):
+        from core.run_trace import safe
+        from ui.workbench import read_trace
+
+        self.assertEqual(
+            safe({
+                "previous_session_close": 309.75,
+                "previous_session_date": "2026-11-26",
+                "change_from_previous_session_pct": 0.73,
+                "output_token_limit": 256,
+                "session_id": "secret-sid",
+                "api_key": "secret-key",
+                "access_token": "secret-tok",
+                "token_count": "secret-tc",
+            }),
+            {
+                "previous_session_close": 309.75,
+                "previous_session_date": "2026-11-26",
+                "change_from_previous_session_pct": 0.73,
+                "output_token_limit": 256,
+                "session_id": "[redacted]",
+                "api_key": "[redacted]",
+                "access_token": "[redacted]",
+                "token_count": "[redacted]",
+            },
+        )
+
+        class FaithfulModels(RecordingNarratorModels):
+            def complete(self, system, prompt, **kwargs):
+                if "User question:" in prompt:
+                    return (
+                        "Türk Hava Yollari Anonim Ortakligi (THYAO.IS) last price is 312.0 TRY, "
+                        "up 0.73 percent from previous session close 309.75 TRY, while no accepted news is available in the local store. "
+                        "The reports do not identify a specific risk."
+                    )
+                return "Türk Hava Yollari Anonim Ortakligi (THYAO.IS) last price is 312.0 TRY, up 0.73 percent from previous session close 309.75 TRY."
+
+        class TryMarket(FakeMarket):
+            def get_snapshot(self, ticker):
+                snap = {
+                    "ticker": ticker,
+                    "name": "Türk Hava Yollari Anonim Ortakligi",
+                    "currency": "TRY",
+                    "status": "available",
+                    "price": 312.0,
+                    "previous_session_close": 309.75,
+                    "previous_session_date": "2026-11-26",
+                    "change_from_previous_session_pct": 0.73,
+                    "source": "Yahoo Finance",
+                }
+                self.snapshots[ticker] = snap
+                return snap
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            models = FaithfulModels()
+            router = ScriptedRouter(lambda q: RoutedQuery("thesis_review", 0.8, "intraday", ["THYAO.IS"]))
+            svc = ChatService(REPO, root, models=models, market_factory=TryMarket, router_factory=lambda: router)
+            try:
+                sess = svc.store.create_session(uuid.uuid4().hex)
+                job = svc.submit(sess["id"], "THY, turkish stock. Should I buy now?", uuid.uuid4().hex, models.narrator_id)
+                done = wait(svc, job)
+                self.assertEqual(done["status"], "complete")
+                tr = read_trace(root / "traces", job["id"])
+                self.assertEqual(tr["status"], "complete")
+                news_span = next(s for s in tr["spans"] if s["name"] == "News Researcher")
+                self.assertEqual(news_span["status"], "complete")
+                self.assertEqual(news_span["outputs"]["validation"]["validation_reason"], "no_news")
+                da_span = next(s for s in tr["spans"] if s["name"] == "Data Analyst")
+                raw_snap = da_span["outputs"]["raw_facts"]["THYAO.IS"]
+                self.assertEqual(raw_snap["previous_session_close"], 309.75)
+                self.assertEqual(raw_snap["previous_session_date"], "2026-11-26")
+                self.assertEqual(raw_snap["change_from_previous_session_pct"], 0.73)
+            finally:
+                svc.close()
+
+    def test_process_guard_matches_only_cofinance_children_and_binds_on_windows(self):
+        import subprocess
+        import sys
+        from core.process_guard import _is_cofinance_child, bind_child
+
+        repo_str = str(REPO.resolve()).lower()
+        data_str = str((REPO / "data").resolve()).lower() + os.sep.lower()
+        self.assertTrue(_is_cofinance_child(
+            {"Name": "llama-server.exe", "ExecutablePath": str(REPO / "data/local_models/b12110-vulkan/llama-server.exe"), "CommandLine": ""},
+            repo_str, data_str,
+        ))
+        self.assertTrue(_is_cofinance_child(
+            {"Name": "python.exe", "ExecutablePath": "python.exe", "CommandLine": f"python.exe -u {REPO / 'core/hymemory_worker.py'}"},
+            repo_str, data_str,
+        ))
+        self.assertFalse(_is_cofinance_child(
+            {"Name": "llama-server.exe", "ExecutablePath": r"C:\OtherApp\llama-server.exe", "CommandLine": ""},
+            repo_str, data_str,
+        ))
+        self.assertFalse(_is_cofinance_child(
+            {"Name": "pythonw.exe", "ExecutablePath": "pythonw.exe", "CommandLine": r"pythonw.exe C:\Users\baris\Desktop\new bridge\PCbridge.pyw"},
+            repo_str, data_str,
+        ))
+        if os.name == "nt":
+            proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(0.3)"])
+            try:
+                self.assertTrue(bind_child(proc))
+            finally:
+                proc.wait(timeout=5)
+
 
 if __name__ == "__main__":
     unittest.main()

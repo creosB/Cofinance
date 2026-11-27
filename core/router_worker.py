@@ -212,6 +212,8 @@ class RouterProcess:
             self.process=subprocess.Popen([sys.executable,'-E','-B','-u','-m','core.router_worker'],cwd=self.repo,env=env,
                 stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=log,text=True,encoding='utf-8',errors='replace',
                 creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+        from .process_guard import bind_child
+        bind_child(self.process)
         proc=self.process;out=self.queue
         def reader():
             try:

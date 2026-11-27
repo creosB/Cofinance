@@ -24,6 +24,12 @@ from typing import Any, Callable
 
 TRACE_FORMAT = "cofinance-trace/1"
 SECRET = re.compile(r"api.?key|token|cookie|password|secret|authorization|credential|session", re.I)
+SAFE_TRACE_KEYS = frozenset({
+    "previous_session_close",
+    "previous_session_date",
+    "change_from_previous_session_pct",
+    "output_token_limit",
+})
 THINK = re.compile(r"<think(?:ing)?>.*?(?:</think(?:ing)?>|$)", re.I | re.S)
 
 
@@ -34,7 +40,7 @@ def safe(value: Any, depth: int = 0) -> Any:
     if dataclasses.is_dataclass(value):
         value = dataclasses.asdict(value)
     if isinstance(value, dict):
-        return {str(k)[:100]: "[redacted]" if SECRET.search(str(k)) else safe(v, depth + 1)
+        return {str(k)[:100]: "[redacted]" if (str(k) not in SAFE_TRACE_KEYS and SECRET.search(str(k))) else safe(v, depth + 1)
                 for k, v in list(value.items())[:40]}
     if isinstance(value, (list, tuple, set)):
         return [safe(v, depth + 1) for v in list(value)[:40]]
@@ -378,11 +384,14 @@ def run_traced_team(orchestrator, query: str, trace: TraceRecorder, *, session_i
         def run(self, *args, **kwargs):
             with trace.span(self.name, "agent", actor=self.name) as span:
                 report = self.agent.run(*args, **kwargs)
+                val = getattr(report, "validation", {}) or {}
+                is_no_news = val.get("validation_reason") == "no_news" and not val.get("rejected_numbers")
+                is_fallback = (not report.faithful_numbers) and not is_no_news
                 trace.event("Number faithfulness", "gate", {"passed": report.faithful_numbers,
-                            "fallback_used": not report.faithful_numbers, "allowed_numbers": report.allowed_numbers,
-                            **getattr(report, "validation", {})},
-                            actor=self.name, fallback=not report.faithful_numbers)
-                span.update(output=report, fallback=not report.faithful_numbers)
+                            "fallback_used": is_fallback, "allowed_numbers": report.allowed_numbers,
+                            **val},
+                            actor=self.name, fallback=is_fallback)
+                span.update(output=report, fallback=is_fallback)
                 return report
     router = original.router
     if isinstance(router, GlinerQueryRouter):

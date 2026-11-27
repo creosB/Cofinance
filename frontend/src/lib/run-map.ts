@@ -92,7 +92,7 @@ export function interactiveStages(run:Run):MapStage[]{
  const handoffs=spans.filter(s=>s.kind==='handoff'),dispatch=handoffs.find(s=>s.name==='Executive Route')
  const delegated=object(dispatch?.outputs).delegated_agents
  const workers=(actor:string)=>spans.filter(s=>s.actor===actor&&s.kind!=='handoff')
- const workerDetail=(actor:string)=>{const nodes=workers(actor),models=nodes.filter(s=>s.kind==='model'),gates=nodes.filter(s=>s.kind==='gate');if(!nodes.length)return Array.isArray(delegated)&&!delegated.includes(actor)?'Python did not dispatch this role for this intent.':'No role activity recorded.';return models.length+' narrator call'+(models.length===1?'':'s')+' / '+nodes.filter(s=>s.kind==='tool').length+' tool calls'+(gates.some(s=>s.status==='fallback')?' / report replaced after validation':'')}
+ const workerDetail=(actor:string)=>{const nodes=workers(actor),models=nodes.filter(s=>s.kind==='model'),gates=nodes.filter(s=>s.kind==='gate');if(!nodes.length)return Array.isArray(delegated)&&!delegated.includes(actor)?'Python did not dispatch this role for this intent.':'No role activity recorded.';const noNews=actor==='News Researcher'&&gates.some(s=>text(object(s.outputs).validation_reason)==='no_news');return models.length+' narrator call'+(models.length===1?'':'s')+' / '+nodes.filter(s=>s.kind==='tool').length+' tool calls'+(noNews?' / no accepted local news':gates.some(s=>s.status==='fallback')?' / report replaced after validation':'')}
  const docSpans=workers('Document Reader'),showDocs=docSpans.length>0||(Array.isArray(delegated)&&delegated.includes('Document Reader'))
  const lead=spans.filter(s=>s.actor==='Market Team Lead'&&s.kind==='model')
  const memory=spans.filter(s=>s.actor==='Conversation memory')

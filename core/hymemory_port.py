@@ -190,6 +190,8 @@ class HyMemoryLite:
              "--port", str(port), "-c", "8192", "-ub", "8192", "--alias", "qwen3-embedding-0.6b"],
             cwd=str(self.server.parent), stdin=subprocess.DEVNULL, stdout=(logs / "embedder.log").open("a"),
             stderr=subprocess.STDOUT, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        from .process_guard import bind_child
+        bind_child(self.embedder)
         until = time.monotonic() + 120
         while time.monotonic() < until:
             if self.embedder.poll() is not None:
@@ -216,6 +218,7 @@ class HyMemoryLite:
             [str(self.venv_python), "-u", str(self.repo / "core" / "hymemory_worker.py")], cwd=str(self.base),
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=(logs / "worker.log").open("a"), env=env,
             text=True, encoding="utf-8", creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        bind_child(self.worker)
         self.replies = queue.Queue()
         def pump(stream, q):
             for line in stream:

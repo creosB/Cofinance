@@ -242,6 +242,10 @@ def restart_dashboard():
     pids = {l.split()[-1] for l in out.splitlines() if '127.0.0.1:8878' in l and 'LISTENING' in l}
     for pid in pids:
         subprocess.run(['taskkill', '/PID', pid, '/T', '/F'], capture_output=True)
+    from core.process_guard import cleanup_orphaned_servers
+    cleaned = cleanup_orphaned_servers(ROOT)
+    if cleaned:
+        print('cleaned orphaned Cofinance servers:', cleaned)
     e = env()
     e.pop('COFINANCE_MEMORY', None)
     subprocess.Popen(['cmd.exe', '/k', 'run-dashboard.cmd'], cwd=ROOT, env=e, creationflags=subprocess.CREATE_NEW_CONSOLE)

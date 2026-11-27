@@ -27,6 +27,55 @@ def valid_symbol(symbol):
 
 _EXPLICIT_TICKER = re.compile(r"\$?[A-Z][A-Z0-9.\-=]{0,9}")
 _QUERY_STOP = frozenset({"the", "of", "and", "in", "for", "inc", "corp", "co", "ltd"})
+_TYPE_CUES: tuple[tuple[re.Pattern, str], ...] = (
+    (re.compile(r"\b(?:stocks?|shares?|equit(?:y|ies))\b", re.I), "EQUITY"),
+    (re.compile(r"\b(?:etfs?|exchange[- ]traded\s+funds?)\b", re.I), "ETF"),
+    (re.compile(r"\b(?:crypto|cryptocurrenc(?:y|ies)|coins?)\b", re.I), "CRYPTOCURRENCY"),
+    (re.compile(r"\b(?:futures?|commodit(?:y|ies))\b", re.I), "FUTURE"),
+    (re.compile(r"\b(?:ind(?:ex|ices))\b", re.I), "INDEX"),
+)
+_MARKET_CUES: tuple[tuple[str, re.Pattern, frozenset[str], tuple[str, ...], tuple[str, ...]], ...] = (
+    ("TR", re.compile(r"\b(?:turkish|turkey|t[uü]rkiye|istanbul|bist)\b", re.I), frozenset({"IST"}), (".IS",), ("turk", "türk", "turkey", "istanbul")),
+    ("DE", re.compile(r"\b(?:german|germany|frankfurt|xetra|dax)\b", re.I), frozenset({"GER", "FRA", "ETR", "DUS", "MUN", "HAM", "BER"}), (".DE", ".F"), ("german",)),
+    ("GB", re.compile(r"\b(?:british|uk|london|ftse|lse)\b", re.I), frozenset({"LSE", "LON", "IOB"}), (".L",), ("london",)),
+    ("JP", re.compile(r"\b(?:japanese|japan|tokyo|nikkei)\b", re.I), frozenset({"JPX", "TYO"}), (".T",), ("japan", "tokyo")),
+    ("FR", re.compile(r"\b(?:french|france|paris|cac)\b", re.I), frozenset({"PAR"}), (".PA",), ("france", "paris")),
+    ("CA", re.compile(r"\b(?:canadian|canada|toronto|tsx)\b", re.I), frozenset({"TOR", "TSX", "VAN"}), (".TO", ".V"), ("canada",)),
+    ("HK", re.compile(r"\b(?:hong\s+kong|hkex|hsi)\b", re.I), frozenset({"HKG"}), (".HK",), ("hong kong",)),
+    ("IN", re.compile(r"\b(?:indian|india|mumbai|nse|bse|sensex|nifty)\b", re.I), frozenset({"NSI", "BOM", "BSE"}), (".NS", ".BO"), ("india",)),
+    ("KR", re.compile(r"\b(?:korean|korea|seoul|kospi|kosdaq)\b", re.I), frozenset({"KSC", "KOE"}), (".KS", ".KQ"), ("korea",)),
+    ("AU", re.compile(r"\b(?:australian|australia|sydney|asx)\b", re.I), frozenset({"ASX"}), (".AX",), ("australia",)),
+    ("BR", re.compile(r"\b(?:brazilian|brazil|bovespa|sao\s+paulo)\b", re.I), frozenset({"SAO"}), (".SA",), ("brazil",)),
+    ("CH", re.compile(r"\b(?:swiss|switzerland|zurich)\b", re.I), frozenset({"EBS"}), (".SW",), ("swiss",)),
+    ("NL", re.compile(r"\b(?:dutch|netherlands|amsterdam|aex)\b", re.I), frozenset({"AMS"}), (".AS",), ("netherlands",)),
+    ("ES", re.compile(r"\b(?:spanish|spain|madrid|ibex)\b", re.I), frozenset({"MCE"}), (".MC",), ("spain",)),
+    ("IT", re.compile(r"\b(?:italian|italy|milan)\b", re.I), frozenset({"MIL"}), (".MI",), ("italy",)),
+    ("CN", re.compile(r"\b(?:chinese|china|shanghai|shenzhen)\b", re.I), frozenset({"SHH", "SHZ"}), (".SS", ".SZ"), ("china",)),
+    ("US", re.compile(r"\b(?:american|nyse|nasdaq)\b|\bu\.?s\.?\s+(?:stock|equity|market|etf)\b", re.I), frozenset({"NMS", "NYQ", "NGM", "NCM", "PCX", "ASE", "BTS"}), (), ()),
+)
+
+
+def _extract_query_cues(context_query: str) -> tuple[str | None, tuple[str, frozenset[str], tuple[str, ...], tuple[str, ...]] | None]:
+    text = context_query or ""
+    if not text:
+        return None, None
+    want_type = next((qtype for pat, qtype in _TYPE_CUES if pat.search(text)), None)
+    want_market = next(((code, exchs, sfxs, hints) for code, pat, exchs, sfxs, hints in _MARKET_CUES if pat.search(text)), None)
+    return want_type, want_market
+
+
+def _matches_market(symbol: str, exchange: str, name: str, market_cue) -> bool:
+    if not market_cue:
+        return False
+    code, exchs, sfxs, hints = market_cue
+    if exchange.upper() in exchs:
+        return True
+    if sfxs and any(symbol.upper().endswith(s) for s in sfxs):
+        return True
+    if code == "US" and "." not in symbol and "=" not in symbol and not symbol.startswith("^"):
+        return True
+    low_name = name.lower()
+    return any(h in low_name for h in hints)
 
 
 def _overlap_tokens(text: str) -> set[str]:
@@ -35,17 +84,19 @@ def _overlap_tokens(text: str) -> set[str]:
     return longer or toks
 
 
-def resolve_yahoo_symbol(term: str, fetch=None) -> dict | None:
+def resolve_yahoo_symbol(term: str, fetch=None, *, context_query: str = "") -> dict | None:
     query = " ".join((term or "").strip().split())
     if not query or len(query) > 80:
         return None
     clean_key = query.lstrip("$").lower()
     explicit_ticker = bool(_EXPLICIT_TICKER.fullmatch(query))
     q_tokens = _overlap_tokens(query.lstrip("$"))
+    want_type, want_market = _extract_query_cues(context_query)
+    cache_key = f"{query}|{want_market[0] if want_market else ''}|{want_type or ''}"
     use_cache = fetch is None or fetch is fetch_json
     now = time.monotonic()
     if use_cache:
-        cached = _SYMBOL_CACHE.get(query)
+        cached = _SYMBOL_CACHE.get(cache_key)
         if cached and now - cached[0] < _SYMBOL_CACHE_TTL:
             return dict(cached[1]) if cached[1] is not None else None
     fn = fetch or fetch_json
@@ -74,17 +125,22 @@ def resolve_yahoo_symbol(term: str, fetch=None) -> dict | None:
             score = float(raw_score) if finite(raw_score) and raw_score >= 0 else None
             exact_sym = sym.lower() == clean_key or raw_sym.lower() == clean_key
             cand_tokens = _overlap_tokens(f"{sym} {raw_sym} {name}")
-            overlap = bool(q_tokens & cand_tokens)
+            overlap = bool(q_tokens & cand_tokens) or any(
+                len(qt) >= 3 and ct.startswith(qt) for qt in q_tokens for ct in cand_tokens
+            )
+            exchange = str(item.get("exchange") or "")
             rows.append({
                 "idx": idx,
                 "score": score,
                 "exact_sym": exact_sym,
                 "overlap": overlap,
+                "market_match": _matches_market(sym, exchange, name, want_market),
+                "type_match": bool(want_type and qtype == want_type),
                 "entry": {
                     "symbol": sym,
                     "name": name,
                     "quote_type": qtype,
-                    "exchange": str(item.get("exchange") or ""),
+                    "exchange": exchange,
                     "source": "Yahoo Finance search",
                     **({"score": round(score, 2)} if score is not None else {}),
                 },
@@ -92,15 +148,24 @@ def resolve_yahoo_symbol(term: str, fetch=None) -> dict | None:
         if rows:
             has_scores = any(r["score"] is not None for r in rows)
             top_score = max((r["score"] for r in rows if r["score"] is not None), default=0.0)
+            any_market_match = bool(want_market and any(r["market_match"] for r in rows))
+            any_type_match = bool(want_type and any(r["type_match"] for r in rows))
 
             def rank_key(row):
                 sc = row["score"]
-                promote_exact = row["exact_sym"] and (
-                    explicit_ticker
-                    or (not has_scores)
-                    or (sc is not None and top_score > 0 and sc >= 0.85 * top_score)
+                m_rank = (0 if row["market_match"] else 1) if any_market_match else 0
+                t_rank = (0 if row["type_match"] else 1) if any_type_match else 0
+                promote_exact = (
+                    row["exact_sym"]
+                    and m_rank == 0
+                    and t_rank == 0
+                    and (
+                        explicit_ticker
+                        or (not has_scores)
+                        or (sc is not None and top_score > 0 and sc >= 0.85 * top_score)
+                    )
                 )
-                return (0 if promote_exact else 1, -(sc if sc is not None else -1.0), row["idx"])
+                return (m_rank, t_rank, 0 if promote_exact else 1, -(sc if sc is not None else -1.0), row["idx"])
 
             rows.sort(key=rank_key)
             best = rows[0]
@@ -109,6 +174,7 @@ def resolve_yahoo_symbol(term: str, fetch=None) -> dict | None:
                 and best["score"] < 25000.0
                 and not best["exact_sym"]
                 and not best["overlap"]
+                and not best["market_match"]
             )
             if not low_score_junk:
                 found = dict(best["entry"])
@@ -116,10 +182,22 @@ def resolve_yahoo_symbol(term: str, fetch=None) -> dict | None:
                     {k: r["entry"][k] for k in ("symbol", "name", "quote_type", "exchange", "score") if k in r["entry"]}
                     for r in rows[:3]
                 ]
+                if (
+                    len(rows) >= 2
+                    and not best["exact_sym"]
+                    and not best["market_match"]
+                    and best["score"] is not None
+                    and rows[1]["score"] is not None
+                    and rows[1]["score"] >= 0.70 * best["score"]
+                    and rows[1]["type_match"] == best["type_match"]
+                    and (best["type_match"] or rows[1]["entry"]["quote_type"] == best["entry"]["quote_type"])
+                    and not (best["overlap"] and not rows[1]["overlap"])
+                ):
+                    found["ambiguous"] = True
     except (OSError, ValueError, KeyError, IndexError, TypeError, OverflowError, AttributeError):
         found = None
     if use_cache:
-        _SYMBOL_CACHE[query] = (now, dict(found) if found is not None else None)
+        _SYMBOL_CACHE[cache_key] = (now, dict(found) if found is not None else None)
     return found
 
 
@@ -293,9 +371,9 @@ class MarketTools:
         self.snapshots[ticker]=snap
         return snap
 
-    def resolve_symbol(self, term):
+    def resolve_symbol(self, term, context_query=""):
         self.check()
-        out = resolve_yahoo_symbol(term, fetch=self.fetch)
+        out = resolve_yahoo_symbol(term, fetch=self.fetch, context_query=context_query)
         self.check()
         return out
 

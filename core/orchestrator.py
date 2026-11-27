@@ -596,6 +596,7 @@ class TeamLeadOrchestrator:
         "Copy numbers exactly as written and never round. Do not add headings, dates, or numbers that are not in the reports. "
         "Do not call volume, momentum, or valuation high, low, strong, or weak: the reports contain no comparison data. "
         "Use only names and terms that appear in the reports. "
+        "Identify each asset using its full name and ticker symbol from the Data Analyst report. "
         "If a report says data or news is unavailable, say so plainly instead of guessing."
     )
 

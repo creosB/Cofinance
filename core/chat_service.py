@@ -375,17 +375,37 @@ class ChatService:
                 raise GlinerOutputError('Unsupported router intent.')
             tools=self.market_factory(cancel=cancel)
             resolved_tickers=list(dict.fromkeys(routed.tickers))
+            resolved_assets=[]
+            ambiguous_matches=[]
             candidates=tuple(getattr(routed,'entity_candidates',()) or ())
             if routed.intent!='open_conversation' and candidates and hasattr(tools,'resolve_symbol') and (not resolved_tickers or (routed.intent=='compare_assets' and len(resolved_tickers)<2)):
                 for term in candidates:
                     if len(resolved_tickers)>=6:break
                     self.store.progress(job['id'],f'Resolving {term}')
-                    found=trace.call('Resolve asset symbol','tool',lambda t=term:tools.resolve_symbol(t),actor='Yahoo Finance search',inputs={'term':term})
+                    def _lookup(t=term):
+                        try:
+                            return tools.resolve_symbol(t, context_query=job['query'])
+                        except TypeError:
+                            return tools.resolve_symbol(t)
+                    found=trace.call('Resolve asset symbol','tool',_lookup,actor='Yahoo Finance search',inputs={'term':term,'context_query':job['query'][:200]})
                     check()
-                    if isinstance(found,dict) and found.get('symbol') and found['symbol'] not in resolved_tickers:
+                    if isinstance(found,dict) and found.get('ambiguous') and found.get('alternatives'):
+                        ambiguous_matches.append((term, found['alternatives']))
+                    elif isinstance(found,dict) and found.get('symbol') and found['symbol'] not in resolved_tickers:
                         resolved_tickers.append(found['symbol'])
+                        resolved_assets.append({k:found[k] for k in ('symbol','name','quote_type','exchange') if k in found})
             documents=self.store.documents(session['id'])
             doc_match=bool(documents) and (routed.intent!='open_conversation' or any(e.get('matched') for e in select_excerpts(documents,job['query'],top=1)))
+            if ambiguous_matches and not resolved_tickers and not doc_match:
+                term, alts = ambiguous_matches[0]
+                choices = ', '.join(f"{a['symbol']} ({a['name']}, {a.get('exchange') or a.get('quote_type')})" for a in alts[:3])
+                answer = f"Multiple assets matched \"{term}\": {choices}. Reply with the exact ticker symbol or market you want to research."
+                trace.event('Asset clarification required','decision',{'reason':'ambiguous_symbol','term':term,'alternatives':alts[:3]},actor='Python')
+                trace.finish(summary={'origin':'chat','conversation_id':job['session_id'],'flow':'clarification','answer_kind':'clarification','answer':answer,'risk_mode':'not_resolved','model_choice':job['model']})
+                with self.lock:
+                    check()
+                    self.store.finish(job['id'],answer,{'kind':'clarification','charts':[],'evidence':[],'tickers':session_tickers,'mode':job['model'],'usage':trace.data.get('usage')},session_tickers,'complete')
+                return
             if routed.intent=='open_conversation':
                 tickers=[]
             else:
@@ -420,12 +440,8 @@ class ChatService:
                     self.store.progress(job['id'],'Loading the selected narrator')
                 self._load_narrator_locked()
                 if think:
-                    self.store.progress(job['id'],'Starting deep think')
-                    try:self.models.load_thinker();deep['used']=True
-                    except (ModelError,OSError) as exc:
-                        deep['note']='Deep think could not start ('+str(exc)[:120]+'), so this answer was written without it.'
-                        trace.event('Deep think unavailable','decision',{'reason':'start_failed','note':deep['note']},actor='Python')
-                    check()
+                    deep['note']='Deep think is used for Market Team Lead research synthesis, not general chat.'
+                    trace.event('Deep think skipped','decision',{'reason':'open_conversation','note':deep['note']},actor='Python')
                 elif self.models.thinker_loaded():self.models.stop_thinker()
                 self.store.progress(job['id'],'Answering locally')
                 inactive=self.ledger.inactive_runs(session['id'])
@@ -435,7 +451,7 @@ class ChatService:
                                 inputs={'intent':routed.intent,'history_messages':len(chat_messages),'live_tools':False}) as span_res:
                     with capture_usage() as receipts:
                         check()
-                        raw=self.models.complete(OPEN_CHAT_SYSTEM,job['query'],max_tokens=280,think=deep['used'],
+                        raw=self.models.complete(OPEN_CHAT_SYSTEM,job['query'],max_tokens=280,think=False,
                                                  messages=chat_messages,temperature=0.2,allow_truncated=True)
                     span_res['usage']=receipts[-1] if receipts else None
                     check()
