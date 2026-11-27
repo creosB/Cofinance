@@ -854,7 +854,8 @@ class TeamLeadOrchestrator:
                 val["restated_numbers"] = sum(1 for n in numbers_in(text) if any(abs(n - p) <= max(1e-9, abs(p) * 1e-9) for p in earlier))
             return ok, val
 
-        clean_synth = narrate(synth_prompt, 256)
+        lead_budget = 256 if len(tickers) <= 1 else min(448, 256 + 96 * (len(tickers) - 1))
+        clean_synth = narrate(synth_prompt, lead_budget)
         faithful, validation = judge(clean_synth)
         retried = False
         # Feedback retry (2026-11-08): a first draft rejected by a guard gets ONE retry whose last instruction names exactly
@@ -863,7 +864,7 @@ class TeamLeadOrchestrator:
         reason = validation.get("validation_reason")
         if not faithful and clean_synth and reason in self.RETRY_REASONS:
             retried = True
-            retry = narrate(synth_prompt + self.feedback(validation), 256)
+            retry = narrate(synth_prompt + self.feedback(validation), lead_budget)
             retry_ok, retry_val = judge(retry)
             summary = {"reason": reason, "rejected": self.rejected(validation), "retry_passed_guards": retry_ok,
                        "used": "retry" if retry_ok else "fallback",

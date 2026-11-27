@@ -238,6 +238,24 @@ class TestClaimProvenance(unittest.TestCase):
         agent.run(["NVDA", "AAPL"], "fundamental_equity", EventBus(), "s2")
         self.assertEqual(seen_budgets, [256, 384])
 
+        lead_budgets = []
+
+        class LeadBudgetLLM:
+            def complete(self, system, prompt, *, max_tokens=256, **kwargs):
+                lead_budgets.append(max_tokens)
+                return "NVDA trades at 135 USD and AAPL trades at 225 USD."
+
+        orch = TeamLeadOrchestrator(
+            router=_StubRouter(["NVDA", "AAPL"], intent="compare_assets"),
+            data_agent=DataAnalystAgent(BudgetLLM(), tools),
+            news_agent=NewsResearcherAgent(None, _EmptyNews()),
+            lead_llm=LeadBudgetLLM(),
+            tools=tools,
+        )
+        res = orch.run("Compare NVDA and AAPL")
+        self.assertTrue(res.faithful_synthesis)
+        self.assertEqual(lead_budgets, [352])
+
     def test_asset_name_numbers_allowed_for_futures_and_indices(self):
         from core.orchestrator import EventBus, market_fact_numbers
         gold_snap = {
