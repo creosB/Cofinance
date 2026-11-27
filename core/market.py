@@ -13,7 +13,9 @@ from datetime import datetime, timezone
 from urllib.parse import quote, urlsplit
 
 CRYPTO = {"BTC","ETH","SOL","ADA","DOGE","XRP","BNB","AVAX","DOT","LINK"}
-SYMBOL = re.compile(r"[A-Z^][A-Z0-9.\-=]{0,14}")
+NUMERIC_LISTING = r"[0-9]{1,6}\.[A-Z]{1,4}"
+SYMBOL = re.compile(rf"(?:[A-Z^][A-Z0-9.\-=]{{0,14}}|{NUMERIC_LISTING})")
+QUALIFIED_NUMERIC_TICKER = re.compile(rf"(?<![\w.]){NUMERIC_LISTING}(?![\w]|\.[\w.])", re.I)
 SEARCH_QUOTE_TYPES = frozenset({"EQUITY", "ETF", "INDEX", "CRYPTOCURRENCY", "FUTURE", "CURRENCY", "MUTUALFUND"})
 _SYMBOL_CACHE: dict[str, tuple[float, dict | None]] = {}
 _SYMBOL_CACHE_TTL = 300.0
@@ -25,7 +27,7 @@ def valid_symbol(symbol):
     return symbol
 
 
-_EXPLICIT_TICKER = re.compile(r"\$?[A-Z][A-Z0-9.\-=]{0,9}")
+_EXPLICIT_TICKER = re.compile(rf"\$?(?:[A-Z][A-Z0-9.\-=]{{0,9}}|{NUMERIC_LISTING})")
 _QUERY_STOP = frozenset({"the", "of", "and", "in", "for", "inc", "corp", "co", "ltd"})
 _TYPE_CUES: tuple[tuple[re.Pattern, str], ...] = (
     (re.compile(r"\b(?:stocks?|shares?|equit(?:y|ies))\b", re.I), "EQUITY"),
@@ -55,27 +57,23 @@ _MARKET_CUES: tuple[tuple[str, re.Pattern, frozenset[str], tuple[str, ...], tupl
 )
 
 
-def _extract_query_cues(context_query: str) -> tuple[str | None, tuple[str, frozenset[str], tuple[str, ...], tuple[str, ...]] | None]:
+def _extract_query_cues(context_query: str) -> tuple[str | None, tuple[str, frozenset[str], tuple[str, ...]] | None]:
     text = context_query or ""
     if not text:
         return None, None
-    want_type = next((qtype for pat, qtype in _TYPE_CUES if pat.search(text)), None)
-    want_market = next(((code, exchs, sfxs, hints) for code, pat, exchs, sfxs, hints in _MARKET_CUES if pat.search(text)), None)
-    return want_type, want_market
+    kinds = {kind for pat, kind in _TYPE_CUES if pat.search(text)}
+    listing_text = re.split(r"\b(?:with\s+.+?\bexposure|exposure\s+to)\b", text, maxsplit=1, flags=re.I)[0]
+    markets = [(code, exchanges, suffixes) for code, pat, exchanges, suffixes, _ in _MARKET_CUES if pat.search(listing_text)]
+    return next(iter(kinds)) if len(kinds) == 1 else None, markets[0] if len(markets) == 1 else None
 
 
-def _matches_market(symbol: str, exchange: str, name: str, market_cue) -> bool:
+def _matches_market(symbol: str, exchange: str, market_cue) -> bool:
     if not market_cue:
         return False
-    code, exchs, sfxs, hints = market_cue
-    if exchange.upper() in exchs:
-        return True
-    if sfxs and any(symbol.upper().endswith(s) for s in sfxs):
-        return True
-    if code == "US" and "." not in symbol and "=" not in symbol and not symbol.startswith("^"):
-        return True
-    low_name = name.lower()
-    return any(h in low_name for h in hints)
+    _, exchanges, suffixes = market_cue
+    if exchange:
+        return exchange.upper() in exchanges
+    return bool(suffixes and symbol.endswith(suffixes))
 
 
 def _overlap_tokens(text: str) -> set[str]:
@@ -134,7 +132,7 @@ def resolve_yahoo_symbol(term: str, fetch=None, *, context_query: str = "") -> d
                 "score": score,
                 "exact_sym": exact_sym,
                 "overlap": overlap,
-                "market_match": _matches_market(sym, exchange, name, want_market),
+                "market_match": _matches_market(sym, exchange, want_market),
                 "type_match": bool(want_type and qtype == want_type),
                 "entry": {
                     "symbol": sym,
@@ -145,27 +143,16 @@ def resolve_yahoo_symbol(term: str, fetch=None, *, context_query: str = "") -> d
                     **({"score": round(score, 2)} if score is not None else {}),
                 },
             })
+        rows = [r for r in rows if (not want_market or r["market_match"]) and (not want_type or r["type_match"])]
         if rows:
-            has_scores = any(r["score"] is not None for r in rows)
-            top_score = max((r["score"] for r in rows if r["score"] is not None), default=0.0)
-            any_market_match = bool(want_market and any(r["market_match"] for r in rows))
-            any_type_match = bool(want_type and any(r["type_match"] for r in rows))
+            top_score = max((r["score"] for r in rows if r["score"] is not None), default=None)
 
             def rank_key(row):
                 sc = row["score"]
-                m_rank = (0 if row["market_match"] else 1) if any_market_match else 0
-                t_rank = (0 if row["type_match"] else 1) if any_type_match else 0
-                promote_exact = (
-                    row["exact_sym"]
-                    and m_rank == 0
-                    and t_rank == 0
-                    and (
-                        explicit_ticker
-                        or (not has_scores)
-                        or (sc is not None and top_score > 0 and sc >= 0.85 * top_score)
-                    )
+                promote_exact = row["exact_sym"] and (
+                    explicit_ticker or top_score is None or (sc is not None and sc >= 0.85 * top_score)
                 )
-                return (m_rank, t_rank, 0 if promote_exact else 1, -(sc if sc is not None else -1.0), row["idx"])
+                return (0 if promote_exact else 1, -(sc if sc is not None else -1.0), row["idx"])
 
             rows.sort(key=rank_key)
             best = rows[0]
@@ -174,7 +161,6 @@ def resolve_yahoo_symbol(term: str, fetch=None, *, context_query: str = "") -> d
                 and best["score"] < 25000.0
                 and not best["exact_sym"]
                 and not best["overlap"]
-                and not best["market_match"]
             )
             if not low_score_junk:
                 found = dict(best["entry"])
@@ -185,11 +171,8 @@ def resolve_yahoo_symbol(term: str, fetch=None, *, context_query: str = "") -> d
                 if (
                     len(rows) >= 2
                     and not best["exact_sym"]
-                    and not best["market_match"]
-                    and best["score"] is not None
-                    and rows[1]["score"] is not None
-                    and rows[1]["score"] >= 0.70 * best["score"]
-                    and rows[1]["type_match"] == best["type_match"]
+                    and (best["score"] is None or rows[1]["score"] is None
+                         or rows[1]["score"] >= 0.70 * best["score"])
                     and (best["type_match"] or rows[1]["entry"]["quote_type"] == best["entry"]["quote_type"])
                     and not (best["overlap"] and not rows[1]["overlap"])
                 ):

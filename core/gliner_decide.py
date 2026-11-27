@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Protocol, Sequence, Set, Tuple
 
 from .entities import extract_known_tickers
+from .market import QUALIFIED_NUMERIC_TICKER
 from .signals import Classifier, Item, Judgment
 
 
@@ -276,9 +277,9 @@ class GlinerQueryRouter:
 
         tickers = extract_known_tickers(query, self.universe, self.aliases)
         seen = set(tickers)
-        candidates: List[str] = []
-        seen_candidates: Set[str] = set()
-        has_asset_cue = bool(_ASSET_QUERY_RE.search(query or ""))
+        candidates = list(dict.fromkeys(m.group().upper() for m in QUALIFIED_NUMERIC_TICKER.finditer(query or "")))[:6]
+        seen_candidates = {candidate.lower() for candidate in candidates}
+        has_asset_cue = bool(candidates or _ASSET_QUERY_RE.search(query or ""))
 
         skip_ner = intent == "open_conversation" and not tickers and intent_conf >= 0.50 and not has_asset_cue
         needs_ner = not skip_ner and (not tickers or (intent == "compare_assets" and len(tickers) < 2))

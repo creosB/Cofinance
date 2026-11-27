@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Iterator, List, Optional
 
 from .memory import MemoryHit, _namespace
+from .process_guard import spawn_managed
 
 MODEL_FILE = "Qwen3-Embedding-0.6B-Q8_0.gguf"
 MODEL_SIZE = 639150592
@@ -80,23 +81,28 @@ class HyMemoryLite:
         finally:
             db.close()
 
-    def _vacuum_sqlite(self, path: Path) -> None:
+    @staticmethod
+    def _checkpoint(db: sqlite3.Connection) -> None:
+        result = db.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+        if result is not None and result[0]:
+            raise sqlite3.OperationalError("Memory checkpoint is busy")
+
+    def _vacuum_sqlite(self, path: Path, *, strict: bool = False) -> None:
         if not path.is_file():
             return
         db = sqlite3.connect(path, timeout=5)
         try:
             db.execute("PRAGMA secure_delete=ON")
             db.execute("VACUUM")
-            db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            self._checkpoint(db)
         except sqlite3.Error:
-            pass
+            if strict:
+                raise
         finally:
             db.close()
 
     def _scrub_internal_stores(self, *, session_id: Optional[str] = None, memory_ids: tuple[str, ...] = (), clear_all: bool = False) -> None:
         store_dir = self.base / "store" / "data"
-        if not store_dir.is_dir():
-            return
         self.close()
         cache_db = store_dir / "cache.db"
         if cache_db.is_file():
@@ -114,9 +120,10 @@ class HyMemoryLite:
                         for mid in memory_ids:
                             db.execute("DELETE FROM memory_operations_v2 WHERE memory_id=? OR old_memory_id=?", (mid, mid))
                 db.execute("VACUUM")
-                db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                self._checkpoint(db)
             except sqlite3.Error:
-                pass
+                if clear_all:
+                    raise
             finally:
                 db.close()
         hist_db = store_dir / "history.db"
@@ -133,9 +140,10 @@ class HyMemoryLite:
                         for mid in memory_ids:
                             db.execute("DELETE FROM memory_history WHERE memory_id=?", (mid,))
                 db.execute("VACUUM")
-                db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                self._checkpoint(db)
             except sqlite3.Error:
-                pass
+                if clear_all:
+                    raise
             finally:
                 db.close()
         chroma_db = store_dir / "vector_db" / "chroma.sqlite3"
@@ -156,9 +164,10 @@ class HyMemoryLite:
                             db.execute("DELETE FROM embeddings_queue WHERE metadata LIKE ?", (f"%{session_id}%",))
                     db.execute("INSERT INTO embedding_fulltext_search(embedding_fulltext_search) VALUES('rebuild')")
                 db.execute("VACUUM")
-                db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                self._checkpoint(db)
             except sqlite3.Error:
-                pass
+                if clear_all:
+                    raise
             finally:
                 db.close()
         if clear_all:
@@ -167,13 +176,13 @@ class HyMemoryLite:
                 for log_file in default_logs.glob("*.log*"):
                     try:
                         log_file.unlink()
-                    except OSError:
+                    except FileNotFoundError:
                         pass
 
     def scrub_all(self) -> None:
         with self.write_lock:
             self._scrub_internal_stores(clear_all=True)
-            self._vacuum_sqlite(self.base / "links.db")
+            self._vacuum_sqlite(self.base / "links.db", strict=True)
 
     # -- processes -------------------------------------------------------------------------------------------------
     def start(self) -> None:
@@ -185,13 +194,11 @@ class HyMemoryLite:
         logs = self.base / "logs"
         logs.mkdir(exist_ok=True)
         port = _free_port()
-        self.embedder = subprocess.Popen(
+        self.embedder = spawn_managed(
             [str(self.server), "--model", str(self.model), "--embedding", "--pooling", "last", "--host", "127.0.0.1",
-             "--port", str(port), "-c", "8192", "-ub", "8192", "--alias", "qwen3-embedding-0.6b"],
+             "--port", str(port), "-c", "8192", "-ub", "8192", "--alias", "qwen3-embedding-0.6b"], error_type=HyMemoryError,
             cwd=str(self.server.parent), stdin=subprocess.DEVNULL, stdout=(logs / "embedder.log").open("a"),
             stderr=subprocess.STDOUT, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        from .process_guard import bind_child
-        bind_child(self.embedder)
         until = time.monotonic() + 120
         while time.monotonic() < until:
             if self.embedder.poll() is not None:
@@ -214,11 +221,14 @@ class HyMemoryLite:
             "MEMORY_LOG_DIR": str(logs), "ANONYMIZED_TELEMETRY": "False", "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1",
             "PYTHONIOENCODING": "utf-8", "HTTP_PROXY": CLOSED, "HTTPS_PROXY": CLOSED, "ALL_PROXY": CLOSED,
             "NO_PROXY": "127.0.0.1,localhost"})
-        self.worker = subprocess.Popen(
-            [str(self.venv_python), "-u", str(self.repo / "core" / "hymemory_worker.py")], cwd=str(self.base),
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=(logs / "worker.log").open("a"), env=env,
-            text=True, encoding="utf-8", creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        bind_child(self.worker)
+        try:
+            self.worker = spawn_managed(
+                [str(self.venv_python), "-u", str(self.repo / "core" / "hymemory_worker.py")], error_type=HyMemoryError,
+                cwd=str(self.base), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=(logs / "worker.log").open("a"),
+                env=env, text=True, encoding="utf-8", creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        except HyMemoryError:
+            self.close()
+            raise
         self.replies = queue.Queue()
         def pump(stream, q):
             for line in stream:

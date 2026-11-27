@@ -116,7 +116,10 @@ export function ConversationList({chat,onSelect}:{chat:ChatController;onSelect?:
  }
  const clearAll=async()=>{
   setWorking('*')
-  try{const r=await chat.clearConversations() as {deleted?:number};const n=r?.deleted??0;done(r,'Deleted '+n+' conversation'+(n===1?'':'s')+'.');setClearOpen(false)}
+  try{const r=await chat.clearConversations() as {deleted?:number;cleanup_retry?:boolean;error?:string};const n=r?.deleted??0
+   if(r?.cleanup_retry)setNotice({text:r.error||'Local memory cleanup is incomplete. Retry Clear All.',bad:true})
+   else done(r,'Deleted '+n+' conversation'+(n===1?'':'s')+'.')
+   setClearOpen(false)}
   catch(e){fail(e,'The conversations could not be cleared.')}finally{setWorking('')}
  }
  return <div className="side-section conversation-history"><div className="history-search"><Search size={16} aria-hidden="true"/><Input aria-label="Search conversations" placeholder="Search conversations" value={search} onChange={e=>setSearch(e.target.value)}/></div><div className="side-heading"><span>Conversations</span></div>
@@ -136,7 +139,7 @@ export function ConversationList({chat,onSelect}:{chat:ChatController;onSelect?:
      <TooltipContent side="right">{running?'A run is active in this conversation':'Delete conversation'}</TooltipContent></Tooltip>
    </div>})}
    {chat.workspace&&!sessions.length&&<p className="sidebar-empty">No conversations yet.</p>}{sessions.length>0&&!matches.length&&<p className="sidebar-empty">No matching conversations.</p>}</div>
-  <details className="history-options"><summary>History options<ChevronDown size={14}/></summary><Button variant="ghost" disabled={chat.busy||anyRun||!sessions.length||!!working} onClick={()=>{setNotice(null);setClearOpen(true)}}><ListX size={16}/>Clear all conversations</Button>{anyRun&&<p className="sidebar-empty">Wait for the active run to finish.</p>}</details>
+  <details className="history-options"><summary>History options<ChevronDown size={14}/></summary><Button variant="ghost" disabled={chat.busy||anyRun||!!working} onClick={()=>{setNotice(null);setClearOpen(true)}}><ListX size={16}/>Clear all conversations</Button>{anyRun&&<p className="sidebar-empty">Wait for the active run to finish.</p>}</details>
   <Dialog open={clearOpen} onOpenChange={v=>{if(working!=='*')setClearOpen(v)}}>
    <DialogContent className="clear-dialog">
     <DialogHeader><DialogTitle>Clear all conversations?</DialogTitle>

@@ -26,6 +26,10 @@ def _ensure_job() -> int | None:
             kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
             kernel32.CreateJobObjectW.argtypes = [wintypes.LPVOID, wintypes.LPCWSTR]
             kernel32.CreateJobObjectW.restype = wintypes.HANDLE
+            kernel32.SetInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, wintypes.LPVOID, wintypes.DWORD]
+            kernel32.SetInformationJobObject.restype = wintypes.BOOL
+            kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+            kernel32.CloseHandle.restype = wintypes.BOOL
 
             class _IO_COUNTERS(ctypes.Structure):
                 _fields_ = [
@@ -99,6 +103,21 @@ def bind_child(process: subprocess.Popen | None) -> bool:
         return bool(kernel32.AssignProcessToJobObject(wintypes.HANDLE(job), wintypes.HANDLE(int(handle))))
     except Exception:
         return False
+
+
+def spawn_managed(command, *, error_type=OSError, **options) -> subprocess.Popen:
+    process = subprocess.Popen(command, **options)
+    if os.name != "nt" or bind_child(process):
+        return process
+    try:
+        if process.poll() is None:
+            process.kill()
+        process.wait(timeout=5)
+    finally:
+        for stream in (process.stdin, process.stdout, process.stderr):
+            if stream is not None:
+                stream.close()
+    raise error_type("Local worker could not be contained; startup stopped.")
 
 
 def _is_cofinance_child(proc: dict, repo_str: str, data_str: str) -> bool:

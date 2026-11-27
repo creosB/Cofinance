@@ -19,6 +19,7 @@ import urllib.request
 import zipfile
 from pathlib import Path, PurePosixPath
 from urllib.parse import urlsplit
+from .process_guard import spawn_managed
 
 MODEL_ID = "lfm3-1.7b-q4km"
 REVISION = "cd0c74c575b5c416f3011b5b4c298077f26ca8c2"
@@ -550,10 +551,8 @@ class LocalModels:
         command = server_command(executables[0], self.path_of(model), model, port, key, backend, flags=thinking_server_flags(backend))
         env = {k:v for k,v in os.environ.items() if k.upper() in {"SYSTEMROOT","WINDIR","PATH","TEMP","TMP","USERPROFILE","LOCALAPPDATA","APPDATA","COMSPEC","PROCESSOR_ARCHITECTURE"}}
         with (self.root / "llama-server-think.log").open("a", encoding="utf-8") as log:
-            process = subprocess.Popen(command, cwd=self.backend_dir(backend), env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+            process = spawn_managed(command, error_type=ModelError, cwd=self.backend_dir(backend), env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
                                        creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
-        from .process_guard import bind_child
-        bind_child(process)
         self.thinker = {"process": process, "url": url, "key": key, "model": model, "backend": backend}
         try:
             for _ in range(180):
@@ -607,10 +606,8 @@ class LocalModels:
         label = BACKENDS[backend]["label"]
         self.update(phase="loading", stage=f"Starting local {label} narrator", error="")
         with (self.root / "llama-server.log").open("a", encoding="utf-8") as log:
-            self.process = subprocess.Popen(command, cwd=self.backend_dir(backend), env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+            self.process = spawn_managed(command, error_type=ModelError, cwd=self.backend_dir(backend), env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
                                             creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
-        from .process_guard import bind_child
-        bind_child(self.process)
         for _ in range(180):
             self.check_cancel()
             if self.process.poll() is not None: raise ModelError("Local narrator exited. See the managed runtime log.")

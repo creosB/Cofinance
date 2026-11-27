@@ -153,8 +153,15 @@ METRIC_CUES: Tuple[Tuple[re.Pattern[str], Tuple[str, ...], str], ...] = (
 _TEMPORAL_MODIFIER = re.compile(r"^\s*[- ]?(?:week|weeks|day|days|month|months|year|years|hour|hours)\b", re.I)
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+|;\s*")
 _SUBCLAUSE_SPLIT = re.compile(r",\s*(?:and\s+|while\s+|whereas\s+|but\s+)?|\s+\b(?:while|whereas|versus|vs\.?)\b\s+", re.I)
-_CURRENCY_BEFORE = re.compile(r"(?:[$€£₺¥])\s*$")
-_CURRENCY_AFTER = re.compile(r"^\s*(?:usd|eur|gbp|gbx|try|jpy|cad|chf|hkd|inr|krw|aud|brl|cny|sek|nok|pln|dollars?|euros?|pounds?|lira|yen|yuan)\b", re.I)
+_CURRENCY_SYMBOLS = {"$": frozenset({"USD", "CAD", "AUD", "HKD", "NZD", "SGD", "MXN"}),
+                     "\u20ac": frozenset({"EUR"}), "\u00a3": frozenset({"GBP"}),
+                     "\u20ba": frozenset({"TRY"}), "\u00a5": frozenset({"JPY", "CNY"})}
+_CURRENCY_WORDS = {"dollar": "$", "dollars": "$", "euro": "EUR", "euros": "EUR",
+                   "pound": "GBP", "pounds": "GBP", "pence": "GBX", "lira": "TRY",
+                   "yen": "JPY", "yuan": "CNY"}
+_CURRENCY_BEFORE = re.compile("[" + "".join(_CURRENCY_SYMBOLS) + r"]\s*$")
+_CURRENCY_AFTER = re.compile(r"^\s*(usd|eur|gbp|gbx|try|jpy|cad|chf|hkd|inr|krw|aud|brl|cny|sek|nok|pln|nzd|sgd|mxn|"
+                             + "|".join(_CURRENCY_WORDS) + r")\b", re.I)
 _PERCENT_AFTER = re.compile(r"^\s*(?:%|percent|percentage)\b", re.I)
 _COUNT_AFTER = re.compile(r"^\s*(?:shares?|contracts?)\b", re.I)
 _NAME_STOP = frozenset({
@@ -201,6 +208,7 @@ def _fact_rows(raw_facts: Mapping[str, Any]) -> Tuple[List[Dict[str, Any]], Dict
                 "value": float(shown_val),
                 "shown": shown_text,
                 "unit": FIELD_UNIT[key],
+                "currency": _currency_code(snap.get("currency")) if FIELD_UNIT[key] == "currency" else None,
             })
     return rows, aliases
 
@@ -209,17 +217,30 @@ def _protected(start: int, end: int, protected_spans: Sequence[Tuple[int, int]])
     return any(start < b and end > a for a, b in protected_spans)
 
 
-def _claimed_unit(text: str, start: int, end: int) -> str | None:
+def _currency_code(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    code = value.strip()
+    if code == "GBp":
+        return "GBX"
+    return code.upper() if re.fullmatch(r"[A-Za-z]{3}", code) else None
+
+
+def _claimed_unit(text: str, start: int, end: int) -> tuple[str | None, frozenset[str] | None]:
     token = text[start:end]
-    before = text[max(0, start - 4):start]
+    before = _CURRENCY_BEFORE.search(text[max(0, start - 4):start])
     after = text[end:min(len(text), end + 16)]
+    named = _CURRENCY_AFTER.search(after)
     if "%" in token or _PERCENT_AFTER.search(after):
-        return "percent"
-    if _CURRENCY_BEFORE.search(before) or _CURRENCY_AFTER.search(after):
-        return "currency"
+        return "percent", None
+    if before or named:
+        prefix = _CURRENCY_SYMBOLS[before.group().strip()] if before else None
+        marker = _CURRENCY_WORDS.get(named.group(1).lower(), named.group(1)) if named else None
+        suffix = (_CURRENCY_SYMBOLS.get(marker) or frozenset({_currency_code(marker)})) if marker else None
+        return "currency", prefix & suffix if prefix is not None and suffix is not None else prefix or suffix
     if _COUNT_AFTER.search(after):
-        return "count"
-    return None
+        return "count", None
+    return None, None
 
 
 def _sentence_bounds(text: str, start: int, end: int) -> Tuple[int, int]:
@@ -424,7 +445,7 @@ def check_claim_provenance(
 
         sent_lo, sent_hi = _sentence_bounds(text, start, end)
         sub_lo, sub_hi = _subclause_bounds(text, sent_lo, sent_hi, start, end)
-        claimed_unit = _claimed_unit(text, start, end)
+        claimed_unit, denominations = _claimed_unit(text, start, end)
         claimed_fields, cue_label = _local_cues(text, start, end, sub_lo, sub_hi, raw_span_coords, claimed_unit)
         claimed_asset = _asset_for_span(text, sent_lo, sent_hi, sub_lo, sub_hi, start, aliases)
 
@@ -434,6 +455,10 @@ def check_claim_provenance(
         if any(matches(value, ov) for ov in other_vals) and not claimed_fields:
             continue
 
+        def denomination_ok(r: Mapping[str, Any]) -> bool:
+            return denominations is None or (bool(denominations) and
+                   (r["currency"] is None or r["currency"] in denominations))
+
         def row_ok(r: Mapping[str, Any]) -> bool:
             if claimed_asset and r["asset"].upper() != claimed_asset.upper():
                 return False
@@ -441,7 +466,7 @@ def check_claim_provenance(
                 return False
             if claimed_unit and r["unit"] != claimed_unit:
                 return False
-            return True
+            return denomination_ok(r)
 
         if any(row_ok(r) for r in matched_rows):
             continue
@@ -453,11 +478,17 @@ def check_claim_provenance(
             violations.append("metric")
         if claimed_unit and not any(r["unit"] == claimed_unit for r in matched_rows):
             violations.append("unit")
+        matching_claim = [r for r in matched_rows if (not claimed_asset or r["asset"].upper() == claimed_asset.upper())
+                          and (not claimed_fields or r["field"] in claimed_fields) and r["unit"] == "currency"]
+        if denominations is not None and matching_claim and not any(denomination_ok(r) for r in matching_claim):
+            violations.append("currency")
         if not violations:
             violations.append("combination")
 
         if "asset" in violations:
             kind = "asset_misattribution"
+        elif "currency" in violations:
+            kind = "currency_mismatch"
         elif "metric" in violations and "unit" not in violations:
             kind = "metric_misbinding"
         elif "unit" in violations and "metric" not in violations:
@@ -473,6 +504,7 @@ def check_claim_provenance(
                 "asset": claimed_asset,
                 "fields": list(claimed_fields),
                 "unit": claimed_unit,
+                "currencies": sorted(denominations) if denominations is not None else None,
                 "cue": cue_label,
                 "clause": text[sent_lo:sent_hi].strip()[:200],
             },
@@ -482,6 +514,7 @@ def check_claim_provenance(
                     "field": r["field"],
                     "shown": r["shown"],
                     "unit": r["unit"],
+                    "currency": r["currency"],
                 }
                 for r in matched_rows
             ],

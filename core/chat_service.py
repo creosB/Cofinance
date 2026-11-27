@@ -375,32 +375,39 @@ class ChatService:
                 raise GlinerOutputError('Unsupported router intent.')
             tools=self.market_factory(cancel=cancel)
             resolved_tickers=list(dict.fromkeys(routed.tickers))
-            resolved_assets=[]
-            ambiguous_matches=[]
+            resolution_gaps=[]
             candidates=tuple(getattr(routed,'entity_candidates',()) or ())
-            if routed.intent!='open_conversation' and candidates and hasattr(tools,'resolve_symbol') and (not resolved_tickers or (routed.intent=='compare_assets' and len(resolved_tickers)<2)):
+            if routed.intent!='open_conversation' and candidates and (not resolved_tickers or routed.intent=='compare_assets'):
+                clauses=re.split(r'\s+(?:and|versus|vs\.?)\s+',job['query'],flags=re.I) if routed.intent=='compare_assets' else [job['query']]
                 for term in candidates:
-                    if len(resolved_tickers)>=6:break
+                    if len(resolved_tickers)>=6:raise ValueError('Limit a research run to six assets.')
+                    matching=[c for c in clauses if re.search(r'(?<!\w)'+re.escape(term)+r'(?!\w)',c,re.I)]
+                    context=matching[0] if len(matching)==1 else job['query'] if len(clauses)==1 else ''
                     self.store.progress(job['id'],f'Resolving {term}')
-                    def _lookup(t=term):
-                        try:
-                            return tools.resolve_symbol(t, context_query=job['query'])
-                        except TypeError:
-                            return tools.resolve_symbol(t)
-                    found=trace.call('Resolve asset symbol','tool',_lookup,actor='Yahoo Finance search',inputs={'term':term,'context_query':job['query'][:200]})
+                    def lookup():
+                        resolver=getattr(tools,'resolve_symbol',None)
+                        if resolver is None:return None
+                        try:return resolver(term,context_query=context)
+                        except TypeError:return resolver(term)
+                    found=trace.call('Resolve asset symbol','tool',lookup,actor='Yahoo Finance search',inputs={'term':term,'context_query':context[:200]})
                     check()
-                    if isinstance(found,dict) and found.get('ambiguous') and found.get('alternatives'):
-                        ambiguous_matches.append((term, found['alternatives']))
-                    elif isinstance(found,dict) and found.get('symbol') and found['symbol'] not in resolved_tickers:
-                        resolved_tickers.append(found['symbol'])
-                        resolved_assets.append({k:found[k] for k in ('symbol','name','quote_type','exchange') if k in found})
+                    if isinstance(found,dict) and found.get('ambiguous'):
+                        resolution_gaps.append((term,found.get('alternatives',[])))
+                    elif isinstance(found,dict) and found.get('symbol'):
+                        if found['symbol'] not in resolved_tickers:resolved_tickers.append(found['symbol'])
+                    else:
+                        resolution_gaps.append((term,[]))
             documents=self.store.documents(session['id'])
             doc_match=bool(documents) and (routed.intent!='open_conversation' or any(e.get('matched') for e in select_excerpts(documents,job['query'],top=1)))
-            if ambiguous_matches and not resolved_tickers and not doc_match:
-                term, alts = ambiguous_matches[0]
-                choices = ', '.join(f"{a['symbol']} ({a['name']}, {a.get('exchange') or a.get('quote_type')})" for a in alts[:3])
-                answer = f"Multiple assets matched \"{term}\": {choices}. Reply with the exact ticker symbol or market you want to research."
-                trace.event('Asset clarification required','decision',{'reason':'ambiguous_symbol','term':term,'alternatives':alts[:3]},actor='Python')
+            if resolution_gaps:
+                term,alts=resolution_gaps[0]
+                if alts:
+                    choices=', '.join(f"{a['symbol']} ({a['name']}, {a.get('exchange') or a.get('quote_type')})" for a in alts[:3])
+                    answer=f'Multiple assets matched "{term}": {choices}. Reply with the exact ticker symbol or market you want to research.'
+                else:
+                    answer=f'I could not match "{term}" to an asset for this request. What is its exact ticker or exchange?'
+                trace.event('Asset clarification required','decision',{'reason':'ambiguous_symbol' if alts else 'unresolved_symbol','term':term,'alternatives':alts[:3],
+                            'unresolved_mentions':[name for name,_ in resolution_gaps]},actor='Python')
                 trace.finish(summary={'origin':'chat','conversation_id':job['session_id'],'flow':'clarification','answer_kind':'clarification','answer':answer,'risk_mode':'not_resolved','model_choice':job['model']})
                 with self.lock:
                     check()
@@ -925,6 +932,7 @@ class ChatService:
             self._clearing=True
         results=[]
         orphan_traces=0
+        cleanup_retry=False
         try:
             for sid in ids:
                 try:results.append(self._delete_one(sid))
@@ -941,7 +949,7 @@ class ChatService:
             _,semantic=self.backends()
             if semantic is not None and hasattr(semantic,'scrub_all') and not self.store.session_ids():
                 try:semantic.scrub_all()
-                except Exception:pass
+                except Exception:cleanup_retry=True
         finally:
             with self.lock:
                 self.deleting.difference_update(ids)
@@ -951,8 +959,10 @@ class ChatService:
         result={'deleted':len(results),'messages':sum(r['messages'] for r in results),
                 'traces_deleted':sum(r['traces_deleted'] for r in results)+orphan_traces,
                 'memory_pending':sum(r['memory_pending'] for r in results),
-                'sweep_pending':sum(1 for r in results if r['sweep_pending']),
-                'error':next((r['error'] for r in results if r['error']),'')}
+                'sweep_pending':sum(1 for r in results if r['sweep_pending'])+int(cleanup_retry),
+                'error':'Some local memory copies could not be cleared. Retry Clear All.' if cleanup_retry else
+                        next((r['error'] for r in results if r['error']), '')}
+        if cleanup_retry:result['cleanup_retry']=True
         self.ledger.record_op(request_id,'clear_conversations','*',result)
         return result
 

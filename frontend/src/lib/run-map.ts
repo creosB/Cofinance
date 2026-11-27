@@ -82,8 +82,10 @@ export function interactiveStages(run:Run):MapStage[]{
 
  if(flow==='clarification'){
   const clarifySpans=spans.filter(s=>s.name==='Asset clarification required')
-  const dispatchStage=stage('dispatch','Dispatch policy','Python coordinator','Tool-only mode requires a ticker, company, or attached PDF before running research tools.',clarifySpans,run,'Asset clarification required (tool-only mode)')
-  const resultStage=stage('result','Accepted result','Local conversation','Saved clarification prompt without calling a local narrator or market tools.',clarifySpans,run,answerAccepted?'Clarification recorded (no model call)':'No accepted final answer recorded')
+  const reason=text(object(clarifySpans[0]?.outputs).reason)
+  const lookupClarification=reason==='ambiguous_symbol'||reason==='unresolved_symbol'
+  const dispatchStage=stage('dispatch','Dispatch policy','Python coordinator','The request needs a confirmed asset before specialists can research it.',clarifySpans,run,lookupClarification?'Symbol lookup needs clarification':'Asset clarification required')
+  const resultStage=stage('result','Accepted result','Local conversation','Saved the clarification without narrating a research answer.',clarifySpans,run,answerAccepted?'Clarification recorded (no narrator call)':'No accepted final answer recorded')
   if(answerAccepted&&resultStage.state==='not_observed')resultStage.state='complete'
   if(!answerAccepted)resultStage.state=run.status==='running'?'running':'not_reached'
   return [requestStage,routerStage,dispatchStage,resultStage]

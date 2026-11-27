@@ -319,4 +319,33 @@ class TestChatShellBrowser(unittest.TestCase):
             oc_thread.join(timeout=3)
             oc_service.close()
 
+    def test_clear_all_failure_is_visible_and_can_be_retried_with_empty_history(self):
+        clear = self.service.clear_conversations
+        requests = []
+
+        def clear_with_one_failure(request_id):
+            result = clear(request_id)
+            requests.append(request_id)
+            if len(requests) == 1:
+                return {**result, 'cleanup_retry': True, 'sweep_pending': 1,
+                        'error': 'Some local memory copies could not be cleared. Retry Clear All.'}
+            return result
+
+        page = self.page
+        hist = page.locator('details.history-options')
+        if not hist.evaluate('e => e.open'):
+            hist.locator('summary').click()
+        trigger = page.get_by_role('button', name='Clear all conversations', exact=True)
+        with patch.object(self.service, 'clear_conversations', side_effect=clear_with_one_failure):
+            trigger.click()
+            page.get_by_role('dialog').get_by_role('button', name='Delete all', exact=True).click()
+            page.get_by_role('alert').filter(has_text='Retry Clear All.').wait_for()
+            page.get_by_text('No conversations yet.', exact=True).wait_for()
+            trigger.click()
+            page.get_by_role('dialog').get_by_role('button', name='Delete all', exact=True).click()
+            page.get_by_text('Deleted 0 conversations.', exact=True).wait_for()
+        self.assertEqual(len(requests), 2)
+        self.assertNotEqual(*requests)
+
+
 if __name__=='__main__': unittest.main()
