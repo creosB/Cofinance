@@ -423,6 +423,8 @@ def verify_cmd(full=False, browser=True):
                 'tests.test_evidence_status',
                 'tests.test_outer_loop',
                 'tests.test_route_smoke',
+                'tests.test_single_pass_data',
+                'tests.test_concurrent_io',
             ],
             ROOT,
             env(),

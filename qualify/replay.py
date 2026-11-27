@@ -378,7 +378,7 @@ def run(root, variant, *, router, llm, clock=time.time, limit=None):
             market, news = ReplayMarket(series, names, fng, origin), ReplayNews(news_rows, cutoff)
             rec_llm = Recorder(llm)
             analyst = DataAnalystAgent(rec_llm, market, stop=cfg.get('analyst_stop'))
-            orch = TeamLeadOrchestrator(router, analyst, NewsResearcherAgent(rec_llm, news), rec_llm, market)
+            orch = TeamLeadOrchestrator(router, analyst, NewsResearcherAgent(rec_llm, news), rec_llm, market, stop=None)
             query = QUERY.format(t=t)
             t0 = clock()
             rec = {'id': cid, 'symbol': t, 'origin': origin, 'entry_date': entry, 'exit_date': exit_, 'variant': variant, 'label': 'ERROR'}

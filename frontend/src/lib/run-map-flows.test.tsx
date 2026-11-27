@@ -57,6 +57,20 @@ function makeTrace(flow: ChatFlow): Run {
       ],
     })
   }
+  if (flow === 'python_market_answer') {
+    return parseRun({
+      ...base,
+      status: 'complete',
+      summary: { origin: 'chat', flow, answer_kind: 'research', answer: 'NVDA previous-session close: 130.0 USD on 2026-11-26.' },
+      spans: [
+        { id: sid(1), parent_id: null, name: 'Route conversational request', kind: 'route', actor: 'Routing executive', model: '', status: 'complete', start_ms: 0, duration_ms: 80, inputs: { query: 'Previous close for NVDA' }, outputs: { intent: 'price_snapshot', tickers: ['NVDA'] } },
+        { id: sid(2), parent_id: null, name: 'Executive Route', kind: 'handoff', actor: 'GLiNER2.5-Decide', model: '', status: 'complete', start_ms: 80, duration_ms: 1, inputs: {}, outputs: { delegated_agents: ['Data Analyst'] } },
+        { id: sid(3), parent_id: null, name: 'Market snapshot', kind: 'tool', actor: 'Data Analyst', model: '', status: 'complete', start_ms: 85, duration_ms: 40, inputs: { ticker: 'NVDA' }, outputs: { price: 138.5 } },
+        { id: sid(4), parent_id: null, name: 'Synthesis faithfulness', kind: 'gate', actor: 'Market Team Lead', model: '', status: 'complete', start_ms: 130, duration_ms: 1, inputs: {}, outputs: { faithful_synthesis: true, method: 'python_market_answer', validation_reason: 'previous_close_request' } },
+        { id: sid(5), parent_id: null, name: 'Interactive research', kind: 'run', actor: 'Python', model: '', status: 'complete', start_ms: 0, duration_ms: 135, inputs: {}, outputs: { answer: 'NVDA previous-session close: 130.0 USD on 2026-11-26.' } },
+      ],
+    })
+  }
   if (flow === 'python_news_answer') {
     return parseRun({
       ...base,

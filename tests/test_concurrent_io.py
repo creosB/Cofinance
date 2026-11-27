@@ -6,9 +6,10 @@ from pathlib import Path
 
 from core.chat_service import ChatService
 from core.crowd_odds import lookup
-from core.local_models import Cancelled
-from core.market import MarketTools
+from core.local_models import Cancelled, digest, local_json
+from core.market import MarketTools, SnapshotCache
 from core.gliner_decide import RoutedQuery
+from core.run_trace import TraceRecorder, TracedTools
 
 
 def _chart_payload():
@@ -239,6 +240,202 @@ class TestConcurrentIO(unittest.TestCase):
                 self.assertIsNotNone(assistant["payload"]["crowd_odds"])
             finally:
                 svc.close()
+
+    def test_multi_asset_snapshots_overlap_and_preserve_input_order(self):
+        barrier = threading.Barrier(2, timeout=1.0)
+        overlapped = {"yes": False}
+
+        def fetch(url):
+            if "/chart/" in url and "range=1y" in url:
+                try:
+                    barrier.wait()
+                    overlapped["yes"] = True
+                except threading.BrokenBarrierError:
+                    pass
+                if "AAPL" in url:
+                    time.sleep(0.08)
+                return _chart_payload()
+            if "fundamentals-timeseries" in url:
+                return _fundamentals_payload()
+            if "range=max" in url:
+                return _ath_payload()
+            return {}
+
+        tools = MarketTools(fetch=fetch)
+        trace = TraceRecorder("Parallel snapshots", mode="fixture", directory=None)
+        traced = TracedTools(tools, trace)
+        snaps = traced.get_snapshots(["AAPL", "MSFT"])
+        self.assertTrue(overlapped["yes"])
+        self.assertEqual(list(snaps.keys()), ["AAPL", "MSFT"])
+        self.assertEqual(list(tools.snapshots.keys()), ["AAPL", "MSFT"])
+        self.assertEqual(list(tools.charts.keys()), ["AAPL", "MSFT"])
+        span_tickers = [s["inputs"]["ticker"] for s in trace.data["spans"] if s["name"] == "Market snapshot"]
+        self.assertEqual(span_tickers, ["AAPL", "MSFT"])
+
+    def test_multi_candidate_symbol_resolution_overlaps_and_keeps_order(self):
+        barrier = threading.Barrier(2, timeout=1.0)
+        overlapped = {"yes": False}
+
+        class ParallelResolveMarket:
+            def __init__(self, cancel=None):
+                self.snapshots = {}
+                self.charts = {}
+                self.evidence = []
+
+            def resolve_symbol(self, term, context_query=""):
+                try:
+                    barrier.wait()
+                    overlapped["yes"] = True
+                except threading.BrokenBarrierError:
+                    pass
+                if term == "FirstCo":
+                    time.sleep(0.08)
+                    return {"symbol": "FIRST", "name": "First Corp", "quote_type": "EQUITY", "exchange": "NMS"}
+                return {"symbol": "SECOND", "name": "Second Corp", "quote_type": "EQUITY", "exchange": "NMS"}
+
+            def get_snapshot(self, ticker):
+                snap = {"ticker": ticker, "status": "available", "price": 100.0, "currency": "USD",
+                        "price_as_of": "2026-11-27", "quote_status": {"state": "last_session", "as_of": "2026-11-27"}}
+                self.snapshots[ticker] = snap
+                return snap
+
+            def plot_history(self, ticker):
+                return ""
+
+        class TwoCandidateRouter:
+            def route(self, _q):
+                return RoutedQuery("compare_assets", 0.9, "swing_week", [], entity_candidates=("FirstCo", "SecondCo"))
+
+        with tempfile.TemporaryDirectory() as tmp:
+            svc = ChatService(
+                Path(__file__).resolve().parents[1],
+                root=Path(tmp),
+                market_factory=ParallelResolveMarket,
+                router_factory=lambda: TwoCandidateRouter(),
+                crowd_odds=lambda _t: None,
+            )
+            try:
+                sid = "3" * 32
+                svc.store.create_session(sid)
+                job = svc.submit(sid, "Compare FirstCo and SecondCo", "4" * 32, "facts")
+                for _ in range(100):
+                    cur = svc.store.job(job["id"])
+                    if cur["status"] not in {"queued", "running"}:
+                        break
+                    time.sleep(0.03)
+                self.assertIn(cur["status"], {"complete", "degraded"})
+                self.assertTrue(overlapped["yes"])
+                sess = svc.store.session(sid)
+                self.assertEqual(sess["messages"][-1]["payload"]["tickers"], ["FIRST", "SECOND"])
+                trace = __import__("json").loads((Path(tmp) / "traces" / f"{job['id']}.json").read_text(encoding="utf-8"))
+                resolved_terms = [s["inputs"]["term"] for s in trace["spans"] if s["name"] == "Resolve asset symbol"]
+                self.assertEqual(resolved_terms, ["FirstCo", "SecondCo"])
+            finally:
+                svc.close()
+
+    def test_snapshot_cache_hits_expires_preserves_quote_status_and_skips_failures(self):
+        now = [100.0]
+        calls = {"chart": 0}
+        fail_next = {"on": False}
+
+        def fetch(url):
+            if fail_next["on"]:
+                raise TimeoutError("provider timeout")
+            if "/chart/" in url and "range=1y" in url:
+                calls["chart"] += 1
+                return _chart_payload()
+            if "fundamentals-timeseries" in url:
+                return _fundamentals_payload()
+            if "range=max" in url:
+                return _ath_payload()
+            return {}
+
+        cache = SnapshotCache(ttl=45.0, clock=lambda: now[0])
+        t1 = MarketTools(fetch=fetch, cache=cache)
+        s1 = t1.get_snapshot("NVDA")
+        self.assertEqual(calls["chart"], 1)
+        s1["price"] = 999999.0
+
+        now[0] = 120.0
+        t2 = MarketTools(fetch=fetch, cache=cache)
+        s2 = t2.get_snapshot("NVDA")
+        self.assertEqual(calls["chart"], 1)
+        self.assertEqual(s2["price"], 100.0)
+        self.assertEqual(s2["price_as_of"], s1["price_as_of"])
+        self.assertEqual(s2["quote_status"], s1["quote_status"])
+        self.assertIn("NVDA", t2.cache_hits)
+        self.assertIn("NVDA", t2.charts)
+
+        now[0] = 150.0
+        t3 = MarketTools(fetch=fetch, cache=cache)
+        t3.get_snapshot("NVDA")
+        self.assertEqual(calls["chart"], 2)
+
+        cache.clear()
+        fail_next["on"] = True
+        t4 = MarketTools(fetch=fetch, cache=cache)
+        bad = t4.get_snapshot("NVDA")
+        self.assertEqual(bad["status"], "unavailable")
+        fail_next["on"] = False
+        t5 = MarketTools(fetch=fetch, cache=cache)
+        good = t5.get_snapshot("NVDA")
+        self.assertEqual(good["status"], "available")
+
+    def test_digest_memoization_strict_mode_and_local_json_keepalive_reconnect(self):
+        import hashlib
+        import http.server
+        import os
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            sample = Path(tmp) / "weights.bin"
+            sample.write_bytes(b"abcd1234")
+            first = digest(sample)
+            self.assertEqual(first, hashlib.sha256(b"abcd1234").hexdigest())
+            st = sample.stat()
+            sample.write_bytes(b"efgh5678")
+            os.utime(sample, ns=(st.st_atime_ns, st.st_mtime_ns))
+            self.assertEqual(digest(sample), first)
+            with patch.dict(os.environ, {"COFINANCE_STRICT_MODEL_VERIFY": "1"}):
+                self.assertEqual(digest(sample), hashlib.sha256(b"efgh5678").hexdigest())
+
+        connections = []
+        drop_once = {"done": False}
+
+        class KeepAliveHandler(http.server.BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1"
+
+            def log_message(self, *args):
+                pass
+
+            def do_GET(self):
+                connections.append(self.client_address)
+                if self.path == "/drop" and not drop_once["done"]:
+                    drop_once["done"] = True
+                    self.close_connection = True
+                    self.connection.close()
+                    return
+                body = b'{"ok":true}'
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+        srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), KeepAliveHandler)
+        srv.daemon_threads = True
+        th = threading.Thread(target=srv.serve_forever, daemon=True)
+        th.start()
+        try:
+            base = f"http://127.0.0.1:{srv.server_port}"
+            self.assertEqual(local_json(base + "/health", key="k", timeout=5), {"ok": True})
+            self.assertEqual(local_json(base + "/health", key="k", timeout=5), {"ok": True})
+            self.assertEqual(connections[0], connections[1])
+            self.assertEqual(local_json(base + "/drop", key="k", timeout=5), {"ok": True})
+            self.assertGreaterEqual(len(connections), 3)
+        finally:
+            srv.shutdown()
+            srv.server_close()
 
 
 if __name__ == "__main__":

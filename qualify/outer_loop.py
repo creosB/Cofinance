@@ -67,6 +67,8 @@ class TraceReplayCase:
     documents: List[Dict[str, Any]]
     narrator_responses: Tuple[str, ...]
     expected_agents: Tuple[str, ...]
+    collect_only: bool = False
+    collect_reason: str = ""
 
 
 class FixedRouter:
@@ -230,7 +232,11 @@ def extract_replay_case(path: Path) -> Tuple[Optional[TraceReplayCase], Optional
             return None, "missing_model_transcript"
         transcript.append(out)
 
-    needs_model = da is not None or dr is not None
+    synth_gate = next((s for s in reversed(spans) if isinstance(s, dict) and s.get("name") == "Synthesis faithfulness"), None)
+    synth_out = synth_gate.get("outputs") if synth_gate and isinstance(synth_gate.get("outputs"), dict) else {}
+    collect_only = synth_out.get("method") == "python_market_answer"
+    collect_reason = str(synth_out.get("validation_reason") or "") if collect_only else ""
+    needs_model = (da is not None or dr is not None) and not collect_only
     if needs_model and not transcript:
         return None, "missing_model_transcript"
 
@@ -253,6 +259,8 @@ def extract_replay_case(path: Path) -> Tuple[Optional[TraceReplayCase], Optional
             documents=documents,
             narrator_responses=tuple(transcript),
             expected_agents=tuple(expected_agents),
+            collect_only=collect_only,
+            collect_reason=collect_reason,
         ),
         None,
     )
@@ -324,6 +332,8 @@ def run_trace_case(factory: TraceFactory, case: TraceReplayCase) -> Dict[str, An
                     fallback_tickers=case.routed.tickers,
                     context=case.context,
                     documents=case.documents or None,
+                    collect_only=case.collect_only,
+                    collect_reason=case.collect_reason,
                 )
                 span.update(
                     output={"answer": result.final_synthesis, "agents": result.delegated_agents},

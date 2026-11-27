@@ -170,6 +170,14 @@ class TestSystemIntegrationAndFlows(unittest.TestCase):
                 self.assertEqual(tr["summary"]["flow"], "single_pass_data_answer")
                 traces_by_flow["single_pass_data_answer"] = tr
 
+                s_py = svc.store.create_session(uuid.uuid4().hex)
+                j = svc.submit(s_py["id"], "Previous close for NVDA", uuid.uuid4().hex, models.state["selected"])
+                done = wait(svc, j)
+                self.assertEqual(done["status"], "complete")
+                tr = read_trace(root / "traces", j["id"])
+                self.assertEqual(tr["summary"]["flow"], "python_market_answer")
+                traces_by_flow["python_market_answer"] = tr
+
                 s_news = svc.store.create_session(uuid.uuid4().hex)
                 j = svc.submit(s_news["id"], "Any news on NVDA?", uuid.uuid4().hex, models.state["selected"])
                 done = wait(svc, j)

@@ -6,6 +6,7 @@ verification and qualification are separate states. Partial files resume on retr
 from __future__ import annotations
 
 import hashlib
+import http.client
 import json
 import os
 import secrets
@@ -146,12 +147,40 @@ def atomic(path: Path, value):
     os.replace(temp, path)
 
 
+_DIGEST_LOCK = threading.Lock()
+_DIGEST_CACHE: dict[tuple[str, int, int, int], str] = {}
+_RUNTIME_VERIFY_CACHE: set[tuple[str, tuple[str, int, int, int], tuple[tuple[str, int, int, int], ...]]] = set()
+_LOCAL_HTTP = threading.local()
+
+
+def _strict_verify() -> bool:
+    return os.environ.get("COFINANCE_STRICT_MODEL_VERIFY", "").strip() == "1"
+
+
+def _file_sig(path: Path) -> tuple[str, int, int, int]:
+    st = path.stat()
+    return (str(path.resolve()), st.st_size, st.st_mtime_ns, getattr(st, "st_ino", 0))
+
+
 def digest(path: Path):
+    strict = _strict_verify()
+    sig = None if strict else _file_sig(path)
+    if sig is not None:
+        with _DIGEST_LOCK:
+            cached = _DIGEST_CACHE.get(sig)
+            if cached is not None:
+                return cached
     h = hashlib.sha256()
     with path.open("rb") as file:
         for chunk in iter(lambda: file.read(1024 * 1024), b""):
             h.update(chunk)
-    return h.hexdigest()
+    out = h.hexdigest()
+    if sig is not None:
+        with _DIGEST_LOCK:
+            if len(_DIGEST_CACHE) >= 256:
+                _DIGEST_CACHE.clear()
+            _DIGEST_CACHE[sig] = out
+    return out
 
 
 def public_host(url):
@@ -176,21 +205,76 @@ def public_open(url, headers=None):
     return opener.open(urllib.request.Request(url, headers={"User-Agent": "Cofinance-local-model-manager", **(headers or {})}), timeout=25)
 
 
+def _local_http_pool() -> dict[tuple[str, int], http.client.HTTPConnection]:
+    pool = getattr(_LOCAL_HTTP, "pool", None)
+    if pool is None:
+        pool = {}
+        _LOCAL_HTTP.pool = pool
+    return pool
+
+
+def _close_local_conn(pool: dict, key: tuple[str, int]) -> None:
+    conn = pool.pop(key, None)
+    if conn is not None:
+        try:
+            conn.close()
+        except OSError:
+            pass
+
+
 def local_json(url, body=None, key="", timeout=90):
     p = urlsplit(url)
     if p.scheme != "http" or p.hostname != "127.0.0.1" or p.username or p.password:
         raise ModelError("Inference must use the managed loopback endpoint.")
-    class NoRedirect(urllib.request.HTTPRedirectHandler):
-        def redirect_request(self, *args):
-            raise ModelError("Local inference redirects are not allowed.")
-    op = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
-    req = urllib.request.Request(url, data=None if body is None else json.dumps(body, allow_nan=False).encode(),
-        headers={"Content-Type": "application/json", "Authorization": "Bearer " + key})
-    with op.open(req, timeout=timeout) as response:
-        data = response.read(2 * 1024 * 1024 + 1)
-        if len(data) > 2 * 1024 * 1024:
-            raise ModelError("Local model response exceeded the limit.")
-        return json.loads(data)
+    port = p.port or 80
+    target = (p.path or "/") + (f"?{p.query}" if p.query else "")
+    payload = None if body is None else json.dumps(body, allow_nan=False).encode("utf-8")
+    method = "GET" if payload is None else "POST"
+    headers = {"Content-Type": "application/json", "Authorization": "Bearer " + key, "Connection": "keep-alive"}
+    pool = _local_http_pool()
+    pool_key = (p.hostname, port)
+    if len(pool) >= 4 and pool_key not in pool:
+        for old_key in list(pool):
+            _close_local_conn(pool, old_key)
+    for attempt in range(2):
+        conn = pool.get(pool_key)
+        reused = conn is not None
+        if conn is None:
+            conn = http.client.HTTPConnection(p.hostname, port, timeout=timeout)
+            pool[pool_key] = conn
+        else:
+            conn.timeout = timeout
+            if conn.sock is not None:
+                try:
+                    conn.sock.settimeout(timeout)
+                except OSError:
+                    pass
+        try:
+            conn.request(method, target, body=payload, headers=headers)
+            response = conn.getresponse()
+            if 300 <= response.status < 400:
+                response.read()
+                _close_local_conn(pool, pool_key)
+                raise ModelError("Local inference redirects are not allowed.")
+            data = response.read(2 * 1024 * 1024 + 1)
+            if len(data) > 2 * 1024 * 1024:
+                _close_local_conn(pool, pool_key)
+                raise ModelError("Local model response exceeded the limit.")
+            if response.status >= 400:
+                if response.will_close:
+                    _close_local_conn(pool, pool_key)
+                raise urllib.error.HTTPError(url, response.status, response.reason, response.headers, None)
+            if response.will_close:
+                _close_local_conn(pool, pool_key)
+            return json.loads(data)
+        except (http.client.RemoteDisconnected, http.client.BadStatusLine, ConnectionResetError, BrokenPipeError):
+            _close_local_conn(pool, pool_key)
+            if reused and attempt == 0:
+                continue
+            raise
+        except BaseException:
+            _close_local_conn(pool, pool_key)
+            raise
 
 
 class LocalModels:
@@ -503,13 +587,37 @@ class LocalModels:
         archive = self.root / BACKENDS[backend]["archive"]
         if not archive.is_file() or digest(archive) != BACKENDS[backend]["sha"]:
             raise ModelError("Pinned runtime archive failed verification.")
-        # Compare extracted bytes directly to the verified archive, not a mutable receipt alone.
+        strict = _strict_verify()
+        runtime_root = self.backend_dir(backend)
+        cache_key = None
+        if not strict:
+            try:
+                with zipfile.ZipFile(archive) as z:
+                    names = [entry.filename for entry in z.infolist() if not entry.is_dir()]
+                extracted = []
+                for rel in names:
+                    member = runtime_root / rel
+                    if member.is_symlink() or not member.is_file():
+                        raise ModelError("Extracted runtime integrity check failed.")
+                    extracted.append(_file_sig(member))
+                cache_key = (str(runtime_root.resolve()), _file_sig(archive), tuple(extracted))
+                with _DIGEST_LOCK:
+                    if cache_key in _RUNTIME_VERIFY_CACHE:
+                        self.check_cancel()
+                        return
+            except OSError:
+                cache_key = None
         with zipfile.ZipFile(archive) as z:
             for entry in z.infolist():
                 if entry.is_dir(): continue
-                path = self.backend_dir(backend) / entry.filename
+                path = runtime_root / entry.filename
                 if path.is_symlink() or not path.is_file() or digest(path) != hashlib.sha256(z.read(entry)).hexdigest():
                     raise ModelError("Extracted runtime integrity check failed.")
+        if cache_key is not None:
+            with _DIGEST_LOCK:
+                if len(_RUNTIME_VERIFY_CACHE) >= 32:
+                    _RUNTIME_VERIFY_CACHE.clear()
+                _RUNTIME_VERIFY_CACHE.add(cache_key)
         self.check_cancel()
 
     def stop_process(self):

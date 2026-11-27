@@ -322,47 +322,64 @@ class DataAnalystAgent:
         # Pass stop=None for the old behaviour (replay v1 does, so it stays reproducible).
         self.stop = list(stop) if stop else None
 
-    def run(self, tickers: Sequence[str], risk_mode: str, bus: EventBus, session_id: str) -> SpecialistReport:
+    def run(self, tickers: Sequence[str], risk_mode: str, bus: EventBus, session_id: str, *,
+            collect_only: bool = False, skip_if_any_unavailable: bool = False, collect_reason: str = "") -> SpecialistReport:
         facts: Dict[str, Any] = {}
         charts: List[str] = []
         allowed: List[float] = []
+        ordered = list(tickers)
 
-        for tkr in tickers:
+        for tkr in ordered:
             bus.publish(A2AEvent(session_id, "TOOL_CALL", self.NAME, {"tool": "get_snapshot", "ticker": tkr}))
-            snap = self.tools.get_snapshot(tkr)
+        batch_fetch = getattr(self.tools, "get_snapshots", None)
+        snaps = batch_fetch(ordered) if callable(batch_fetch) and len(ordered) > 1 else {tkr: self.tools.get_snapshot(tkr) for tkr in ordered}
+        for tkr in ordered:
+            snap = snaps[tkr]
             facts[tkr] = snap
-            # Only values shown to the narrator, in the form shown (readable, scale included), are allowed back out.
             allowed.extend(market_fact_numbers(tkr, snap))
-
             bus.publish(A2AEvent(session_id, "TOOL_CALL", self.NAME, {"tool": "plot_history", "ticker": tkr}))
             charts.append(self.tools.plot_history(tkr))
 
-        sys_prompt = self.SYSTEM_CRYPTO if risk_mode == "risk_guardian_crypto" else self.SYSTEM_STOCK
-        prompt = "Facts from market-data tools:\n" + "\n\n".join(
-            "\n".join(market_fact_lines(tkr, snap)) for tkr, snap in facts.items())
-        try:
-            options = {"stop": self.stop} if self.stop else {}
-            budget = 256 if len(facts) <= 1 else min(512, 256 + 128 * (len(facts) - 1))
-            raw = self.llm.complete(sys_prompt, prompt, max_tokens=budget, **options) if allowed else ""
-            clean = clean_narration(final_answer(raw) or "")
-        except Exception:
-            clean = ""
-        faithful = bool(clean) and bool(allowed) and score_numbers_faithful(clean, allowed)
-        validation = number_review(clean, allowed, faithful)
-        faithful = check_wording(clean, prompt, faithful, validation)
-        faithful = direction_review(clean, facts, faithful, validation)
-        faithful = provenance_review(clean, facts, faithful, validation)
-        invented_risks = unsupported_risks(clean, risk_cues(facts, {})) if faithful else []
-        if invented_risks:
-            validation["unsupported_risks"] = invented_risks
-            validation["validation_reason"] = "unsupported_risk"
-            faithful = False
-        if not faithful:
+        any_unavailable = any(snap.get("status") == "unavailable" or snap.get("price") is None for snap in facts.values())
+        if collect_only or (skip_if_any_unavailable and any_unavailable):
             clean = self._deterministic_fallback(facts)
+            reason = "incomplete_comparison" if (skip_if_any_unavailable and any_unavailable) else (collect_reason or "python_market_answer")
+            faithful = bool(allowed) and not any_unavailable
+            validation = {
+                "allowed_numbers": allowed,
+                "observed_numbers": numbers_in(clean),
+                "rejected_numbers": [],
+                "unsupported_terms": [],
+                "method": "python_market_answer",
+                "validation_reason": reason if faithful else ("incomplete_comparison" if (skip_if_any_unavailable and any_unavailable) else "no_available_quote"),
+            }
+        else:
+            sys_prompt = self.SYSTEM_CRYPTO if risk_mode == "risk_guardian_crypto" else self.SYSTEM_STOCK
+            prompt = "Facts from market-data tools:\n" + "\n\n".join(
+                "\n".join(market_fact_lines(tkr, snap)) for tkr, snap in facts.items())
+            try:
+                options = {"stop": self.stop} if self.stop else {}
+                budget = 256 if len(facts) <= 1 else min(512, 256 + 128 * (len(facts) - 1))
+                raw = self.llm.complete(sys_prompt, prompt, max_tokens=budget, **options) if allowed else ""
+                clean = clean_narration(final_answer(raw) or "")
+            except Exception:
+                clean = ""
+            faithful = bool(clean) and bool(allowed) and score_numbers_faithful(clean, allowed)
+            validation = number_review(clean, allowed, faithful)
+            faithful = check_wording(clean, prompt, faithful, validation)
+            faithful = direction_review(clean, facts, faithful, validation)
+            faithful = provenance_review(clean, facts, faithful, validation)
+            invented_risks = unsupported_risks(clean, risk_cues(facts, {})) if faithful else []
+            if invented_risks:
+                validation["unsupported_risks"] = invented_risks
+                validation["validation_reason"] = "unsupported_risk"
+                faithful = False
+            if not faithful:
+                clean = self._deterministic_fallback(facts)
 
         report = SpecialistReport(
             agent_name=self.NAME,
-            tickers=list(tickers),
+            tickers=ordered,
             raw_facts=facts,
             allowed_numbers=allowed,
             chart_refs=charts,
@@ -375,7 +392,7 @@ class DataAnalystAgent:
                 session_id,
                 "AGENT_RESULT",
                 self.NAME,
-                {"tickers": list(tickers), "faithful_numbers": faithful, "charts": charts, "summary": clean},
+                {"tickers": ordered, "faithful_numbers": faithful, "charts": charts, "summary": clean},
             )
         )
         return report
@@ -609,6 +626,7 @@ class TeamLeadOrchestrator:
         tools: MarketDataTools,
         bus: Optional[EventBus] = None,
         document_agent: Optional[DocumentReaderAgent] = None,
+        stop: Optional[Sequence[str]] = ("\n\n",),
     ) -> None:
         self.router = router
         self.data_agent = data_agent
@@ -617,9 +635,11 @@ class TeamLeadOrchestrator:
         self.tools = tools
         self.bus = bus or EventBus()
         self.document_agent = document_agent or DocumentReaderAgent()
+        self.stop = list(stop) if stop else None
 
     NEWS_ONLY = "python_news_answer"
     DATA_ONLY = "single_pass_data_answer"
+    MARKET_ONLY = "python_market_answer"
     REQUESTED_METRICS = (
         (re.compile(r"\bforward\s+p/?e\b", re.I), ("forward_pe_ratio",), ("forward p/e", "forward pe")),
         (re.compile(r"\b(?:p/?e|price[- ]to[- ]earnings)\b", re.I), ("pe_ratio", "forward_pe_ratio"), ("p/e", "pe ratio", "price-to-earnings")),
@@ -663,8 +683,19 @@ class TeamLeadOrchestrator:
                 return True
         return False
 
+    @staticmethod
+    def _all_tickers_mentioned(tickers: Sequence[str], summary: str, raw_facts: Mapping[str, Any]) -> bool:
+        low = (summary or "").lower()
+        for tkr in tickers:
+            snap = (raw_facts or {}).get(tkr) if isinstance(raw_facts, Mapping) else None
+            name = str(snap.get("name") or "").strip().lower() if isinstance(snap, Mapping) else ""
+            if tkr.lower() not in low and not (name and name in low):
+                return False
+        return True
+
     def _data_only(self, routed: RoutedQuery, risk_mode: str, delegated: List[str], data_rep: SpecialistReport,
-                   cues: Sequence[Mapping[str, Any]], session_id: str) -> TeamRunResult:
+                   cues: Sequence[Mapping[str, Any]], session_id: str, *,
+                   news_rep: Optional[SpecialistReport] = None) -> TeamRunResult:
         base = data_rep.summary.rstrip()
         low_base = base.lower()
         risks = [
@@ -672,9 +703,14 @@ class TeamLeadOrchestrator:
             for c in cues
             if not any(str(a).lower() in low_base for a in (c.get("anchors") or ()))
         ]
-        if risks and base and not base.endswith((".", "!", "?")):
+        if base and not base.endswith((".", "!", "?")):
             base += "."
-        answer = base + (" Risk the reports support: " + "; ".join(risks) + "." if risks else "")
+        parts = [base] if base else []
+        if news_rep is not None and routed.intent == "thesis_review" and "no accepted news" not in low_base:
+            parts.append(NO_NEWS)
+        if risks:
+            parts.append("Risk the reports support: " + "; ".join(risks) + ".")
+        answer = " ".join(parts)
         self.bus.publish(A2AEvent(session_id, "GATE_CHECK", self.NAME, {
             "faithful_synthesis": True,
             "method": self.DATA_ONLY,
@@ -686,8 +722,26 @@ class TeamLeadOrchestrator:
             "risks": risks,
         }))
         return TeamRunResult(routed=routed, risk_mode=risk_mode, delegated_agents=delegated, data_report=data_rep,
-                             news_report=None, final_synthesis=answer, faithful_synthesis=True,
+                             news_report=news_rep, final_synthesis=answer, faithful_synthesis=True,
                              events=list(self.bus.history))
+
+    def _python_market_only(self, routed: RoutedQuery, risk_mode: str, delegated: List[str],
+                            data_rep: Optional[SpecialistReport], news_rep: Optional[SpecialistReport],
+                            doc_rep: Optional[SpecialistReport], cues: Sequence[Mapping[str, Any]],
+                            session_id: str, *, reason: str, faithful: bool) -> TeamRunResult:
+        parts = [p.summary for p in (data_rep, news_rep, doc_rep) if p and p.summary]
+        answer = " ".join(parts)
+        allowed = [n for p in (data_rep, news_rep, doc_rep) if p for n in p.allowed_numbers]
+        self.bus.publish(A2AEvent(session_id, "GATE_CHECK", self.NAME, {
+            "faithful_synthesis": faithful,
+            "method": self.MARKET_ONLY,
+            "validation_reason": reason or self.MARKET_ONLY,
+            "allowed_numbers_count": len(allowed),
+            "risks": [str(c["text"]) for c in cues],
+        }))
+        return TeamRunResult(routed=routed, risk_mode=risk_mode, delegated_agents=delegated, data_report=data_rep,
+                             news_report=news_rep, final_synthesis=answer, faithful_synthesis=faithful,
+                             events=list(self.bus.history), document_report=doc_rep)
 
     def _news_only(self, routed: RoutedQuery, risk_mode: str, delegated: List[str], news_rep: SpecialistReport,
                    cues: Sequence[Mapping[str, Any]], session_id: str) -> TeamRunResult:
@@ -704,7 +758,8 @@ class TeamLeadOrchestrator:
                              events=list(self.bus.history))
 
     def run(self, user_query: str, session_id: str = "default", fallback_tickers: Sequence[str] = (),
-            context: str = "", documents: Optional[Sequence[Mapping[str, Any]]] = None) -> TeamRunResult:
+            context: str = "", documents: Optional[Sequence[Mapping[str, Any]]] = None, *,
+            collect_only: bool = False, collect_reason: str = "") -> TeamRunResult:
         """`context` is the previous accepted answer in this conversation (local chat history, not a
         memory model). It is data for the lead only; its numbers are NOT added to the allowlist.
         `documents` are the PDFs attached to this conversation ({id, name, pages}); with any, the Document Reader runs
@@ -754,7 +809,19 @@ class TeamLeadOrchestrator:
                     {"to": DataAnalystAgent.NAME, "tickers": tickers, "risk_mode": risk_mode},
                 )
             )
-            data_rep = self.data_agent.run(tickers, risk_mode, self.bus, session_id)
+            skip_incomplete_compare = routed.intent == "compare_assets"
+            if collect_only or skip_incomplete_compare:
+                try:
+                    data_rep = self.data_agent.run(
+                        tickers, risk_mode, self.bus, session_id,
+                        collect_only=collect_only,
+                        skip_if_any_unavailable=skip_incomplete_compare,
+                        collect_reason=collect_reason,
+                    )
+                except TypeError:
+                    data_rep = self.data_agent.run(tickers, risk_mode, self.bus, session_id)
+            else:
+                data_rep = self.data_agent.run(tickers, risk_mode, self.bus, session_id)
 
         if NewsResearcherAgent.NAME in delegated and tickers:
             self.bus.publish(
@@ -784,13 +851,30 @@ class TeamLeadOrchestrator:
         # News-only question (Baris, 2026-11-17): the answer is the Python digest plus the listed risks, no Lead call.
         # Live, the Lead only restated the digest and twice failed the risk guard ("the reports do not name a
         # particular risk" while one was listed), so the model had nothing to add except ways to be wrong.
+        incomplete_compare = (
+            routed.intent == "compare_assets"
+            and data_rep is not None
+            and any(snap.get("status") == "unavailable" or snap.get("price") is None
+                    for snap in (data_rep.raw_facts or {}).values())
+        )
+        if collect_only or incomplete_compare:
+            reason = "incomplete_comparison" if incomplete_compare else (collect_reason or self.MARKET_ONLY)
+            faithful = (not incomplete_compare) and (data_rep is None or data_rep.faithful_numbers)
+            return self._python_market_only(routed, risk_mode, delegated, data_rep, news_rep, doc_rep, cues, session_id,
+                                            reason=reason, faithful=faithful)
         if news_rep is not None and data_rep is None and doc_rep is None:
             return self._news_only(routed, risk_mode, delegated, news_rep, cues, session_id)
-        if (data_rep is not None and news_rep is None and doc_rep is None
+        news_absent = news_rep is None or (
+            isinstance(news_rep.validation, Mapping)
+            and news_rep.validation.get("validation_reason") == "no_news"
+            and not any((news_rep.raw_facts or {}).values())
+        )
+        if (data_rep is not None and news_absent and doc_rep is None
                 and not previous and data_rep.faithful_numbers and self._same_narrator()
                 and not unsupported_risks(data_rep.summary, cues)
+                and self._all_tickers_mentioned(tickers, data_rep.summary, data_rep.raw_facts)
                 and not self._missing_requested_metric(user_query, data_rep.summary, data_rep.raw_facts)):
-            return self._data_only(routed, risk_mode, delegated, data_rep, cues, session_id)
+            return self._data_only(routed, risk_mode, delegated, data_rep, cues, session_id, news_rep=news_rep)
         synth_prompt = (
             f"User question: {' '.join(user_query.split())[:600]}\n"
             + (f"Conversation memory, earlier accepted answers (context only): {previous}\n" if previous else "")
@@ -821,8 +905,17 @@ class TeamLeadOrchestrator:
 
         def narrate(prompt: str, max_tokens: int) -> str:
             try:
-                raw = self.lead_llm.complete(self.SYSTEM, prompt, max_tokens=max_tokens) if (data_rep or news_rep or doc_rep) else ""
-                # Markdown emphasis is stripped (the UI renders plain text); a restated second block is dropped.
+                if not (data_rep or news_rep or doc_rep):
+                    raw = ""
+                elif self.stop:
+                    try:
+                        raw = self.lead_llm.complete(self.SYSTEM, prompt, max_tokens=max_tokens, stop=self.stop)
+                    except TypeError as exc:
+                        if "stop" not in str(exc):
+                            raise
+                        raw = self.lead_llm.complete(self.SYSTEM, prompt, max_tokens=max_tokens)
+                else:
+                    raw = self.lead_llm.complete(self.SYSTEM, prompt, max_tokens=max_tokens)
                 return clean_narration(final_answer(raw) or "")
             except Exception:
                 return ""

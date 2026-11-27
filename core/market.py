@@ -3,10 +3,12 @@ Alternative.me sentiment. Never generates demo values or calls Streamlit.
 """
 from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
+import copy
 import json
 import math
 import re
 import statistics
+import threading
 import time
 import urllib.request
 from urllib.error import URLError
@@ -21,7 +23,52 @@ NUMERIC_LISTING = r"[0-9]{1,6}\.[A-Z]{1,4}"
 SYMBOL = re.compile(rf"(?:[A-Z^][A-Z0-9.\-=]{{0,14}}|{NUMERIC_LISTING})")
 SEARCH_QUOTE_TYPES = frozenset({"EQUITY", "ETF", "INDEX", "CRYPTOCURRENCY", "FUTURE", "CURRENCY", "MUTUALFUND"})
 _SYMBOL_CACHE: dict[str, tuple[float, dict | None]] = {}
+_SYMBOL_CACHE_LOCK = threading.Lock()
 _SYMBOL_CACHE_TTL = 300.0
+
+
+class SnapshotCache:
+    def __init__(self, ttl: float = 45.0, clock=time.monotonic, max_entries: int = 128):
+        self.ttl = float(ttl)
+        self.clock = clock
+        self.max_entries = int(max_entries)
+        self._lock = threading.Lock()
+        self._entries: dict[str, tuple[float, dict, dict | None, list[dict]]] = {}
+
+    def get(self, canonical_symbol: str):
+        key = str(canonical_symbol or "").strip().upper()
+        if not key or self.ttl <= 0:
+            return None
+        now = self.clock()
+        with self._lock:
+            entry = self._entries.get(key)
+            if entry is None:
+                return None
+            stored_at, snap, chart, evidence = entry
+            if now - stored_at >= self.ttl:
+                self._entries.pop(key, None)
+                return None
+            return copy.deepcopy(snap), copy.deepcopy(chart), copy.deepcopy(evidence)
+
+    def put(self, canonical_symbol: str, snap: dict, chart: dict | None, evidence: list[dict]) -> None:
+        key = str(canonical_symbol or "").strip().upper()
+        if not key or self.ttl <= 0 or not isinstance(snap, dict):
+            return
+        if snap.get("status") != "available" or snap.get("error") or not finite(snap.get("price")):
+            return
+        qstate = (snap.get("quote_status") or {}).get("state")
+        if qstate in {"unavailable", "timestamp_invalid", "timestamp_unknown"} or not snap.get("price_as_of") or snap.get("price_as_of") == "Not supplied by source":
+            return
+        now = self.clock()
+        with self._lock:
+            if key not in self._entries and len(self._entries) >= self.max_entries:
+                oldest = min(self._entries, key=lambda k: self._entries[k][0])
+                self._entries.pop(oldest, None)
+            self._entries[key] = (now, copy.deepcopy(snap), copy.deepcopy(chart), copy.deepcopy(evidence))
+
+    def clear(self) -> None:
+        with self._lock:
+            self._entries.clear()
 
 
 def listing_timezone(meta):
@@ -118,7 +165,8 @@ def resolve_yahoo_symbol(term: str, fetch=None, *, context_query: str = "") -> d
     use_cache = fetch is None or fetch is fetch_json
     now = time.monotonic()
     if use_cache:
-        cached = _SYMBOL_CACHE.get(cache_key)
+        with _SYMBOL_CACHE_LOCK:
+            cached = _SYMBOL_CACHE.get(cache_key)
         if cached and now - cached[0] < _SYMBOL_CACHE_TTL:
             return dict(cached[1]) if cached[1] is not None else None
     fn = fetch or fetch_json
@@ -206,7 +254,8 @@ def resolve_yahoo_symbol(term: str, fetch=None, *, context_query: str = "") -> d
     except (OSError, ValueError, KeyError, IndexError, TypeError, OverflowError, AttributeError):
         found = None
     if use_cache:
-        _SYMBOL_CACHE[cache_key] = (now, dict(found) if found is not None else None)
+        with _SYMBOL_CACHE_LOCK:
+            _SYMBOL_CACHE[cache_key] = (now, dict(found) if found is not None else None)
     return found
 
 
@@ -229,11 +278,15 @@ def fetch_json(url, limit=4*1024*1024):
 
 
 class MarketTools:
-    def __init__(self, cancel=None, fetch=fetch_json):
+    def __init__(self, cancel=None, fetch=fetch_json, cache: SnapshotCache | None = None):
         self.fetch,self.cancel=fetch,cancel
+        self._cache=cache
+        self._lock=threading.Lock()
         self.charts={}
         self.snapshots={}
         self.evidence=[]
+        self._evidence_by_ticker={}
+        self.cache_hits=set()
 
     def check(self):
         if self.cancel and self.cancel.is_set():
@@ -315,11 +368,27 @@ class MarketTools:
     def get_snapshot(self,ticker):
         valid_symbol(ticker);self.check()
         symbol=ticker+"-USD" if ticker in CRYPTO else ticker
+        if self._cache is not None:
+            cached=self._cache.get(symbol)
+            if cached is not None:
+                snap,chart,ev=cached
+                snap["ticker"]=ticker
+                with self._lock:
+                    self.snapshots[ticker]=snap
+                    if chart is not None:
+                        chart["ticker"]=ticker
+                        self.charts[ticker]=chart
+                    self._evidence_by_ticker[ticker]=list(ev)
+                    self.evidence.extend(ev)
+                    self.cache_hits.add(ticker)
+                return snap
         url="https://query1.finance.yahoo.com/v8/finance/chart/"+quote(symbol,safe="")+"?range=1y&interval=1d"
         current=datetime.now(timezone.utc)
         now=current.isoformat()
         snap={"ticker":ticker,"source":"Yahoo Finance chart API","fetched_at":now,"status":"unavailable",
               "quote_status":{"state":"unavailable","observed_at":now}}
+        local_chart=None
+        local_evidence=[]
         try:
             raw=self.fetch(url); self.check()
             current=datetime.now(timezone.utc)
@@ -341,7 +410,8 @@ class MarketTools:
             if freshness["state"]=="timestamp_invalid":
                 snap.pop("price",None)
                 snap.update(status="unavailable",error="Source quote timestamp is in the future.")
-                self.snapshots[ticker]=snap
+                with self._lock:
+                    self.snapshots[ticker]=snap
                 return snap
             ts=meta.get("regularMarketTime") if freshness["as_of"] else None
             # chartPreviousClose is the close BEFORE the requested window (about a year ago for range=1y),
@@ -363,7 +433,7 @@ class MarketTools:
                     snap["previous_session_date"]=bar_date.isoformat()
                     # Direction is computed here, never inferred by the narrator (live 2026-11-08: "186.64 (down from 181.6)").
                     snap["change_from_previous_session_pct"]=round((price/close-1)*100,4)
-            self.charts[ticker]={"ticker":ticker,"currency":snap["currency"],"source":"Yahoo Finance","fetched_at":now,"points":points,"window":"1 year","adjustment":"Source Close, not total return"}
+            local_chart={"ticker":ticker,"currency":snap["currency"],"source":"Yahoo Finance","fetched_at":now,"points":points,"window":"1 year","adjustment":"Source Close, not total return"}
             if ticker in CRYPTO:
                 high=snap.get("high_52_week")
                 if finite(high) and high>0:snap["drawdown_from_52_week_high_pct"]=round((1-price/high)*100,4)
@@ -378,7 +448,7 @@ class MarketTools:
                 snap.update(ath_out)
                 snap.update(sent_fields)
                 if sent_ev:
-                    self.evidence.append(sent_ev)
+                    local_evidence.append(sent_ev)
             else:
                 # The chart response never carries fundamentals (the old reads here were always empty). Missing fields
                 # remain visibly absent; each present one keeps its own as-of date.
@@ -392,7 +462,7 @@ class MarketTools:
                 fund_out.pop("currency",None)
                 snap.update(fund_out)
                 snap.update(ath_out)
-            self.evidence.append({"title":ticker+" market data","url":"https://finance.yahoo.com/quote/"+quote(symbol,safe=""),"source":"Yahoo Finance","as_of":snap["price_as_of"]})
+            local_evidence.append({"title":ticker+" market data","url":"https://finance.yahoo.com/quote/"+quote(symbol,safe=""),"source":"Yahoo Finance","as_of":snap["price_as_of"]})
         except (OSError,ValueError,KeyError,IndexError,TypeError,OverflowError) as exc:
             timeout=isinstance(exc,TimeoutError) or isinstance(exc,URLError) and isinstance(exc.reason,TimeoutError)
             if timeout:
@@ -400,8 +470,51 @@ class MarketTools:
                 snap['error']='Market-data provider timed out. No values were substituted.'
             else:
                 snap['error']='Source request failed or returned invalid market data. No values were substituted.'
-        self.snapshots[ticker]=snap
+        with self._lock:
+            self.snapshots[ticker]=snap
+            if local_chart is not None:
+                self.charts[ticker]=local_chart
+            if local_evidence:
+                self._evidence_by_ticker[ticker]=list(local_evidence)
+                self.evidence.extend(local_evidence)
+        if self._cache is not None and snap.get("status")=="available":
+            self._cache.put(symbol,snap,local_chart,local_evidence)
         return snap
+
+    def reorder_collected(self, tickers):
+        ordered=list(tickers)
+        with self._lock:
+            self.snapshots={t:self.snapshots[t] for t in ordered if t in self.snapshots}|{k:v for k,v in self.snapshots.items() if k not in ordered}
+            self.charts={t:self.charts[t] for t in ordered if t in self.charts}|{k:v for k,v in self.charts.items() if k not in ordered}
+            if self._evidence_by_ticker:
+                rebuilt=[]
+                seen=set()
+                for t in ordered:
+                    if t in self._evidence_by_ticker:
+                        rebuilt.extend(self._evidence_by_ticker[t])
+                        seen.add(t)
+                for t,items in self._evidence_by_ticker.items():
+                    if t not in seen:
+                        rebuilt.extend(items)
+                self.evidence=rebuilt
+
+    def get_snapshots(self, tickers):
+        ordered=list(tickers)
+        if len(ordered)<=1:
+            return {t:self.get_snapshot(t) for t in ordered}
+        pool=ThreadPoolExecutor(max_workers=min(len(ordered),4))
+        futures={t:pool.submit(self.get_snapshot,t) for t in ordered}
+        out={}
+        try:
+            for t in ordered:
+                out[t]=futures[t].result()
+        except BaseException:
+            pool.shutdown(wait=False,cancel_futures=True)
+            raise
+        else:
+            pool.shutdown(wait=True)
+        self.reorder_collected(ordered)
+        return out
 
     def resolve_symbol(self, term, context_query=""):
         self.check()

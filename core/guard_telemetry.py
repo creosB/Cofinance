@@ -17,7 +17,17 @@ from .usage import counts as usage_counts
 
 SCHEMA_VERSION = 1
 GUARD_GATE_NAMES = frozenset({"Number faithfulness", "Synthesis faithfulness"})
-KNOWN_BYPASS_METHODS = frozenset({"single_pass_data_answer", "python_news_answer", "python_digest", "no_news"})
+KNOWN_BYPASS_METHODS = frozenset({
+    "single_pass_data_answer",
+    "python_market_answer",
+    "python_news_answer",
+    "python_digest",
+    "no_news",
+    "decision_evidence_assessment",
+    "previous_close_request",
+    "valuation_measure",
+    "incomplete_comparison",
+})
 KNOWN_ACTORS = frozenset({"Data Analyst", "News Researcher", "Document Reader", "Market Team Lead"})
 SAFE_REASON_RE = re.compile(r"^[a-zA-Z0-9_.-]{1,64}$")
 

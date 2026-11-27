@@ -32,7 +32,7 @@ export function formatProvenanceConflict(c:ProvenanceConflict):string{
  const detail=c.violations.length?'wrong '+c.violations.join('/'):c.kind.replaceAll('_',' ')
  return (c.text||'value')+(claimed?' as '+claimed:'')+' ('+detail+')'
 }
-export const CHAT_FLOWS=['open_conversation','clarification','single_pass_data_answer','python_news_answer','multi_agent_research','document_research','watchlist_add','cancelled','error'] as const
+export const CHAT_FLOWS=['open_conversation','clarification','single_pass_data_answer','python_market_answer','python_news_answer','multi_agent_research','document_research','watchlist_add','cancelled','error'] as const
 export type ChatFlow=typeof CHAT_FLOWS[number]
 function formatNarrator(modelIds:string[]){
  return modelIds.length===1?(modelIds[0].includes('LiquidAI/LFM3')?'LFM3 1.7B / shared narrator':modelIds[0].includes('AtomicChat/LFM3')?'LFM3 1.7B Uncensored (AtomicChat) / shared narrator':modelIds[0]):modelIds.length?'Multiple recorded backends':'No narrator inference observed'
@@ -51,6 +51,7 @@ export function detectFlow(run:Run):ChatFlow{
  const finalGate=spans.find(s=>s.name==='Synthesis faithfulness')
  const gateMethod=text(object(finalGate?.outputs).method)||text(object(finalGate?.outputs).validation_reason)
  if(gateMethod==='single_pass_data_answer')return 'single_pass_data_answer'
+ if(gateMethod==='python_market_answer')return 'python_market_answer'
  if(['python_news_answer','python_digest','no_news'].includes(gateMethod)&&!spans.some(s=>s.actor==='Data Analyst'&&s.kind!=='handoff'))return 'python_news_answer'
  return 'multi_agent_research'
 }
@@ -104,11 +105,12 @@ export function interactiveStages(run:Run):MapStage[]{
  const finalGate=spans.filter(s=>s.name==='Synthesis faithfulness')
  const gateOut=object(finalGate[0]?.outputs),gateMethod=text(gateOut.method)||text(gateOut.validation_reason)
  const singlePass=lead.length===0&&gateMethod==='single_pass_data_answer'
+ const pythonMarket=lead.length===0&&gateMethod==='python_market_answer'
  const pythonNews=lead.length===0&&['python_news_answer','python_digest','no_news'].includes(gateMethod)
- const leadOwner=lead[0]?.model||(singlePass?'Verified single-pass (Data Analyst)':pythonNews?'Python news synthesis':run.status==='error'?'Not reached':'Python fallback')
- const leadDetail=[lead.length?lead.length+' synthesis call'+(lead.length===1?'':'s'):singlePass?'Verified single-pass: reused Data Analyst report':pythonNews?'Deterministic news answer, no synthesis pass needed':run.status==='error'?'Run stopped before synthesis':'No synthesis model call recorded',memoryDetail(memory)].filter(Boolean).join(' / ')
+ const leadOwner=lead[0]?.model||(singlePass?'Verified single-pass (Data Analyst)':pythonMarket?'Python market answer':pythonNews?'Python news synthesis':run.status==='error'?'Not reached':'Python fallback')
+ const leadDetail=[lead.length?lead.length+' synthesis call'+(lead.length===1?'':'s'):singlePass?'Verified single-pass: reused Data Analyst report':pythonMarket?'Deterministic market answer, no narrator pass needed':pythonNews?'Deterministic news answer, no synthesis pass needed':run.status==='error'?'Run stopped before synthesis':'No synthesis model call recorded',memoryDetail(memory)].filter(Boolean).join(' / ')
  const leadStage=stage('lead','Team Lead synthesis',leadOwner,'The same selected narrator combines accepted reports in a separate role call, or Python reuses a single verified specialist report directly. Conversation memory is passed as context only; its numbers never pass the guard.',[...lead,...memory],run,leadDetail)
- if((singlePass||pythonNews)&&leadStage.state==='not_observed')leadStage.state='complete'
+ if((singlePass||pythonMarket||pythonNews)&&leadStage.state==='not_observed')leadStage.state='complete'
  const workerStages:MapStage[]=[
   stage('data','Data Analyst',workers('Data Analyst').some(s=>s.kind==='model')?narrator:'No narrator inference observed','Python fetches market data and chart series first. The narrator receives evidence; a number check accepts it or replaces it.',workers('Data Analyst'),run,workerDetail('Data Analyst'),run.status==='running'?'not_observed':'not_dispatched'),
   stage('news','News Researcher',workers('News Researcher').some(s=>s.kind==='model')?narrator:'No narrator inference observed','Reads accepted local news, not a fresh web search. A missing store is a coverage gap, never proof of no catalysts.',workers('News Researcher'),run,workerDetail('News Researcher'),run.status==='running'?'not_observed':'not_dispatched'),
@@ -124,7 +126,7 @@ export function interactiveStages(run:Run):MapStage[]{
   stage('dispatch','Dispatch policy','Python coordinator','Python maps the classified intent to specialist roles. A model label is not permission to write user data.',handoffs,run,Array.isArray(delegated)?delegated.join(' + ')||'No specialist dispatched':'No dispatch recorded'),
   ...workerStages,
   leadStage,
-  stage('guard','Accept or replace','Python faithfulness guard','Checks numbers, claim provenance, direction, terms, and risks against evidence. A failed narration uses the deterministic specialist output.',finalGate,run,finalGate.length?(gateOut.faithful_synthesis===true?(singlePass?'Verified single-pass report accepted':pythonNews?'Deterministic news answer accepted':'Synthesis passed the recorded guard checks'):'Synthesis rejected; fallback used'):'No final validation recorded'),
+  stage('guard','Accept or replace','Python faithfulness guard','Checks numbers, claim provenance, direction, terms, and risks against evidence. A failed narration uses the deterministic specialist output.',finalGate,run,finalGate.length?(gateOut.faithful_synthesis===true?(singlePass?'Verified single-pass report accepted':pythonMarket?'Deterministic market answer accepted':pythonNews?'Deterministic news answer accepted':'Synthesis passed the recorded guard checks'):(pythonMarket?'Comparison incomplete; quote unavailable':'Synthesis rejected; fallback used')):'No final validation recorded'),
   resultStage,
  ]
 }

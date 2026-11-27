@@ -20,7 +20,7 @@ from .documents import select_excerpts
 from .entities import extract_tickers
 from .gliner_decide import DEFAULT_ALIASES, GlinerQueryRouter, GlinerOutputError
 from .local_models import LocalModels, MODEL_ID, ModelError, Cancelled, narrators
-from .market import MarketTools, has_listing_constraint
+from .market import MarketTools, SnapshotCache, has_listing_constraint
 from .news_service import coverage_note, feed_tickers, news_health
 from .evidence_status import decision_assessment, decision_request, previous_close_answer, previous_close_request, requested_valuation, valuation_answer
 from .memory import HybridMemory, LocalKeywordMemory, MemoryHit, context_from
@@ -35,6 +35,7 @@ CHAT_FLOWS=(
     "open_conversation",
     "clarification",
     "single_pass_data_answer",
+    "python_market_answer",
     "python_news_answer",
     "multi_agent_research",
     "document_research",
@@ -67,6 +68,8 @@ def _research_flow(routed,result,trace):
     method=out.get('method') or out.get('validation_reason')
     if method=='single_pass_data_answer':
         return 'single_pass_data_answer'
+    if method=='python_market_answer':
+        return 'python_market_answer'
     if method in ('python_news_answer','python_digest','no_news') and getattr(result,'data_report',None) is None:
         return 'python_news_answer'
     return 'multi_agent_research'
@@ -147,6 +150,7 @@ class ChatService:
         if models is not None and hasattr(self.models,'_on_change'):
             self.models._on_change=self.notify_change
         self.market_factory=market_factory;self.router_factory=router_factory
+        self.snapshot_cache=SnapshotCache(ttl=45.0)
         self.news_backend_factory=news_backend_factory;self.feed_fetch=feed_fetch
         # MemoryPort. Hybrid (keyword + Hy-Memory lite, rank fusion) is the default since 2026-11-08: it passed the
         # pre-registered rule on a new set (22/24 vs keyword 17/24, data/_memory_compare_v2.py), approved by Baris.
@@ -382,7 +386,10 @@ class ChatService:
             concise_metric=re.fullmatch(r'\s*(?:market\s+cap(?:italization|italisation)?|share\s+price|enterprise\s+value)[,.?!\s]*(?:please[.!\s]*)?',job['query'],re.I)
             if routed.intent=='open_conversation' and session_tickers and (previous_close_request(job['query']) or concise_metric):
                 routed=dataclasses.replace(routed,intent='price_snapshot')
-            tools=self.market_factory(cancel=cancel)
+            if self.market_factory is MarketTools:
+                tools=MarketTools(cancel=cancel,cache=self.snapshot_cache)
+            else:
+                tools=self.market_factory(cancel=cancel)
             resolved_tickers=list(dict.fromkeys(routed.tickers))
             resolution_gaps=[]
             candidates=list(getattr(routed,'entity_candidates',()) or ())
@@ -417,23 +424,77 @@ class ChatService:
                         if symbol.upper()==up or (len(up)>=2 and base.startswith(up)) or any(low in n for n in session_names.get(symbol,())):
                             hits.append(symbol)
                     return hits[0] if len(hits)==1 else None
+                planned=[]
                 for term in candidates:
-                    if len(resolved_tickers)>=6:raise ValueError('Limit a research run to six assets.')
                     context=confirmations.get(term) or clause_for(term)
+                    prior_hit=None
                     if term not in confirmations and not has_listing_constraint(context):
                         prior_hit=match_prior_asset(term)
-                        if prior_hit is not None:
-                            if prior_hit not in resolved_tickers:resolved_tickers.append(prior_hit)
-                            trace.event('Reuse resolved conversation asset','decision',{'term':term,'ticker':prior_hit},actor='Python')
-                            continue
-                    self.store.progress(job['id'],f'Resolving {term}')
-                    def lookup():
-                        resolver=getattr(tools,'resolve_symbol',None)
-                        if resolver is None:return None
-                        try:return resolver(term,context_query=context)
-                        except TypeError:return resolver(term)
-                    found=trace.call('Resolve asset symbol','tool',lookup,actor='Yahoo Finance search',inputs={'term':term,'context_query':context[:200]})
-                    check()
+                    planned.append((term,context,prior_hit))
+                remaining_slots=max(0,6-len(resolved_tickers))
+                to_lookup=[(idx,term,context) for idx,(term,context,prior_hit) in enumerate(planned) if prior_hit is None][:remaining_slots+1]
+                lookup_results={}
+                if len(to_lookup)>1:
+                    self.store.progress(job['id'],f'Resolving {len(to_lookup)} assets')
+                    resolver=getattr(tools,'resolve_symbol',None)
+                    parent_id=trace.parent.get()
+                    def run_lookup(term,context):
+                        start=trace.clock()
+                        start_ms=round(max(0.0,(start-trace.started)*1000),3)
+                        if resolver is None:
+                            return start_ms,0.0,None,None
+                        try:
+                            try:val=resolver(term,context_query=context)
+                            except TypeError:val=resolver(term)
+                            return start_ms,(trace.clock()-start)*1000.0,val,None
+                        except BaseException as exc:
+                            return start_ms,(trace.clock()-start)*1000.0,None,exc
+                    pool=ThreadPoolExecutor(max_workers=min(len(to_lookup),4))
+                    futures=[(idx,term,context,pool.submit(run_lookup,term,context)) for idx,term,context in to_lookup]
+                    try:
+                        for idx,term,context,fut in futures:
+                            while True:
+                                check()
+                                try:
+                                    lookup_results[idx]=(term,context,*fut.result(timeout=0.05))
+                                    break
+                                except TimeoutError:
+                                    continue
+                    except BaseException:
+                        pool.shutdown(wait=False,cancel_futures=True)
+                        raise
+                    else:
+                        pool.shutdown(wait=True)
+                    first_err=None
+                    for idx,_,_ in to_lookup:
+                        term,context,start_ms,dur_ms,val,exc=lookup_results[idx]
+                        if exc is not None:
+                            trace.record_completed('Resolve asset symbol','tool',actor='Yahoo Finance search',
+                                                   inputs={'term':term,'context_query':context[:200]},
+                                                   start_ms=start_ms,duration_ms=dur_ms,error_type=type(exc).__name__,parent_id=parent_id)
+                            if first_err is None:first_err=exc
+                        else:
+                            trace.record_completed('Resolve asset symbol','tool',actor='Yahoo Finance search',
+                                                   inputs={'term':term,'context_query':context[:200]},outputs=val,
+                                                   start_ms=start_ms,duration_ms=dur_ms,parent_id=parent_id)
+                    if first_err is not None:raise first_err
+                for idx,(term,context,prior_hit) in enumerate(planned):
+                    if len(resolved_tickers)>=6:raise ValueError('Limit a research run to six assets.')
+                    if prior_hit is not None:
+                        if prior_hit not in resolved_tickers:resolved_tickers.append(prior_hit)
+                        trace.event('Reuse resolved conversation asset','decision',{'term':term,'ticker':prior_hit},actor='Python')
+                        continue
+                    if idx in lookup_results:
+                        found=lookup_results[idx][4]
+                    else:
+                        self.store.progress(job['id'],f'Resolving {term}')
+                        def lookup():
+                            resolver=getattr(tools,'resolve_symbol',None)
+                            if resolver is None:return None
+                            try:return resolver(term,context_query=context)
+                            except TypeError:return resolver(term)
+                        found=trace.call('Resolve asset symbol','tool',lookup,actor='Yahoo Finance search',inputs={'term':term,'context_query':context[:200]})
+                        check()
                     if isinstance(found,dict) and found.get('ambiguous'):
                         resolution_gaps.append((term,found.get('alternatives',[])))
                     elif isinstance(found,dict) and found.get('symbol') and (term not in confirmations or found['symbol']==term):
@@ -536,7 +597,14 @@ class ChatService:
             if documents and not tickers:
                 trace.event('Answer from attached files','decision',{'reason':'no_asset_but_documents','documents':len(documents),
                             'note':'The question named no asset and the conversation has attached PDFs, so they are the evidence.'},actor='Python')
-            needs_narrator=job['model']!='facts' and not (routed.intent=='news_catalysts' and not documents)
+            asked_for_decision=bool(tickers) and decision_request(job['query'])
+            asked_previous_close=bool(tickers) and not doc_match and routed.intent!='watchlist_add' and previous_close_request(job['query'])
+            asked_valuation=bool(tickers) and not doc_match and not asked_for_decision and routed.intent in {'price_snapshot','compare_assets'} and measure in {'share_price','market_cap'}
+            collect_reason=('decision_evidence_assessment' if (asked_for_decision and not doc_match) else
+                            'previous_close_request' if asked_previous_close else
+                            'valuation_measure' if asked_valuation else '')
+            python_owned=bool(collect_reason)
+            needs_narrator=job['model']!='facts' and not python_owned and not (routed.intent=='news_catalysts' and not documents)
             if needs_narrator:
                 if not self.models.is_loaded():
                     self.store.progress(job['id'],'Loading the selected narrator')
@@ -549,17 +617,21 @@ class ChatService:
                         trace.event('Deep think unavailable','decision',{'reason':'start_failed','note':deep['note']},actor='Python')
                     check()
                 elif self.models.thinker_loaded():self.models.stop_thinker()
-            elif think:
-                if job['model']=='facts':
-                    deep['note']='Tool-only mode does not use Deep think.'
-                    trace.event('Deep think skipped','decision',{'reason':'facts_only','note':deep['note']},actor='Python')
-                else:
-                    deep['note']='News-only answers use the verified Python digest, so Deep think was not needed.'
-                    trace.event('Deep think skipped','decision',{'reason':'python_news_only','note':deep['note']},actor='Python')
+            else:
+                if self.models.thinker_loaded():
+                    self.models.stop_thinker()
+                if think:
+                    if job['model']=='facts':
+                        deep['note']='Tool-only mode does not use Deep think.'
+                        trace.event('Deep think skipped','decision',{'reason':'facts_only','note':deep['note']},actor='Python')
+                    elif python_owned:
+                        deep['note']='This answer is computed directly from verified market evidence, so Deep think was not needed.'
+                        trace.event('Deep think skipped','decision',{'reason':collect_reason,'note':deep['note']},actor='Python')
+                    else:
+                        deep['note']='News-only answers use the verified Python digest, so Deep think was not needed.'
+                        trace.event('Deep think skipped','decision',{'reason':'python_news_only','note':deep['note']},actor='Python')
             news=NewsReader(self.root/'news.db')
-            narrator=self.models if job['model']!= 'facts' else FactsOnly()
-            # Routing is already recorded. Reuse the validated result without a second inference.
-            asked_for_decision=bool(tickers) and decision_request(job['query'])
+            narrator=self.models if (job['model']!='facts' and not python_owned) else FactsOnly()
             routed=dataclasses.replace(routed,tickers=tickers,intent='thesis_review' if asked_for_decision else routed.intent)
             class FixedRouter:
                 def route(self,text):check();return routed
@@ -589,7 +661,7 @@ class ChatService:
             odds_future=odds_pool.submit(self.crowd_odds,tickers) if odds_pool else None
             try:
                 result=run_traced_team(orch,job['query'],trace,session_id=job['session_id'],context=context_from(previous,hits),
-                                       documents=documents or None,finish=False)
+                                       documents=documents or None,finish=False,collect_only=python_owned,collect_reason=collect_reason)
                 check()
                 answer=result.final_synthesis or 'No accepted evidence is available for this request.'
                 if routed.intent=='watchlist_add':answer+=' Use the Add to watchlist button to confirm tracking.'

@@ -242,6 +242,25 @@ class TraceRecorder:
             if token is not None:
                 self.parent.reset(token)
 
+    def record_completed(self, name: str, kind: str, *, actor: str = "Python", model: str = "", inputs: Any = None,
+                         outputs: Any = None, start_ms: float | None = None, duration_ms: float = 0.0,
+                         error_type: str = "", fallback: bool = False, parent_id: str | None = None) -> None:
+        with self.lock:
+            if len(self.data["spans"]) >= self.max_spans:
+                self.data["dropped_spans"] += 1
+                self.flush()
+                return
+            status = "error" if error_type else ("fallback" if fallback else "complete")
+            node = {"id": uuid.uuid4().hex, "parent_id": parent_id if parent_id is not None else self.parent.get(),
+                    "name": safe(name), "kind": kind, "actor": safe(actor), "model": safe(model),
+                    "status": status, "start_ms": round(max(0.0, (self.clock() - self.started) * 1000) if start_ms is None else start_ms, 3),
+                    "duration_ms": round(max(0.0, float(duration_ms)), 3),
+                    "inputs": safe(inputs), "outputs": safe(outputs)}
+            if error_type:
+                node["error_type"] = safe(error_type)
+            self.data["spans"].append(node)
+            self.flush()
+
     def finish(self, *, error: bool = False, summary: Any = None) -> dict:
         with self.lock:
             self.data["status"] = "error" if error else "degraded" if any(
@@ -322,6 +341,61 @@ class TracedTools:
     def get_snapshot(self, ticker):
         return self.trace.call("Market snapshot", "tool", lambda: self.tools.get_snapshot(ticker),
                                actor="Data Analyst", inputs={"ticker": ticker})
+
+    def get_snapshots(self, tickers):
+        ordered = list(tickers)
+        if len(ordered) <= 1:
+            return {t: self.get_snapshot(t) for t in ordered}
+        from concurrent.futures import ThreadPoolExecutor
+        parent_id = self.trace.parent.get()
+
+        def run_one(ticker):
+            start = self.trace.clock()
+            start_ms = round(max(0.0, (start - self.trace.started) * 1000), 3)
+            try:
+                value = self.tools.get_snapshot(ticker)
+                return ticker, start_ms, (self.trace.clock() - start) * 1000.0, value, None
+            except BaseException as exc:
+                return ticker, start_ms, (self.trace.clock() - start) * 1000.0, None, exc
+
+        pool = ThreadPoolExecutor(max_workers=min(len(ordered), 4))
+        futures = [pool.submit(run_one, t) for t in ordered]
+        check_fn = getattr(self.tools, "check", None)
+        results = []
+        try:
+            for fut in futures:
+                while True:
+                    if callable(check_fn):
+                        check_fn()
+                    try:
+                        results.append(fut.result(timeout=0.05))
+                        break
+                    except TimeoutError:
+                        continue
+        except BaseException:
+            pool.shutdown(wait=False, cancel_futures=True)
+            raise
+        else:
+            pool.shutdown(wait=True)
+
+        out = {}
+        first_err = None
+        for ticker, start_ms, dur_ms, value, exc in results:
+            if exc is not None:
+                self.trace.record_completed("Market snapshot", "tool", actor="Data Analyst", inputs={"ticker": ticker},
+                                            start_ms=start_ms, duration_ms=dur_ms, error_type=type(exc).__name__,
+                                            parent_id=parent_id)
+                if first_err is None:
+                    first_err = exc
+            else:
+                self.trace.record_completed("Market snapshot", "tool", actor="Data Analyst", inputs={"ticker": ticker},
+                                            outputs=value, start_ms=start_ms, duration_ms=dur_ms, parent_id=parent_id)
+                out[ticker] = value
+        if first_err is not None:
+            raise first_err
+        if hasattr(self.tools, "reorder_collected"):
+            self.tools.reorder_collected(ordered)
+        return out
 
     def plot_history(self, ticker):
         return self.trace.call("Price history", "tool", lambda: self.tools.plot_history(ticker),
@@ -470,7 +544,7 @@ def run_traced_clock1(tickers, fetch, classifier, trace: TraceRecorder, *, cfg=N
 
 
 def run_traced_team(orchestrator, query: str, trace: TraceRecorder, *, session_id: str = "trace", fallback_tickers=(), context: str = "",
-                    documents=None, finish: bool = True):
+                    documents=None, finish: bool = True, collect_only: bool = False, collect_reason: str = ""):
     """Instrument every called backend. Preserves existing tool side effects, so this is not a dry run."""
     from .gliner_decide import GlinerQueryRouter
     from .orchestrator import DataAnalystAgent, DocumentReaderAgent, EventBus, NewsResearcherAgent, TeamLeadOrchestrator
@@ -512,11 +586,13 @@ def run_traced_team(orchestrator, query: str, trace: TraceRecorder, *, session_i
                                     stop=getattr(original.data_agent, "stop", None)), "Data Analyst"),
         AgentTrace(NewsResearcherAgent(TracedLLM(original.news_agent.llm, trace, "News Researcher"), TracedStore(original.news_agent.store, trace)), "News Researcher"),
         TracedLLM(original.lead_llm, trace, "Market Team Lead"), tools, bus,
-        document_agent=AgentTrace(getattr(original, "document_agent", None) or DocumentReaderAgent(), "Document Reader"))
+        document_agent=AgentTrace(getattr(original, "document_agent", None) or DocumentReaderAgent(), "Document Reader"),
+        stop=getattr(original, "stop", ("\n\n",)))
     try:
         with trace.span("Interactive research", "run", inputs={"query": query, "tool_side_effects": "same as original orchestrator",
                                                                 "conversation_context": "previous accepted answer" if context else "none"}) as span:
-            result = clone.run(query, session_id, fallback_tickers, context=context, documents=documents)
+            result = clone.run(query, session_id, fallback_tickers, context=context, documents=documents,
+                               collect_only=collect_only, collect_reason=collect_reason)
             span.update(output={"answer": result.final_synthesis, "agents": result.delegated_agents}, fallback=not result.faithful_synthesis)
         if finish:
             trace.finish(summary={"answer": result.final_synthesis, "risk_mode": result.risk_mode})

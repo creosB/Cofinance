@@ -240,6 +240,185 @@ class TestSinglePassDataNarration(unittest.TestCase):
         )
         self.assertEqual(len(llm_doc.calls), 2)
 
+    def test_no_news_thesis_and_comparison_reuse_data_analyst_and_respect_vetoes(self):
+        tools = _Tools()
+        llm_thesis = _CountingLLM("NVIDIA Corporation trades at 186.64 USD, up 2.78 percent from the previous session close.")
+        orch_thesis = TeamLeadOrchestrator(
+            _Router("thesis_review", ("NVDA",)),
+            DataAnalystAgent(llm_thesis, tools),
+            NewsResearcherAgent(llm_thesis, _EmptyNews()),
+            llm_thesis,
+            tools,
+        )
+        res = orch_thesis.run("Give me the NVDA thesis")
+        self.assertEqual(len(llm_thesis.calls), 1)
+        self.assertTrue(res.faithful_synthesis)
+        self.assertIsNotNone(res.news_report)
+        self.assertIn("No accepted news is available in the local store", res.final_synthesis)
+        gate = [e for e in res.events if e.event_type == "GATE_CHECK" and e.agent == TeamLeadOrchestrator.NAME][-1]
+        self.assertEqual(gate.payload["method"], TeamLeadOrchestrator.DATA_ONLY)
+
+        class _TwoAssetTools:
+            def get_snapshot(self, ticker):
+                name = "Microsoft Corporation" if ticker == "MSFT" else "NVIDIA Corporation"
+                return dict(NVDA_SNAP, ticker=ticker, name=name)
+
+            def plot_history(self, ticker):
+                return f"chart://{ticker}"
+
+        two_tools = _TwoAssetTools()
+        llm_cmp_missing = _CountingLLM("NVIDIA Corporation trades at 186.64 USD.")
+        orch_cmp_missing = TeamLeadOrchestrator(
+            _Router("compare_assets", ("NVDA", "MSFT")),
+            DataAnalystAgent(llm_cmp_missing, two_tools),
+            NewsResearcherAgent(llm_cmp_missing, _EmptyNews()),
+            llm_cmp_missing,
+            two_tools,
+        )
+        orch_cmp_missing.run("Compare NVDA and MSFT")
+        self.assertGreaterEqual(len(llm_cmp_missing.calls), 2)
+
+        llm_cmp_ok = _CountingLLM("NVDA trades at 186.64 USD and MSFT trades at 186.64 USD.")
+        orch_cmp_ok = TeamLeadOrchestrator(
+            _Router("compare_assets", ("NVDA", "MSFT")),
+            DataAnalystAgent(llm_cmp_ok, two_tools),
+            NewsResearcherAgent(llm_cmp_ok, _EmptyNews()),
+            llm_cmp_ok,
+            two_tools,
+        )
+        res_cmp = orch_cmp_ok.run("Compare NVDA and MSFT")
+        self.assertEqual(len(llm_cmp_ok.calls), 1)
+        self.assertTrue(res_cmp.faithful_synthesis)
+
+    def test_python_owned_answers_and_incomplete_comparisons_make_zero_llm_calls_and_replay_cleanly(self):
+        import tempfile
+        import time
+        import uuid
+        from pathlib import Path
+        from core.chat_service import ChatService
+        from core.guard_telemetry import summarize_guards
+        from qualify.outer_loop import replay_directory, replay_exit_code
+
+        class _ExplodingModels:
+            def __init__(self):
+                self.state = {"selected": "lfm3-1.7b-atomic-ad-q4km", "phase": "ready"}
+                self.lock = __import__("threading").RLock()
+                self.thread = None
+                self.busy = False
+                self.model_id = "fixture/lfm3"
+                self.narrator_id = "lfm3-1.7b-atomic-ad-q4km"
+                self.loads = 0
+                self.calls = 0
+
+            def is_loaded(self, model=None):
+                return True
+
+            def qualified(self, backend=None, model=None):
+                return True
+
+            def think_qualified(self, backend=None, model=None):
+                return True
+
+            def thinker_loaded(self, model=None, backend=None):
+                return False
+
+            def stop_thinker(self):
+                pass
+
+            def close(self):
+                pass
+
+            def load(self, *args, **kwargs):
+                self.loads += 1
+
+            def complete(self, *args, **kwargs):
+                self.calls += 1
+                raise AssertionError("Deterministic Python market answers must never invoke LFM3")
+
+        class _PartialMarket:
+            def __init__(self, cancel=None):
+                self.snapshots = {}
+                self.charts = {}
+                self.evidence = []
+
+            def get_snapshot(self, ticker):
+                if ticker == "MISS":
+                    snap = {"ticker": ticker, "status": "unavailable", "error": "timeout",
+                            "quote_status": {"state": "unavailable", "failure": "provider_timeout"}}
+                else:
+                    snap = {
+                        **NVDA_SNAP,
+                        "ticker": ticker,
+                        "market_cap": 3_490_000_000_000,
+                        "previous_session_date": "2026-11-26",
+                        "price_as_of": "2026-11-27T16:00:00+00:00",
+                        "quote_status": {"state": "last_session", "as_of": "2026-11-27T16:00:00+00:00"},
+                        "fundamentals_as_of": {"market_cap": {"as_of": "2026-11-26"}},
+                    }
+                    self.charts[ticker] = {"ticker": ticker, "currency": "USD", "points": [{"time": "2026-11-26", "close": 181.6}]}
+                    self.evidence.append({"title": ticker + " quote", "url": "https://finance.yahoo.com/quote/" + ticker, "source": "Yahoo Finance", "as_of": "2026-11-27"})
+                self.snapshots[ticker] = snap
+                return snap
+
+            def plot_history(self, ticker):
+                return f"chart://{ticker}" if ticker in self.charts else ""
+
+        def route_for(query):
+            low = query.lower()
+            if "compare" in low:
+                return RoutedQuery("compare_assets", 0.92, "swing_week", ["NVDA", "MISS"])
+            if "buy" in low:
+                return RoutedQuery("thesis_review", 0.90, "swing_week", ["NVDA"])
+            return RoutedQuery("price_snapshot", 0.93, "intraday", ["NVDA"])
+
+        class _ScriptedRouter:
+            def route(self, query):
+                return route_for(query)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            models = _ExplodingModels()
+            svc = ChatService(
+                Path(__file__).resolve().parents[1],
+                root=root,
+                models=models,
+                market_factory=_PartialMarket,
+                router_factory=lambda: _ScriptedRouter(),
+                crowd_odds=lambda _tickers: None,
+            )
+            try:
+                sid = svc.store.create_session(uuid.uuid4().hex)["id"]
+                cases = [
+                    ("Should I buy NVDA now?", "does not establish whether to buy", "complete"),
+                    ("What did NVDA close at yesterday?", "NVDA previous-session close: 181.6 USD on 2026-11-26.", "complete"),
+                    ("What is NVDA market cap?", "NVDA market capitalization: 3.49 trillion USD", "complete"),
+                    ("Compare NVDA and MISS", "The comparison is incomplete: no usable quote for MISS", "degraded"),
+                ]
+                for query, expected_text, expected_status in cases:
+                    job = svc.submit(sid, query, uuid.uuid4().hex, models.state["selected"])
+                    for _ in range(100):
+                        cur = svc.store.job(job["id"])
+                        if cur["status"] not in {"queued", "running"}:
+                            break
+                        time.sleep(0.02)
+                    self.assertEqual(cur["status"], expected_status)
+                    msg = svc.store.session(sid)["messages"][-1]
+                    self.assertIn(expected_text, msg["content"])
+                    trace = __import__("json").loads((root / "traces" / f"{job['id']}.json").read_text(encoding="utf-8"))
+                    self.assertEqual(trace["summary"]["flow"], "python_market_answer")
+                    self.assertEqual([s for s in trace["spans"] if s["name"] == "Narrate evidence"], [])
+                    gt = summarize_guards(trace["spans"])
+                    self.assertEqual(gt["wasted_passes"], 0)
+                    self.assertEqual(gt["wasted_ms"], 0.0)
+                    self.assertTrue(gt["complete"])
+                self.assertEqual(models.calls, 0)
+                rep = replay_directory(root / "traces")
+                self.assertEqual(rep["coverage"]["replayable"], 4)
+                self.assertEqual(rep["coverage"]["matched"], 4)
+                self.assertEqual(replay_exit_code(rep, fail_on_mismatch=True), 0)
+            finally:
+                svc.close()
+
 
 if __name__ == "__main__":
     unittest.main()
