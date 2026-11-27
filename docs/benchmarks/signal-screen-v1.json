@@ -1,0 +1,297 @@
+{
+  "adoption_decision": "NO_LIVE_SWITCH_WITHOUT_FRESH_UNSEEN_WINDOW",
+  "baseline": "sum_v1 (current headline-v1 sum over AtomicChat headline impacts)",
+  "created_at": "2026-11-27T23:07:31.352105+00:00",
+  "error_and_abstention_accounting": {
+    "dev_judgments_failed": 0,
+    "note": "Abstentions stay counted in coverage and balanced_accuracy_all; no missing exits were reopened.",
+    "window_judgments_failed": 0,
+    "window_missing_outcomes_not_reopened": 16
+  },
+  "gliner_headlines_scored": 61,
+  "limits": [
+    "Dev 72-case outcomes were already known; the 24 scored cases of the 11/09 window were previously looked at on 2026-11-19 and are retrospective diagnostic context only, not a fresh blind holdout.",
+    "Headline titles only (no full article bodies); small sample sizes (9 dev origins, 3 scored window origins) yield wide origin-cluster confidence intervals.",
+    "No live headline-v1 formula was switched by this offline screen; adoption requires a fresh unseen validation rule approved by the user."
+  ],
+  "protocol_sha256": "7e335a1256d2828e",
+  "schema_version": 1,
+  "sha256": "6151beca5fea8ebe1aa68c056def636f8bb84afe4d5136cbaead39e6865e393e",
+  "splits": {
+    "dev_72": {
+      "arms": {
+        "dedup_mean": {
+          "arm": "dedup_mean",
+          "auc": 0.6939,
+          "balanced_accuracy_all": 0.3312,
+          "balanced_accuracy_covered": 0.5636,
+          "cases": 72,
+          "coverage": 0.5139,
+          "delta_auc_vs_sum_v1": 0.0692,
+          "early_auc": 0.7023,
+          "labels": {
+            "ABSTAIN": 35,
+            "DOWN": 12,
+            "ERROR": 0,
+            "UP": 25
+          },
+          "late_auc": 0.6867,
+          "news_cases": 57,
+          "news_only_auc": 0.6823,
+          "origin_cluster_bootstrap_95": [
+            0.6468,
+            0.7562
+          ],
+          "paired_delta_auc_95": [
+            0.0306,
+            0.1097
+          ]
+        },
+        "materiality_dedup_source_mean": {
+          "arm": "materiality_dedup_source_mean",
+          "auc": 0.7034,
+          "balanced_accuracy_all": 0.3958,
+          "balanced_accuracy_covered": 0.5425,
+          "cases": 72,
+          "coverage": 0.625,
+          "delta_auc_vs_sum_v1": 0.0787,
+          "early_auc": 0.7023,
+          "labels": {
+            "ABSTAIN": 27,
+            "DOWN": 12,
+            "ERROR": 0,
+            "UP": 33
+          },
+          "late_auc": 0.7118,
+          "news_cases": 57,
+          "news_only_auc": 0.697,
+          "origin_cluster_bootstrap_95": [
+            0.6597,
+            0.7512
+          ],
+          "paired_delta_auc_95": [
+            0.0376,
+            0.119
+          ]
+        },
+        "materiality_weighted_mean": {
+          "arm": "materiality_weighted_mean",
+          "auc": 0.6806,
+          "balanced_accuracy_all": 0.3312,
+          "balanced_accuracy_covered": 0.5215,
+          "cases": 72,
+          "coverage": 0.5694,
+          "delta_auc_vs_sum_v1": 0.0559,
+          "early_auc": 0.7023,
+          "labels": {
+            "ABSTAIN": 31,
+            "DOWN": 12,
+            "ERROR": 0,
+            "UP": 29
+          },
+          "late_auc": 0.6817,
+          "news_cases": 57,
+          "news_only_auc": 0.6613,
+          "origin_cluster_bootstrap_95": [
+            0.6395,
+            0.7392
+          ],
+          "paired_delta_auc_95": [
+            0.0201,
+            0.098
+          ]
+        },
+        "mean_v1": {
+          "arm": "mean_v1",
+          "auc": 0.6939,
+          "balanced_accuracy_all": 0.3312,
+          "balanced_accuracy_covered": 0.5636,
+          "cases": 72,
+          "coverage": 0.5139,
+          "delta_auc_vs_sum_v1": 0.0692,
+          "early_auc": 0.7023,
+          "labels": {
+            "ABSTAIN": 35,
+            "DOWN": 12,
+            "ERROR": 0,
+            "UP": 25
+          },
+          "late_auc": 0.6867,
+          "news_cases": 57,
+          "news_only_auc": 0.6823,
+          "origin_cluster_bootstrap_95": [
+            0.6468,
+            0.7562
+          ],
+          "paired_delta_auc_95": [
+            0.0306,
+            0.1097
+          ]
+        },
+        "sum_v1": {
+          "arm": "sum_v1",
+          "auc": 0.6247,
+          "balanced_accuracy_all": 0.4363,
+          "balanced_accuracy_covered": 0.5556,
+          "cases": 72,
+          "coverage": 0.7083,
+          "delta_auc_vs_sum_v1": 0.0,
+          "early_auc": 0.6205,
+          "labels": {
+            "ABSTAIN": 21,
+            "DOWN": 14,
+            "ERROR": 0,
+            "UP": 37
+          },
+          "late_auc": 0.6165,
+          "news_cases": 57,
+          "news_only_auc": 0.5739,
+          "origin_cluster_bootstrap_95": [
+            0.5923,
+            0.6723
+          ],
+          "paired_delta_auc_95": null
+        }
+      },
+      "cases": 72
+    },
+    "window_24_retrospective_only": {
+      "arms": {
+        "dedup_mean": {
+          "arm": "dedup_mean",
+          "auc": 0.6438,
+          "balanced_accuracy_all": 0.2,
+          "balanced_accuracy_covered": 0.55,
+          "cases": 24,
+          "coverage": 0.2917,
+          "delta_auc_vs_sum_v1": -0.0375,
+          "early_auc": 0.6667,
+          "labels": {
+            "ABSTAIN": 17,
+            "DOWN": 4,
+            "ERROR": 0,
+            "UP": 3
+          },
+          "late_auc": 0.7,
+          "news_cases": 17,
+          "news_only_auc": 0.5865,
+          "origin_cluster_bootstrap_95": [
+            0.5873,
+            0.7143
+          ],
+          "paired_delta_auc_95": [
+            -0.1428,
+            0.0
+          ]
+        },
+        "materiality_dedup_source_mean": {
+          "arm": "materiality_dedup_source_mean",
+          "auc": 0.6438,
+          "balanced_accuracy_all": 0.2,
+          "balanced_accuracy_covered": 0.55,
+          "cases": 24,
+          "coverage": 0.2917,
+          "delta_auc_vs_sum_v1": -0.0375,
+          "early_auc": 0.6667,
+          "labels": {
+            "ABSTAIN": 17,
+            "DOWN": 4,
+            "ERROR": 0,
+            "UP": 3
+          },
+          "late_auc": 0.7,
+          "news_cases": 17,
+          "news_only_auc": 0.5865,
+          "origin_cluster_bootstrap_95": [
+            0.5873,
+            0.7143
+          ],
+          "paired_delta_auc_95": [
+            -0.1428,
+            0.0
+          ]
+        },
+        "materiality_weighted_mean": {
+          "arm": "materiality_weighted_mean",
+          "auc": 0.6562,
+          "balanced_accuracy_all": 0.2,
+          "balanced_accuracy_covered": 0.55,
+          "cases": 24,
+          "coverage": 0.2917,
+          "delta_auc_vs_sum_v1": -0.0251,
+          "early_auc": 0.6667,
+          "labels": {
+            "ABSTAIN": 17,
+            "DOWN": 4,
+            "ERROR": 0,
+            "UP": 3
+          },
+          "late_auc": 0.7,
+          "news_cases": 17,
+          "news_only_auc": 0.6058,
+          "origin_cluster_bootstrap_95": [
+            0.619,
+            0.7143
+          ],
+          "paired_delta_auc_95": [
+            -0.1428,
+            0.0
+          ]
+        },
+        "mean_v1": {
+          "arm": "mean_v1",
+          "auc": 0.6562,
+          "balanced_accuracy_all": 0.2,
+          "balanced_accuracy_covered": 0.55,
+          "cases": 24,
+          "coverage": 0.2917,
+          "delta_auc_vs_sum_v1": -0.0251,
+          "early_auc": 0.6667,
+          "labels": {
+            "ABSTAIN": 17,
+            "DOWN": 4,
+            "ERROR": 0,
+            "UP": 3
+          },
+          "late_auc": 0.7,
+          "news_cases": 17,
+          "news_only_auc": 0.6058,
+          "origin_cluster_bootstrap_95": [
+            0.619,
+            0.7143
+          ],
+          "paired_delta_auc_95": [
+            -0.1428,
+            0.0
+          ]
+        },
+        "sum_v1": {
+          "arm": "sum_v1",
+          "auc": 0.6813,
+          "balanced_accuracy_all": 0.375,
+          "balanced_accuracy_covered": 0.6458,
+          "cases": 24,
+          "coverage": 0.4583,
+          "delta_auc_vs_sum_v1": 0.0,
+          "early_auc": 0.6667,
+          "labels": {
+            "ABSTAIN": 13,
+            "DOWN": 6,
+            "ERROR": 0,
+            "UP": 5
+          },
+          "late_auc": 0.8333,
+          "news_cases": 17,
+          "news_only_auc": 0.6442,
+          "origin_cluster_bootstrap_95": [
+            0.619,
+            0.8571
+          ],
+          "paired_delta_auc_95": null
+        }
+      },
+      "cases": 24
+    }
+  },
+  "warning": "Experimental offline aggregation screen on existing cached windows (dev 72-case replay and the already-looked-at 24 scored cases of the 11/09 window). Not a fresh unseen evaluation, not a trading signal, and not financial advice. Cofinance never trades."
+}

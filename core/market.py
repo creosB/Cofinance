@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from .evidence_status import quote_status
 
 CRYPTO = {"BTC","ETH","SOL","ADA","DOGE","XRP","BNB","AVAX","DOT","LINK"}
+MARKET_OVERVIEW_TICKERS = ("^GSPC", "^IXIC", "^DJI")
 NUMERIC_LISTING = r"[0-9]{1,6}\.[A-Z]{1,4}"
 SYMBOL = re.compile(rf"(?:[A-Z^][A-Z0-9.\-=]{{0,14}}|{NUMERIC_LISTING})")
 SEARCH_QUOTE_TYPES = frozenset({"EQUITY", "ETF", "INDEX", "CRYPTOCURRENCY", "FUTURE", "CURRENCY", "MUTUALFUND"})
@@ -364,6 +365,23 @@ class MarketTools:
                     {"title":"Crypto Fear & Greed Index (market-wide, not asset-specific)","url":"https://alternative.me/crypto/fear-and-greed-index/","source":"Alternative.me","as_of":as_of})
         except (OSError,ValueError,KeyError,IndexError,TypeError):
             return {"sentiment_status":"Unavailable, no neutral score substituted"},None
+
+    def get_crypto_sentiment(self):
+        self.check()
+        fields, ev = self._fetch_sentiment()
+        if ev is not None:
+            with self._lock:
+                self.evidence.append(ev)
+            return {
+                "status": "available",
+                "source": "Alternative.me",
+                **fields,
+            }
+        return {
+            "status": "unavailable",
+            "source": "Alternative.me",
+            **fields,
+        }
 
     def get_snapshot(self,ticker):
         valid_symbol(ticker);self.check()

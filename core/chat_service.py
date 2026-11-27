@@ -21,7 +21,7 @@ from .documents import select_excerpts
 from .entities import extract_tickers
 from .gliner_decide import DEFAULT_ALIASES, GlinerQueryRouter, GlinerOutputError
 from .local_models import LocalModels, MODEL_ID, ModelError, Cancelled, narrators
-from .market import MarketTools, SnapshotCache, has_listing_constraint
+from .market import MARKET_OVERVIEW_TICKERS, MarketTools, SnapshotCache, has_listing_constraint
 from .news_service import coverage_note, feed_tickers, news_health
 from .evidence_status import decision_assessment, decision_request, previous_close_answer, previous_close_request, requested_valuation, valuation_answer
 from .memory import HybridMemory, LocalKeywordMemory, MemoryHit, context_from
@@ -537,7 +537,58 @@ class ChatService:
                         check()
                         self.store.finish(job['id'],answer,{'kind':'clarification','charts':[],'evidence':[],'tickers':prior,'mode':job['model'],'usage':trace.data.get('usage')},prior,'complete')
                     return
-            if routed.intent=='open_conversation':
+            capability=getattr(routed,'capability','none') if (not resolved_tickers and not candidates and not doc_match) else 'none'
+            if session_tickers and capability in {'market_overview','watchlist_overview','watchlist_compare'}:
+                anaphoric=bool(re.search(r'\b(?:it|its|they|them|their|this|that)\b',job['query'],re.I))
+                if anaphoric or (capability=='market_overview' and routed.intent=='news_catalysts'):
+                    capability='none'
+            if capability=='crypto_sentiment':
+                if self.models.thinker_loaded():
+                    self.models.stop_thinker()
+                if think:
+                    deep['note']='This answer is computed directly from verified market evidence, so Deep think was not needed.'
+                    trace.event('Deep think skipped','decision',{'reason':'crypto_sentiment','note':deep['note']},actor='Python')
+                self.store.progress(job['id'],'Fetching crypto market sentiment')
+                sentiment=trace.call('Fetch crypto market sentiment','tool',lambda:tools.get_crypto_sentiment(),actor='Alternative.me',
+                                     inputs={'source':'Alternative.me Fear & Greed API, read-only'})
+                check()
+                if sentiment.get('status')=='available' and sentiment.get('fear_greed_index') is not None:
+                    val=sentiment['fear_greed_index']
+                    lbl=sentiment.get('fear_greed_label') or ''
+                    as_of=sentiment.get('fear_greed_as_of') or 'time not supplied'
+                    answer=f"Crypto Fear and Greed index (market-wide, not asset-specific): {val}{f' ({lbl})' if lbl else ''}, as of {as_of} via Alternative.me."
+                    faithful_sent=True
+                else:
+                    answer='Crypto Fear and Greed index is currently unavailable from Alternative.me. No values were substituted.'
+                    faithful_sent=False
+                trace.event('Crypto sentiment capability','decision',{'capability':'crypto_sentiment','status':sentiment.get('status')},actor='Python')
+                trace.finish(summary={'origin':'chat','conversation_id':job['session_id'],'flow':'python_market_answer','answer_kind':'research','answer':answer[:2500],'risk_mode':'risk_guardian_crypto','model_choice':job['model']})
+                payload={'kind':'research','mode':job['model'],'tickers':[],'charts':[],'usage':trace.data.get('usage'),
+                         'snapshots':{},'evidence':list(tools.evidence),'citations':[],'faithful_synthesis':faithful_sent,
+                         'risk_mode':'risk_guardian_crypto','deep_think':deep,'capability':'crypto_sentiment','market_answer_note':answer}
+                with self.lock:
+                    check()
+                    self.store.finish(job['id'],answer,payload,session_tickers,'complete')
+                return
+            market_overview_cap=False
+            if capability in {'watchlist_overview','watchlist_compare'}:
+                tickers=[r['ticker'] for r in self.store.watchlist()][:6]
+                if not tickers:
+                    answer='Your watchlist is empty. Name an asset (such as NVDA, Apple, or BTC) to research it, or click Track on any answer to add one.'
+                    trace.event('Asset clarification required','decision',{'reason':'empty_watchlist','capability':capability},actor='Python')
+                    trace.finish(summary={'origin':'chat','conversation_id':job['session_id'],'flow':'clarification','answer_kind':'clarification','answer':answer,'risk_mode':'not_resolved','model_choice':job['model']})
+                    with self.lock:
+                        check()
+                        self.store.finish(job['id'],answer,{'kind':'clarification','charts':[],'evidence':[],'tickers':session_tickers,'mode':job['model'],'usage':trace.data.get('usage')},session_tickers,'complete')
+                    return
+                routed=dataclasses.replace(routed,intent='compare_assets' if (capability=='watchlist_compare' and len(tickers)>=2) else 'price_snapshot')
+                trace.event('Resolve zero-ticker capability','decision',{'capability':capability,'tickers':tickers},actor='Python')
+            elif capability=='market_overview':
+                tickers=list(MARKET_OVERVIEW_TICKERS)
+                routed=dataclasses.replace(routed,intent='price_snapshot')
+                market_overview_cap=True
+                trace.event('Resolve zero-ticker capability','decision',{'capability':capability,'tickers':tickers},actor='Python')
+            elif routed.intent=='open_conversation':
                 tickers=[]
             else:
                 tickers=list(dict.fromkeys(resolved_tickers or session_tickers))
@@ -547,7 +598,7 @@ class ChatService:
                 if routed.intent=='compare_assets' and len(tickers)==1:
                     tickers=list(dict.fromkeys(session_tickers+tickers))
                 if 'watchlist' in job['query'].lower() and not resolved_tickers:
-                    tickers=[r['ticker'] for r in self.store.watchlist()]
+                    tickers=[r['ticker'] for r in self.store.watchlist()][:6]
                     if not tickers and not doc_match:
                         answer='Your watchlist is empty. Name an asset (such as NVDA, Apple, or BTC) to research it, or click Track on any answer to add one.'
                         trace.event('Asset clarification required','decision',{'reason':'empty_watchlist'},actor='Python')
@@ -602,7 +653,8 @@ class ChatService:
             asked_for_decision=bool(tickers) and decision_request(job['query'])
             asked_previous_close=bool(tickers) and not doc_match and routed.intent!='watchlist_add' and previous_close_request(job['query'])
             asked_valuation=bool(tickers) and not doc_match and not asked_for_decision and routed.intent in {'price_snapshot','compare_assets'} and measure in {'share_price','market_cap'}
-            collect_reason=('decision_evidence_assessment' if (asked_for_decision and not doc_match) else
+            collect_reason=('market_overview' if market_overview_cap else
+                            'decision_evidence_assessment' if (asked_for_decision and not doc_match) else
                             'previous_close_request' if asked_previous_close else
                             'valuation_measure' if asked_valuation else '')
             python_owned=bool(collect_reason)

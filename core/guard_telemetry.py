@@ -27,6 +27,8 @@ KNOWN_BYPASS_METHODS = frozenset({
     "previous_close_request",
     "valuation_measure",
     "incomplete_comparison",
+    "market_overview",
+    "crypto_sentiment",
 })
 KNOWN_ACTORS = frozenset({"Data Analyst", "News Researcher", "Document Reader", "Market Team Lead"})
 SAFE_REASON_RE = re.compile(r"^[a-zA-Z0-9_.-]{1,64}$")

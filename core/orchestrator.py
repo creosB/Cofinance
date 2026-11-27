@@ -527,31 +527,50 @@ class DocumentReaderAgent:
     NAME = "Document Reader"
 
     def run(self, question: str, documents: Sequence[Mapping[str, Any]], bus: EventBus, session_id: str) -> SpecialistReport:
-        from .documents import group_excerpts, select_excerpts
+        from .documents import banner_scale, group_excerpts, scalable_excerpt_numbers, select_excerpts
         excerpts = select_excerpts(documents, question)
         groups = group_excerpts(excerpts)
         ordered = [e for g in groups for e in g["excerpts"]]
+        def _ctx_prefix(ex: Mapping[str, Any]) -> str:
+            parts = []
+            hdr = ex.get("section_header")
+            unit = ex.get("unit_banner")
+            body = str(ex.get("text") or "")
+            if hdr and hdr not in body:
+                parts.append(hdr)
+            if unit and unit not in body:
+                parts.append(unit)
+            return f" [{'; '.join(parts)}]" if parts else ""
         if ordered:
             note = "" if all(e["matched"] for e in ordered) else " No page shares words with the question, so the first pages are shown."
             if len(groups) > 1:
                 blocks = [
-                    f'Source "{g["name"]}":\n' + "\n".join(f'  Page {e["page"]}: "{e["text"]}"' for e in g["excerpts"])
+                    f'Source "{g["name"]}":\n' + "\n".join(f'  Page {e["page"]}{_ctx_prefix(e)}: "{e["text"]}"' for e in g["excerpts"])
                     for g in groups
                 ]
                 summary = ("Excerpts from the attached files, quoted by Python and grouped by source file." + note + "\n"
                            + "\n".join(blocks))
             else:
                 summary = ("Excerpts from the attached files, quoted by Python." + note + "\n"
-                           + "\n".join(f'From "{e["name"]}", page {e["page"]}: "{e["text"]}"' for e in ordered))
+                           + "\n".join(f'From "{e["name"]}", page {e["page"]}{_ctx_prefix(e)}: "{e["text"]}"' for e in ordered))
         else:
             summary = "The attached files have no readable text."
         allowed = ([n for e in ordered for n in numbers_in(e["text"])] + [float(e["page"]) for e in ordered]
                    + [n for e in ordered for n in numbers_in(str(e["name"]))])
+        for e in ordered:
+            mult = banner_scale(e.get("unit_banner"))
+            if mult is not None:
+                allowed.extend(v * mult for v in scalable_excerpt_numbers(e["text"]))
+            if e.get("section_header"):
+                allowed.extend(numbers_in(str(e["section_header"])))
         group_meta = [{"document_id": g["document_id"], "name": g["name"], "pages": [e["page"] for e in g["excerpts"]]} for g in groups]
         validation = {"validation_reason": "python_excerpts",
                       "document_count": len(groups),
                       "groups": group_meta,
-                      "excerpts": [{"name": e["name"], "page": e["page"], "matched": e["matched"], "characters": len(e["text"])}
+                      "excerpts": [{"name": e["name"], "page": e["page"], "matched": e["matched"], "characters": len(e["text"]),
+                                    **({"section_header": e["section_header"]} if e.get("section_header") else {}),
+                                    **({"unit_banner": e["unit_banner"]} if e.get("unit_banner") else {}),
+                                    **({"adjacent": True} if e.get("adjacent") else {})}
                                    for e in ordered]}
         return SpecialistReport(agent_name=self.NAME, tickers=[], raw_facts={"excerpts": ordered, "groups": group_meta}, allowed_numbers=allowed,
                                 chart_refs=[], summary=summary, faithful_numbers=True, validation=validation)
@@ -578,6 +597,7 @@ class TeamLeadOrchestrator:
     STRICT_RISK = ("\nStrict: name a risk only from the listed risks, in their words, or say the reports do not identify "
                    "a specific risk. Do not mention execution, supply chain, competition, valuation or any other risk that is not listed.")
     RETRY_REASONS = {"unsupported_risk", "unsupported_terms", "unsupported_numeric_tokens", "direction_conflict", "claim_provenance"}
+    MAX_RECOVERABLE_REJECTED_NUMBERS = 3
 
     @staticmethod
     def rejected(validation: Mapping[str, Any]) -> List[str]:
@@ -613,7 +633,7 @@ class TeamLeadOrchestrator:
         "Copy numbers exactly as written and never round. Do not add headings, dates, or numbers that are not in the reports. "
         "Do not call volume, momentum, or valuation high, low, strong, or weak: the reports contain no comparison data. "
         "Use only names and terms that appear in the reports, and never repeat abbreviations from the user question that are not in the reports. "
-        "Identify each asset using its full name and ticker symbol from the Data Analyst report. "
+        "Identify each asset only by its exact name and ticker symbol from the Data Analyst report; do not copy nicknames or country labels from the user question. "
         "If a report says data or news is unavailable, say so plainly instead of guessing."
     )
 
@@ -893,9 +913,12 @@ class TeamLeadOrchestrator:
             + ("\n\nTask: this is a follow-up. The earlier answer already gave the figures. Answer only the user question "
                "in at most two sentences, and use at most two numbers, only ones the question asks for." if previous else "")
         )
-        # Only numbers in accepted reports can be reused by the lead, not unseen tool fields.
         allowed_numbers = [n for report in (data_rep, news_rep, doc_rep) if report for n in numbers_in(report.summary)
                            if any(abs(n-a) <= max(1e-9, abs(a)*1e-9) for a in report.allowed_numbers)]
+        if doc_rep is not None:
+            for n in doc_rep.allowed_numbers:
+                if not any(abs(n - a) <= max(1e-9, abs(a) * 1e-9) for a in allowed_numbers):
+                    allowed_numbers.append(n)
         # Accepted reports plus the Python-derived risk list (digit-free, from tool facts). Never the question or memory.
         # The agent role names are the prompt's own section headers ("News Researcher report:"), not factual claims.
         # Found live 2026-11-08: an Apple answer saying "the News Researcher reports..." fell back on "Researcher".
@@ -938,6 +961,13 @@ class TeamLeadOrchestrator:
                 val,
                 other_numbers=extra_nums,
             )
+            if ok and doc_rep is not None:
+                from .documents import check_document_claims
+                doc_conflicts = check_document_claims(text, doc_rep.raw_facts)
+                if doc_conflicts:
+                    val["provenance_conflicts"] = doc_conflicts
+                    val["validation_reason"] = "claim_provenance"
+                    ok = False
             invented = unsupported_risks(text, cues) if ok else []
             if invented:
                 val["unsupported_risks"] = invented
@@ -956,7 +986,11 @@ class TeamLeadOrchestrator:
         # what was rejected (an invented risk, a word not in the reports such as "ATH", a number, a wrong direction).
         # Same guards; if the retry also fails, the deterministic fallback (the specialist reports) is used.
         reason = validation.get("validation_reason")
-        if not faithful and clean_synth and reason in self.RETRY_REASONS:
+        hopeless_numbers = (
+            reason == "unsupported_numeric_tokens"
+            and len(validation.get("rejected_numbers") or []) >= self.MAX_RECOVERABLE_REJECTED_NUMBERS
+        )
+        if not faithful and clean_synth and reason in self.RETRY_REASONS and not hopeless_numbers:
             retried = True
             retry = narrate(synth_prompt + self.feedback(validation), lead_budget)
             retry_ok, retry_val = judge(retry)
@@ -966,6 +1000,12 @@ class TeamLeadOrchestrator:
             if retry_ok:
                 clean_synth, faithful, validation = retry, True, retry_val
             validation["guard_retry"] = summary
+        elif hopeless_numbers:
+            validation["guard_retry_skipped"] = {
+                "reason": reason,
+                "rejected_count": len(validation.get("rejected_numbers") or []),
+                "used": "fallback",
+            }
         # Strict follow-ups (approved 2026-11-08): an accepted follow-up that repeats more than two figures from the
         # earlier answer gets ONE retry with a stricter last instruction. The retry passes every guard again and is
         # used only if it is faithful and repeats fewer figures, so strictness costs at most one narrator call and

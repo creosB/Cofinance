@@ -96,6 +96,19 @@ USER_QUERY_BASE_SCHEMA: Dict[str, Any] = {
     k: v for k, v in USER_QUERY_SCHEMA.items() if k != "requested_value"
 }
 
+ZERO_TICKER_CAPABILITY_SCHEMA: Dict[str, Any] = {
+    "capability": {
+        "labels": {
+            "general_chat": "Greeting, casual chat, general knowledge, finance concept, definition, or advice question not requesting live market prices, indices, sentiment, or the user's watchlist",
+            "watchlist_overview": "Live status, prices, updates, or overview of the user's saved watchlist or tracked stocks",
+            "watchlist_compare": "Side-by-side comparison of the stocks or crypto assets currently on the user's watchlist",
+            "market_overview": "Live performance, prices, or status of major stock market indices such as S&P 500, Nasdaq, Dow Jones, or how the overall US market is doing today",
+            "crypto_sentiment": "Current live Crypto Fear and Greed index or overall cryptocurrency market sentiment reading",
+        }
+    }
+}
+LIVE_CAPABILITIES = frozenset({"watchlist_overview", "watchlist_compare", "market_overview", "crypto_sentiment"})
+
 _VALUATION_HEAD_CUE_RE = re.compile(
     r"(?i:\b(?:worth(?!\s+(?:buying|selling|holding|owning|investing|noting|mentioning|watching)\b)"
     r"|val(?:ued|uation)|market\s+(?:cap(?:italization|italisation)?|value)"
@@ -136,6 +149,7 @@ class RoutedQuery:
     tickers: List[str]
     entity_candidates: Tuple[str, ...] = ()
     requested_value: str = "other"
+    capability: str = "none"
 
 
 class GlinerDecideClassifier(Classifier):
@@ -373,6 +387,20 @@ class GlinerQueryRouter:
             elif has_asset_cue and candidates:
                 intent = "thesis_review" if _THESIS_CUE_RE.search(query or "") else "price_snapshot"
 
+        capability = "none"
+        words = re.findall(r"[A-Za-z0-9]+", query or "")
+        if not tickers and not candidates and not use_valuation_head and len(words) >= 2:
+            try:
+                cap_res = self.backend.classify_text(query, ZERO_TICKER_CAPABILITY_SCHEMA, include_confidence=True)
+            except TypeError:
+                cap_res = self.backend.classify_text(query, ZERO_TICKER_CAPABILITY_SCHEMA)
+            except Exception:
+                cap_res = {}
+            if isinstance(cap_res, Mapping) and "capability" in cap_res:
+                cap_label, cap_conf = _unpack_label_conf(cap_res.get("capability"), "general_chat")
+                if cap_label in LIVE_CAPABILITIES and cap_conf >= 0.55:
+                    capability = cap_label
+
         return RoutedQuery(
             intent=intent,
             intent_confidence=round(intent_conf, 4),
@@ -380,6 +408,7 @@ class GlinerQueryRouter:
             tickers=tickers,
             entity_candidates=tuple(candidates),
             requested_value=requested,
+            capability=capability,
         )
 
 
