@@ -14,7 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-from core.run_trace import TRACE_FORMAT, safe
+from core.run_trace import TRACE_FORMAT, read_trace_bytes, safe, save_error_count
 
 ROOT = Path(__file__).resolve().parents[1]
 MAX_TRACE_BYTES = 16 * 1024 * 1024
@@ -74,7 +74,7 @@ async function api(path){const abort=new AbortController(),timer=setTimeout(()=>
 function setView(view){state.view=view;['execution','models','dataset'].forEach(v=>$('#'+v+'-view').classList.toggle('hidden',v!==view));$$('[data-view]').forEach(b=>b.setAttribute('aria-current',b.dataset.view===view?'page':'false'));$('#view-name').textContent=word(view).replace(/^./,c=>c.toUpperCase());$('#mobile-nav').value=view;if(view==='models')renderModels();if(view==='dataset')renderDataset();}
 function renderRuns(){const list=$('#run-list'),key=json([state.run?.id,state.runs.map(r=>[r.id,r.title,r.status,r.mode])]);if(key===state.runListKey)return;state.runListKey=key;const focused=document.activeElement?.dataset.run,top=list.scrollTop;list.innerHTML=state.runs.length?state.runs.map(r=>`<button class="run-button ${state.run?.id===r.id?'selected':''}" data-run="${e(r.id)}" title="${e(r.title)}"><span class="title">${e(r.title)}</span><span class="meta">${status(r.status)}<span>${e(r.mode)}</span></span><span class="muted">${e(when(r.started_at))}</span></button>`).join(''):'<p class="muted">No recorded runs yet.</p>';$$('[data-run]').forEach(b=>b.onclick=()=>loadRun(b.dataset.run));list.scrollTop=top;if(focused)$('[data-run="'+focused+'"]')?.focus({preventScroll:true});}
 function flatten(spans){const byParent=new Map(),ids=new Set(spans.map(s=>s.id));for(const s of spans){const p=ids.has(s.parent_id)?s.parent_id:null;if(!byParent.has(p))byParent.set(p,[]);byParent.get(p).push(s);}const out=[],seen=new Set();function walk(parent,depth){for(const s of byParent.get(parent)||[]){if(seen.has(s.id))continue;seen.add(s.id);out.push({...s,depth});if(depth<30)walk(s.id,depth+1);}}walk(null,0);for(const s of spans)if(!seen.has(s.id))out.push({...s,depth:0});return out;}
-function renderRun(){const r=state.run;if(!r){$('#run-title').textContent='Execution';$('#run-summary').innerHTML='';$('#mode-notice').innerHTML='';$('#timeline').innerHTML='<div class="empty"><h2>No recorded runs</h2><p>Start a traced backend run on your PC. This viewer never starts a model or changes a watchlist.</p><code>python -S -E -B -m ui.workbench</code></div>';return;}$('#run-title').textContent=r.title;$('#run-description').textContent='Trace the evidence, model calls, and rules behind this run.';$('#run-badge').innerHTML=status(r.status);const models=r.spans.filter(s=>s.kind==='model'),gates=r.spans.filter(s=>s.kind==='gate'),issues=r.spans.filter(s=>['error','fallback'].includes(s.status));$('#run-summary').innerHTML=`<span><strong>${e(ms(r.duration_ms))}</strong> total</span><span><strong>${models.length}</strong> model calls</span><span><strong>${gates.length}</strong> gate checks</span><span><strong>${issues.length}</strong> error / fallback steps</span><span>${e(when(r.started_at))}</span>`;let notice=r.mode==='fixture'?'<strong>Fixture run.</strong> Model and tool outputs are test stubs, not live measurements.':r.mode==='replay'?'<strong>Diagnostic replay.</strong> Recorded source data, real calls where identified. Fresh in-memory signal store; no alerts or watchlist writes.':'<strong>Live trace.</strong> Actual executed calls; this viewer is read-only.';if(r.storage_errors||r.dropped_spans)notice+=` Trace incomplete: ${r.storage_errors||0} storage errors, ${r.dropped_spans||0} omitted steps.`;$('#mode-notice').innerHTML=`<div class="inline-notice">${notice}</div>`;renderTimeline();renderInspector();if(state.view==='models')renderModels();}
+function renderRun(){const r=state.run;if(!r){$('#run-title').textContent='Execution';$('#run-summary').innerHTML='';$('#mode-notice').innerHTML='';$('#timeline').innerHTML='<div class="empty"><h2>No recorded runs</h2><p>Start a traced backend run on your PC. This viewer never starts a model or changes a watchlist.</p><code>python -S -E -B -m ui.workbench</code></div>';return;}$('#run-title').textContent=r.title;$('#run-description').textContent='Trace the evidence, model calls, and rules behind this run.';$('#run-badge').innerHTML=status(r.status);const models=r.spans.filter(s=>s.kind==='model'),gates=r.spans.filter(s=>s.kind==='gate'),issues=r.spans.filter(s=>['error','fallback'].includes(s.status));$('#run-summary').innerHTML=`<span><strong>${e(ms(r.duration_ms))}</strong> total</span><span><strong>${models.length}</strong> model calls</span><span><strong>${gates.length}</strong> gate checks</span><span><strong>${issues.length}</strong> error / fallback steps</span><span>${e(when(r.started_at))}</span>`;let notice=r.mode==='fixture'?'<strong>Fixture run.</strong> Model and tool outputs are test stubs, not live measurements.':r.mode==='replay'?'<strong>Diagnostic replay.</strong> Recorded source data, real calls where identified. Fresh in-memory signal store; no alerts or watchlist writes.':'<strong>Live trace.</strong> Actual executed calls; this viewer is read-only.';if(r.storage_errors||r.dropped_spans){const missed=r.dropped_spans||0,failed=r.storage_errors||0,parts=[missed?`${missed} missing ${missed===1?'step':'steps'}`:'',failed?`${failed} save ${failed===1?'error':'errors'}`:''].filter(Boolean).join(', ');notice+=` Trace incomplete: ${parts}.`;}$('#mode-notice').innerHTML=`<div class="inline-notice">${notice}</div>`;renderTimeline();renderInspector();if(state.view==='models')renderModels();}
 function renderTimeline(){if(!state.run)return;const focused=document.activeElement?.dataset.span;const q=state.query.toLowerCase();const rows=flatten(state.run.spans).filter(s=>(state.filter==='all'||s.kind===state.filter||(state.filter==='decision'&&s.kind==='route'))&&(!q||json(s).toLowerCase().includes(q)));state.visible=rows;$('#steps-heading').textContent=`Execution steps (${rows.length})`;$('#timeline').innerHTML=rows.length?rows.map(s=>`<button class="trace-row kind-${e(s.kind)}" data-span="${e(s.id)}" style="--depth:${Math.min(s.depth,6)}" aria-pressed="${s.id===state.selected}"><span class="step-main"><span class="step-mark" aria-hidden="true">${s.kind==='gate'?'=':s.kind==='model'?'M':s.kind==='decision'?'D':s.kind==='tool'?'T':s.kind==='agent'?'A':s.kind==='route'?'R':'·'}</span><span class="step-copy"><span class="step-title">${e(s.name)}</span><span class="step-meta">${e(s.model||s.actor)}${s.inputs?.title?' / '+e(s.inputs.title):''}</span></span></span><span>${status(s.status)}</span><span class="step-time mono">${e(ms(s.duration_ms))}</span></button>`).join(''):'<div class="empty"><h2>No matching steps</h2><p>Try a different term or choose All steps.</p><button id="clear-filters" class="outline">Clear filters</button></div>';$$('[data-span]').forEach(b=>b.onclick=()=>selectSpan(b.dataset.span));if(focused)$('[data-span="'+focused+'"]')?.focus({preventScroll:true});if($('#clear-filters'))$('#clear-filters').onclick=()=>{$('#search').value='';state.query='';setFilter('all');};}
 function setFilter(f){state.filter=f;$$('[data-filter]').forEach(b=>{b.classList.toggle('active',b.dataset.filter===f);b.setAttribute('aria-pressed',String(b.dataset.filter===f));});renderTimeline();}
 function selectSpan(id){state.selected=id;renderTimeline();renderInspector();if(mobile.matches)$('#inspector').scrollIntoView({block:'start',behavior:'instant'});}
@@ -126,9 +126,7 @@ def read_trace(directory: Path, run_id: str) -> dict:
     if not re.fullmatch(r"[0-9a-f]{32}", run_id):
         raise ValueError("invalid run")
     path = directory / (run_id + ".json")
-    if path.is_symlink() or path.stat().st_size > MAX_TRACE_BYTES:
-        raise ValueError("invalid trace size or link")
-    raw = path.read_bytes()
+    raw = read_trace_bytes(path, max_bytes=MAX_TRACE_BYTES)
     run = json.loads(raw.decode("utf-8"))
     if (not isinstance(run, dict) or run.get("format") != TRACE_FORMAT or run.get("id") != run_id
             or not isinstance(run.get("spans"), list) or not isinstance(run.get("title"), str)
@@ -151,7 +149,11 @@ def read_trace(directory: Path, run_id: str) -> dict:
     # Sanitize again at the read boundary; a file is data, never trusted HTML.
     result = {key: safe(value) for key, value in run.items() if key != "spans"}
     result["spans"] = [{k: safe(v) for k, v in span.items()} for span in run["spans"][:2000] if isinstance(span, dict)]
-    result["revision"] = int.from_bytes(hashlib.sha256(raw).digest()[:6], "big")
+    marker_errors = save_error_count(directory, run_id)
+    if marker_errors:
+        result["storage_errors"] = max(int(result.get("storage_errors") or 0), marker_errors)
+    digest_input = raw + (f"|save-error:{marker_errors}".encode("ascii") if marker_errors else b"")
+    result["revision"] = int.from_bytes(hashlib.sha256(digest_input).digest()[:6], "big")
     return result
 
 
@@ -175,15 +177,45 @@ def _trace_category(run: dict) -> str:
     return "chat"
 
 
+_RUN_LIST_CACHE: dict[str, tuple[tuple[int, int, int], dict]] = {}
+
+
+def _trace_sort_key(path: Path) -> int:
+    try:
+        return path.stat().st_mtime_ns
+    except OSError:
+        return -1
+
+
 def list_runs(directory: Path) -> list[dict]:
     runs = []
-    for path in sorted(directory.glob("*.json"), key=lambda p: p.stat().st_mtime_ns, reverse=True)[:100]:
+    if not directory.is_dir():
+        return runs
+    entries = []
+    for path in directory.glob("*.json"):
+        mtime = _trace_sort_key(path)
+        if mtime >= 0:
+            entries.append((mtime, path))
+    entries.sort(key=lambda item: item[0], reverse=True)
+    for _, path in entries[:100]:
         try:
+            st = path.stat()
+            marker = directory / (path.stem + ".save-error")
+            marker_mtime = marker.stat().st_mtime_ns if marker.is_file() else 0
+            sig = (st.st_mtime_ns, st.st_size, marker_mtime)
+            cache_key = str(path)
+            cached = _RUN_LIST_CACHE.get(cache_key)
+            if cached and cached[0] == sig:
+                runs.append(dict(cached[1]))
+                continue
             run = read_trace(directory, path.stem)
         except (OSError, ValueError, TypeError):
             continue
         item = {key: run.get(key) for key in ("id", "title", "status", "mode", "started_at", "duration_ms", "revision")}
         item["category"] = _trace_category(run)
+        if len(_RUN_LIST_CACHE) > 256:
+            _RUN_LIST_CACHE.clear()
+        _RUN_LIST_CACHE[cache_key] = (sig, dict(item))
         runs.append(item)
     return runs
 

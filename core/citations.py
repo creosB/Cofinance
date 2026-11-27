@@ -25,7 +25,7 @@ def shown_facts(snapshots: Mapping[str, Mapping[str, Any]]) -> List[Dict[str, An
         if snap.get("error") or snap.get("status") == "unavailable":
             continue
         for key, value in snap.items():
-            if key in NOT_NARRATED or not _numeric(value):
+            if key in NOT_NARRATED or key not in LABELS or not _numeric(value):
                 continue
             text, meaning = display_value(key, value)
             crypto_index = key == "fear_greed_index"

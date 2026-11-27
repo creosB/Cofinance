@@ -1,5 +1,3 @@
-/* Preserve-mode chat cleanup. DeepSeek-inspired hierarchy, existing Cofinance tokens and controls.
-   DESIGN_VARIANCE=3; MOTION_INTENSITY=1; VISUAL_DENSITY=4. No added animation or dependencies. */
 .workspace-layout{grid-template-columns:248px minmax(0,1fr)}
 .workspace-layout.sidebar-collapsed{grid-template-columns:minmax(0,1fr)}
 .workspace-layout.sidebar-collapsed>.workspace-sidebar{display:none}
@@ -62,8 +60,8 @@
  .workspace-layout .open-mobile-sidebar,.workspace-layout .execution-back-chat{display:inline-flex;min-width:44px;min-height:44px}
  .workspace-layout .open-desktop-sidebar{display:none}
  .workspace-layout .topbar{height:60px;min-height:60px;display:flex;grid-template-columns:none;padding:8px 12px;flex-wrap:nowrap;gap:8px}
- .workspace-layout .topbar .breadcrumb{display:flex;min-width:0}
- .workspace-layout .breadcrumb[data-view="execution"]>.state-badge{display:inline-flex;margin-left:0}
+ .workspace-layout .topbar .breadcrumb{display:flex;min-width:0;overflow:hidden;gap:6px}
+ .workspace-layout .breadcrumb[data-view="execution"]>.state-badge{display:inline-flex;margin-left:0;flex-shrink:0}
  .workspace-layout .breadcrumb[data-view="execution"]>svg{display:none}
  .workspace-layout .topbar-actions{margin-left:auto;justify-content:flex-end}
  .workspace-layout .chat-column{padding-left:16px;padding-right:16px}
@@ -74,8 +72,13 @@
  .workspace-layout .composer-bar{gap:4px}
  .workspace-layout .composer-bar>button:not(.send-button){flex-shrink:0}
 }
+@media(max-width:440px){
+ .workspace-layout .topbar{padding:6px 8px;gap:4px}
+ .workspace-layout .header-leading{gap:4px}
+ .workspace-layout .breadcrumb[data-view="execution"] .crumb-title{display:none}
+ .workspace-layout .breadcrumb[data-view="execution"]>strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}
 
-/* Attached PDFs (2026-11-19): chips above the question, quoted pages under an answer. */
 .attachment-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px;padding:0;list-style:none}
 .attachment-chip{display:flex;align-items:center;gap:6px;max-width:100%;min-height:36px;padding:2px 2px 2px 10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);font-size:13px;color:var(--foreground)}
 .attachment-name{min-width:0;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

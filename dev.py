@@ -342,16 +342,19 @@ def spotcheck_cmd(action, corpus='data/news_corpus_20261108', overwrite=False):
     return 0
 
 
-def guard_stats_cmd(traces='data/traces', mode='all', as_json=False):
+def guard_stats_cmd(traces='data/traces', mode='all', as_json=False, strict=False):
     import json
     from core.guard_telemetry import summarize_guard_directory
     printable_stdout()
     tpath = ROOT / traces if not Path(traces).is_absolute() else Path(traces)
     report = summarize_guard_directory(tpath, mode=mode)
+    cov = report['coverage']
+    strict_failed = strict and (
+        cov['unreadable_files'] > 0 or cov['included_traces'] == 0 or cov['incomplete_traces'] > 0
+    )
     if as_json:
         print(json.dumps(report, indent=2, sort_keys=True))
-        return 0
-    cov = report['coverage']
+        return 1 if strict_failed else 0
     fpa = report['first_pass_acceptance_rate']
     fpa_str = f'{fpa * 100:.1f}%' if fpa is not None else 'n/a'
     w_share = report['wasted_ms_share']
@@ -364,6 +367,8 @@ def guard_stats_cmd(traces='data/traces', mode='all', as_json=False):
         f'wasted passes {report["wasted_passes"]}/{report["total_narrator_passes"]} '
         f'({report["wasted_ms"]:.1f}/{report["total_narrator_ms"]:.1f} ms, {w_str})'
     )
+    if cov['included_traces'] == 0:
+        print('  status: not benchmarkable (0 eligible traces)')
     if cov["excluded_trace_integrity"]:
         excluded = ', '.join(f'{k}={v}' for k, v in cov["excluded_trace_integrity"].items())
         print(f'  excluded from rates: {excluded}')
@@ -380,7 +385,7 @@ def guard_stats_cmd(traces='data/traces', mode='all', as_json=False):
             f'retries={row["guard_retries"]} fallbacks={row["fallbacks"]} '
             f'wasted={row["wasted_passes"]}/{row["total_passes"]} ({row["wasted_ms"]:.1f} ms)'
         )
-    return 0
+    return 1 if strict_failed else 0
 
 
 def showcase_preview_cmd():
@@ -400,6 +405,7 @@ def verify_cmd(full=False, browser=True):
     printable_stdout()
     steps = [
         ('preflight', [PY, 'dev.py', 'preflight'], ROOT, env()),
+        ('parity_self_check', [PY, '-m', 'qualify.parity_oracle', 'self-check'], ROOT, env()),
         (
             'backend_full' if full else 'backend_contracts',
             SUITE if full else [
@@ -489,6 +495,7 @@ def main(argv=None):
     gs.add_argument('--traces', default='data/traces')
     gs.add_argument('--mode', default='all', choices=('all', 'live', 'fixture', 'replay'))
     gs.add_argument('--json', action='store_true')
+    gs.add_argument('--strict', action='store_true')
     vf = sub.add_parser('verify')
     vf.add_argument('--full', action='store_true')
     vf.add_argument('--no-browser', action='store_true')
@@ -519,7 +526,7 @@ def main(argv=None):
     if a.cmd == 'spotcheck':
         raise SystemExit(spotcheck_cmd(a.action, corpus=a.corpus, overwrite=a.overwrite))
     if a.cmd == 'guard-stats':
-        raise SystemExit(guard_stats_cmd(traces=a.traces, mode=a.mode, as_json=a.json))
+        raise SystemExit(guard_stats_cmd(traces=a.traces, mode=a.mode, as_json=a.json, strict=a.strict))
     if a.cmd == 'showcase-preview':
         raise SystemExit(showcase_preview_cmd())
     if a.cmd == 'verify':

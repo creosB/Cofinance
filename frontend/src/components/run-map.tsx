@@ -8,6 +8,15 @@ import { duration, parseRun, type Run } from '@/lib/domain'
 import { TokenUsage } from './token-usage'
 
 const icons:Record<string,typeof Bot>={request:FileText,router:GitBranch,dispatch:GitBranch,assistant:Bot,data:Bot,news:Bot,document:FileText,lead:Layers,guard:ShieldCheck,result:FileText,sources:Search,pregate:ShieldCheck,judge:GitBranch,signals:ShieldCheck,storage:Database}
+function shortOwner(owner:string){
+ if(!owner||owner==='User input'||owner==='Local conversation')return ''
+ if(owner.includes('GLiNER'))return 'GLiNER'
+ if(owner.includes('LFM3'))return 'LFM3 1.7B'
+ if(owner.startsWith('Verified single-pass'))return 'Single-pass'
+ if(owner.startsWith('No narrator'))return 'Python'
+ if(owner.startsWith('Python'))return 'Python'
+ return owner
+}
 export function RunMap({run,selected=null,onInspect}:{run:Run;selected?:string|null;onInspect:(id:string)=>void}){
  const background=isNewsRun(run),flow=background?null:detectFlow(run),stages=background?backgroundStages(run):interactiveStages(run),[chosen,setChosen]=useState('')
  const active=stages.find(s=>s.id===chosen)||stages.find(s=>s.spans.some(n=>n.id===selected))||null
@@ -15,7 +24,7 @@ export function RunMap({run,selected=null,onInspect}:{run:Run;selected?:string|n
  const topStages=stages.filter(s=>topIds.has(s.id)),workerStages=stages.filter(s=>workerIds.has(s.id)),bottomStages=stages.filter(s=>!topIds.has(s.id)&&!workerIds.has(s.id))
  const linear=background||workerStages.length===0
  const heading=background?'Headline to signal':flow==='open_conversation'?'General chat (no live tools)':flow==='clarification'?'Clarification requested':'What ran'
- const node=(s:MapStage)=>{const Icon=icons[s.id]||Layers;return <Button key={s.id} type="button" variant="ghost" className={'map-node map-'+s.state+(active?.id===s.id?' map-selected':'')} data-map-stage={s.id} aria-pressed={active?.id===s.id} onClick={()=>{setChosen(s.id);if(s.primary)onInspect(s.primary.id)}}><span className="map-node-top"><Icon size={16} aria-hidden="true"/><strong>{s.title}</strong><span className="map-state">{stageLabel(s.state)}</span></span><span className="map-detail">{s.detail}</span></Button>}
+ const node=(s:MapStage)=>{const Icon=icons[s.id]||Layers,owner=shortOwner(s.owner);return <Button key={s.id} type="button" variant="ghost" className={'map-node map-'+s.state+(active?.id===s.id?' map-selected':'')} data-map-stage={s.id} aria-pressed={active?.id===s.id} onClick={()=>{setChosen(s.id);if(s.primary)onInspect(s.primary.id)}}><span className="map-node-top"><Icon size={16} aria-hidden="true"/><strong>{s.title}</strong><span className="map-state">{stageLabel(s.state)}</span></span>{owner&&<span className="map-owner">{owner}</span>}<span className="map-detail">{s.detail}</span></Button>}
  return <section className="run-map" aria-label={background?'Background news run map':'Interactive research run map'}><div className="run-map-heading"><div><h2>{heading}</h2></div><Badge variant="outline">{background?'Clock 1':'Clock 2'}</Badge></div>
   {linear?<div className="background-map">{stages.map((s,i)=><div key={s.id}>{i>0&&<div className="map-connector" aria-hidden="true"><ArrowDown size={16}/></div>}{node(s)}</div>)}</div>:<><div className="map-top-row">{topStages.map(node)}</div><div className="map-connector"><ArrowDown size={16} aria-hidden="true"/></div><div className="map-worker-row" data-worker-count={workerStages.length}>{workerStages.map(node)}</div><div className="map-connector"><ArrowDown size={16} aria-hidden="true"/></div><div className="map-bottom-row">{bottomStages.map(node)}</div></>}
   {active&&<div className="map-observations"><div className="section-title"><h3>{active.title}</h3></div>{!active.spans.length?<p className="muted">{active.detail}</p>:<><p className="muted">{active.description}</p><div className="map-observation-list">{active.spans.map(s=><Button type="button" key={s.id} variant="ghost" aria-pressed={s.id===selected} onClick={()=>onInspect(s.id)}><span>{s.name}<small>{s.model||s.actor}</small></span><span className="mono">{duration(s.duration_ms)}</span><ChevronRight size={14}/></Button>)}</div></> }</div>}

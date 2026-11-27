@@ -19,6 +19,7 @@ from http.server import ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from core.run_trace import trace_generation
 from .workbench import ROOT, make_handler
 
 DIST = ROOT / "frontend/dist"
@@ -36,17 +37,18 @@ EVENT_LIFE_S = 600.0    # one stream per connection lifetime; the browser's Even
 
 def _traces_fingerprint(trace_dir: Path | None) -> list:
     if trace_dir is None or not trace_dir.is_dir():
-        return []
-    out = []
+        return [trace_generation()]
+    out: list = [trace_generation()]
     try:
-        for p in sorted(trace_dir.glob("*.json")):
-            try:
-                st = p.stat()
-                out.append((p.name, st.st_mtime_ns, st.st_size))
-            except OSError:
-                continue
+        for pattern in ("*.json", "*.save-error"):
+            for p in sorted(trace_dir.glob(pattern)):
+                try:
+                    st = p.stat()
+                    out.append((p.name, st.st_mtime_ns, st.st_size))
+                except OSError:
+                    continue
     except OSError:
-        return []
+        return [trace_generation()]
     return out
 
 

@@ -30,7 +30,7 @@ function Facts({ticker,snap}:{ticker:string;snap:Snapshot}){
  const p=num(snap.price),cur=typeof snap.currency==='string'?snap.currency:''
  const name=typeof snap.name==='string'&&snap.name!==ticker?snap.name:''
  const receipt=snap.quote_status as unknown as {state?:string;failure?:string}|undefined
- const freshness:Record<string,string>={recent:'Recent quote, not live',delayed:'Delayed quote',last_session:'Last session',last_known:'Last known quote',stale:'Stale quote',timestamp_unknown:'Quote time unknown',timestamp_invalid:'Invalid quote time',unavailable:receipt?.failure==='provider_timeout'?'Quote timed out':'Quote unavailable'}
+ const freshness:Record<string,string>={recent:'Recent quote, not live',delayed:'Delayed quote',last_session:'Last session',last_known:'Last known quote',stale:'Stale quote',timestamp_unknown:'Quote time unknown',timestamp_invalid:'Invalid quote time',unavailable:receipt?.failure==='provider_timeout'?'Quote timed out. No values were substituted.':'Quote unavailable. No values were substituted.'}
  const state=receipt?.state||(p===undefined?'unavailable':'')
  const exchange=typeof snap.exchange==='string'?snap.exchange:''
  const securityType=typeof snap.quote_type==='string'?snap.quote_type:''
@@ -39,6 +39,7 @@ function Facts({ticker,snap}:{ticker:string;snap:Snapshot}){
  const add=(field:string,label:string,format:(value:number)=>string)=>{const v=num(snap[field]);if(v!==undefined)rows.push([field,label,format(v)])}
  const big=(v:number)=>Intl.NumberFormat('en-US',{notation:'compact',maximumFractionDigits:2}).format(v)+unit
  add('previous_session_close','Previous close',v=>price(v)+unit+(typeof snap.previous_session_date==='string'?' on '+snap.previous_session_date:''))
+ add('change_from_previous_session_pct','Change vs previous close',v=>(v>0?'+':'')+v+'%')
  add('market_cap','Market cap',big)
  add('low_52_week','1Y low',v=>price(v)+unit);add('high_52_week','1Y high',v=>price(v)+unit)
  add('volume','Volume',v=>v.toLocaleString())
@@ -51,14 +52,15 @@ function Facts({ticker,snap}:{ticker:string;snap:Snapshot}){
  add('fear_greed_index','Fear & Greed',v=>v+(typeof snap.fear_greed_label==='string'?' '+snap.fear_greed_label:''))
  const asOf=snap.fundamentals_as_of&&typeof snap.fundamentals_as_of==='object'?snap.fundamentals_as_of as Record<string,{as_of?:string}>:{}
  const source=typeof snap.source==='string'?snap.source:''
- const quoted=[freshness[state],when(snap.price_as_of),source].filter(Boolean).join(' ? ')
+ const quoted=[freshness[state],when(snap.price_as_of),source].filter(Boolean).join(' \u00b7 ')
+ const fundamentalsUnavailable=Boolean(snap.fundamentals_status)&&['pe_ratio','forward_pe_ratio','market_cap','revenue_ttm','eps'].every(field=>num(snap[field])===undefined)
  return <div className="facts"><div className="facts-asset"><strong>{ticker}</strong>{name&&<span>{name}</span>}{exchange&&<span className="facts-exchange">{exchange}</span>}</div>
   {p!==undefined&&<div className="facts-quote" data-fact-field="price" tabIndex={-1}><strong>{price(p)}{unit}</strong></div>}
   {quoted&&<p className="facts-source" data-quote-state={state||undefined}>{quoted}</p>}
-  {(rows.length>0||securityType)&&<details className="fact-details"><summary>Market details</summary>
+  {(rows.length>0||securityType||fundamentalsUnavailable)&&<details className="fact-details"><summary>Market details</summary>
    {securityType&&<p className="facts-source">{securityType}</p>}
    {rows.length>0&&<dl className="facts-grid">{rows.map(([field,label,value])=><div data-fact-field={field} tabIndex={-1} key={field}><dt>{label}</dt><dd>{value}</dd>{asOf[field]?.as_of&&<small>{asOf[field].as_of}</small>}{field==='all_time_high'&&typeof snap.history_start==='string'&&<small>History since {snap.history_start}</small>}</div>)}</dl>}
-   {snap.fundamentals_status&&['pe_ratio','forward_pe_ratio','market_cap','revenue_ttm','eps'].every(field=>num(snap[field])===undefined)&&<p className="facts-source">Fundamentals unavailable</p>}
+   {fundamentalsUnavailable&&<p className="facts-source">Fundamentals unavailable</p>}
   </details>}
  </div>
 }
@@ -66,7 +68,7 @@ export const memoryLine=(m:Message['payload']['memory'])=>contextLine(m)
 const kind=(m:Message)=>m.payload.kind==='conversation'?'General chat (no live tools)':m.payload.kind!=='research'||m.payload.decision_assessment?'':m.payload.mode==='facts'||m.payload.faithful_synthesis===false?'Source facts':''
 
 function Cited({message}:{message:Message}){
- const p=message.payload
+ const p=message.payload,[cursor,setCursor]=useState<Record<number,number>>({})
  const jump=(ref:CiteRef)=>{
   const root=document.getElementById(targetId(message.id,ref))
   if(!root)return
@@ -74,9 +76,14 @@ function Cited({message}:{message:Message}){
   for(let n=el.parentElement;n;n=n.parentElement)if(n instanceof HTMLDetailsElement)n.open=true
   el.focus({preventScroll:true});el.scrollIntoView({block:'nearest'})
  }
+ const activate=(index:number,refs:CiteRef[])=>{
+  const next=cursor[index]||0
+  jump(refs[next%refs.length])
+  if(refs.length>1)setCursor(prev=>({...prev,[index]:(next+1)%refs.length}))
+ }
  return <>{segments(message.content,p.citations,p.evidence?.length||0).map((s,i)=>!s.refs?<span key={i}>{s.text}</span>:
   <span key={i} className="cited">{s.text}<Tooltip><TooltipTrigger asChild>
-   <button type="button" className="cite-chip" aria-label={'Source '+s.n+': '+s.refs.map(refText).join('; ')} onClick={()=>jump(s.refs![0])}>{s.n}</button>
+   <button type="button" className="cite-chip" aria-label={'Source '+s.n+': '+s.refs.map(refText).join('; ')} onClick={()=>activate(i,s.refs!)}>{s.n}</button>
   </TooltipTrigger><TooltipContent>{s.refs.map((r,j)=><div key={j}>{refText(r)}</div>)}</TooltipContent></Tooltip></span>)}</>
 }
 

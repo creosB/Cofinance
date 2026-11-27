@@ -198,6 +198,12 @@ class TestBackgroundJobs(unittest.TestCase):
         self.assertTrue(run and text.startswith(dev.RUN + run), text[:80])  # the job wrote this launch's id first
         dev.run_file(dev.log_path('e2e')).unlink(missing_ok=True)
 
+    def test_verify_includes_parity_self_check_before_backend_suite(self):
+        seen = []
+        with mock.patch.object(dev.subprocess, 'call', side_effect=lambda cmd, **kw: seen.append(cmd) or 0):
+            self.assertEqual(dev.verify_cmd(full=False, browser=False), 0)
+        self.assertTrue(any('qualify.parity_oracle' in cmd and 'self-check' in cmd for cmd in seen))
+
 
 if __name__ == '__main__':
     unittest.main()

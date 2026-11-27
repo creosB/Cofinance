@@ -135,12 +135,16 @@ def extract_replay_case(path: Path) -> Tuple[Optional[TraceReplayCase], Optional
         return None, "invalid_json"
     if not isinstance(data, dict):
         return None, "trace_not_object"
+    summary = data.get("summary") if isinstance(data.get("summary"), dict) else {}
+    recorded_flow = str(summary.get("flow") or "")
+    has_trace_envelope = any(k in data for k in ("status", "storage_errors", "dropped_spans"))
+    if has_trace_envelope and (issue := trace_integrity_issue(data)):
+        if issue == "trace_not_terminal" and recorded_flow in {"cancelled", "error"} and data.get("status") == "error":
+            return None, "non_research_flow"
+        return None, issue
     spans = data.get("spans")
     if not isinstance(spans, list) or not spans:
         return None, "missing_spans"
-
-    summary = data.get("summary") if isinstance(data.get("summary"), dict) else {}
-    recorded_flow = str(summary.get("flow") or "")
     if recorded_flow in NON_RESEARCH_FLOWS:
         return None, "non_research_flow"
 

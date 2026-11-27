@@ -94,8 +94,73 @@ class TestRecorder(unittest.TestCase):
             self.assertEqual(trace.data['storage_errors'], 1)
             self.assertEqual(dest.read_bytes(), previous)
             self.assertFalse(list(directory.glob('.trace-*.tmp')))
+            from ui.workbench import read_trace
+            self.assertEqual(read_trace(directory, trace.run_id)['storage_errors'], 1)
             trace.flush()
             self.assertEqual(json.loads(dest.read_bytes())['storage_errors'], 1)
+            self.assertFalse((directory / (trace.run_id + '.save-error')).exists())
+
+    def test_concurrent_readers_and_writer_preserve_terminal_trace_and_sse_generation(self):
+        import threading
+        from ui.dashboard import _traces_fingerprint
+        from ui.workbench import list_runs, read_trace
+
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            trace = TraceRecorder('Concurrent readers', directory=directory)
+            stop = threading.Event()
+            errors = []
+
+            def reader():
+                while not stop.is_set():
+                    try:
+                        read_trace(directory, trace.run_id)
+                        list_runs(directory)
+                    except (OSError, ValueError) as exc:
+                        errors.append(str(exc))
+
+            workers = [threading.Thread(target=reader) for _ in range(3)]
+            for w in workers:
+                w.start()
+            try:
+                for idx in range(12):
+                    trace.event(f'Step {idx}', 'tool', {'idx': idx})
+                before_fp = _traces_fingerprint(directory)
+                trace.finish(summary={'answer': 'Done', 'api_key': 'super-secret-value', 'note': '<think>hidden</think>ok'})
+                after_fp = _traces_fingerprint(directory)
+            finally:
+                stop.set()
+                for w in workers:
+                    w.join(timeout=5)
+            self.assertEqual(errors, [])
+            self.assertNotEqual(before_fp[0], after_fp[0])
+            raw_disk = json.loads((directory / (trace.run_id + '.json')).read_text(encoding='utf-8'))
+            self.assertEqual(raw_disk['status'], 'complete')
+            self.assertEqual(raw_disk['storage_errors'], 0)
+            self.assertEqual(raw_disk['summary']['api_key'], '[redacted]')
+            self.assertNotIn('hidden', raw_disk['summary']['note'])
+            self.assertNotIn('super-secret-value', json.dumps(raw_disk))
+
+    def test_chat_service_single_phase_finish_sanitizes_summary_and_recomputes_degraded_status(self):
+        from tests.test_chat import service, wait
+        import uuid
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            svc = service(root)
+            try:
+                sess = svc.store.create_session(uuid.uuid4().hex)
+                job = svc.submit(sess['id'], 'Compare NVDA and TSLA', uuid.uuid4().hex, 'facts')
+                wait(svc, job)
+                run_id = svc.store.session(sess['id'])['messages'][-1]['run_id']
+                raw_disk = json.loads((root / 'traces' / (run_id + '.json')).read_text(encoding='utf-8'))
+                self.assertIn(raw_disk['status'], ('complete', 'degraded'))
+                self.assertEqual(raw_disk['storage_errors'], 0)
+                self.assertTrue(all(span['status'] != 'running' for span in raw_disk['spans']))
+                self.assertEqual(raw_disk['summary'].get('origin'), 'chat')
+                self.assertIn('guard_telemetry', raw_disk)
+            finally:
+                svc.close()
 
     def test_storage_failure_does_not_change_call_outcome(self):
         with tempfile.TemporaryDirectory() as temp:

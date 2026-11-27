@@ -289,6 +289,35 @@ class TestOuterLoop(unittest.TestCase):
             self.assertEqual(inv_rep["coverage"]["invariant_failures"], 1)
             self.assertEqual(inv_rep["groups"][0]["kind"], "safety_invariant_failed")
 
+    def test_mixed_corpus_strict_replay_cannot_bypass_integrity_via_non_research_or_running_spans(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "valid.json").write_text(json.dumps(_sample_trace()), encoding="utf-8")
+            (root / "clean_cancelled.json").write_text(json.dumps({
+                **_sample_trace(), "status": "error", "summary": {"flow": "cancelled"},
+            }), encoding="utf-8")
+            clean_rep = ol.replay_directory(root)
+            self.assertEqual(ol.replay_exit_code(clean_rep, fail_on_mismatch=True), 0)
+            self.assertEqual(clean_rep["coverage"]["incomplete_by_reason"].get("non_research_flow"), 1)
+
+            bypasses = {
+                "damaged_clarification": ({**_sample_trace(), "storage_errors": 1, "summary": {"flow": "clarification"}}, "trace_storage_errors"),
+                "damaged_open_chat": ({**_sample_trace(), "storage_errors": 1, "summary": {"flow": "open_conversation"}}, "trace_storage_errors"),
+                "damaged_cancelled": ({**_sample_trace(), "status": "error", "storage_errors": 1, "summary": {"flow": "cancelled"}}, "trace_storage_errors"),
+                "damaged_empty_spans": ({"id": "e1", "status": "complete", "storage_errors": 1, "dropped_spans": 0, "spans": []}, "trace_storage_errors"),
+                "damaged_missing_query": ({"id": "q1", "status": "complete", "storage_errors": 1, "dropped_spans": 0, "spans": [{"name": "Other", "status": "complete"}]}, "trace_storage_errors"),
+                "running_span_in_complete": ({**_sample_trace(), "spans": [*_sample_trace()["spans"], {"name": "Partial", "status": "running"}]}, "trace_running_spans"),
+            }
+            for name, (payload, expected_reason) in bypasses.items():
+                with self.subTest(bypass=name):
+                    case_dir = root / name
+                    case_dir.mkdir()
+                    (case_dir / "valid.json").write_text(json.dumps(_sample_trace()), encoding="utf-8")
+                    (case_dir / (name + ".json")).write_text(json.dumps(payload), encoding="utf-8")
+                    rep = ol.replay_directory(case_dir)
+                    self.assertEqual(rep["coverage"]["incomplete_by_reason"].get(expected_reason), 1)
+                    self.assertEqual(ol.replay_exit_code(rep, fail_on_mismatch=True), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

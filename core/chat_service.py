@@ -110,13 +110,17 @@ class LiveTrace(TraceRecorder):
         self.progress_fn=progress;self.last_progress=0
         super().__init__(*args,**kwargs)
     def flush(self):
-        super().flush()
+        saved=super().flush()
         now=time.monotonic()
         if self.progress_fn and now-self.last_progress>.15 and self.data.get('spans'):
             running=[s for s in self.data['spans'] if s['status']=='running']
             if running:
                 self.last_progress=now
-                self.progress_fn(running[-1]['actor']+': '+running[-1]['name'])
+                try:
+                    self.progress_fn(running[-1]['actor']+': '+running[-1]['name'])
+                except Exception:
+                    pass
+        return saved
 
 
 class _NoTrace:
@@ -398,9 +402,30 @@ class ChatService:
                         resolved_tickers.remove(symbol)
                 candidates=list(dict.fromkeys([*confirmations,*candidates]))
             if routed.intent!='open_conversation' and candidates and (not resolved_tickers or comparing or confirmations):
+                session_names={}
+                for message in session.get('messages',[]):
+                    for symbol,snap in ((message.get('payload') or {}).get('snapshots') or {}).items():
+                        if isinstance(snap,dict) and isinstance(snap.get('name'),str) and snap['name'].strip():
+                            session_names.setdefault(symbol,set()).add(snap['name'].strip().lower())
+                def match_prior_asset(term):
+                    clean=term.strip()
+                    if not clean or not session_tickers:return None
+                    up,low=clean.upper(),clean.lower()
+                    hits=[]
+                    for symbol in session_tickers:
+                        base=symbol.upper().split('.',1)[0]
+                        if symbol.upper()==up or (len(up)>=2 and base.startswith(up)) or any(low in n for n in session_names.get(symbol,())):
+                            hits.append(symbol)
+                    return hits[0] if len(hits)==1 else None
                 for term in candidates:
                     if len(resolved_tickers)>=6:raise ValueError('Limit a research run to six assets.')
                     context=confirmations.get(term) or clause_for(term)
+                    if term not in confirmations and not has_listing_constraint(context):
+                        prior_hit=match_prior_asset(term)
+                        if prior_hit is not None:
+                            if prior_hit not in resolved_tickers:resolved_tickers.append(prior_hit)
+                            trace.event('Reuse resolved conversation asset','decision',{'term':term,'ticker':prior_hit},actor='Python')
+                            continue
                     self.store.progress(job['id'],f'Resolving {term}')
                     def lookup():
                         resolver=getattr(tools,'resolve_symbol',None)
@@ -438,7 +463,7 @@ class ChatService:
                 if prior:
                     prefix=', '.join(prior)+': '
                     if measure=='ambiguous_value':
-                        answer=prefix+'Do you mean the share price, the company?s market capitalization, or enterprise value? They are different measures.'
+                        answer=prefix+"Do you mean the share price, the company's market capitalization, or enterprise value? They are different measures."
                         reason='ambiguous_valuation'
                     else:
                         answer=prefix+'Enterprise value is not available from the configured evidence. The share price and market capitalization are different measures, not substitutes.'
@@ -564,7 +589,7 @@ class ChatService:
             odds_future=odds_pool.submit(self.crowd_odds,tickers) if odds_pool else None
             try:
                 result=run_traced_team(orch,job['query'],trace,session_id=job['session_id'],context=context_from(previous,hits),
-                                       documents=documents or None)
+                                       documents=documents or None,finish=False)
                 check()
                 answer=result.final_synthesis or 'No accepted evidence is available for this request.'
                 if routed.intent=='watchlist_add':answer+=' Use the Add to watchlist button to confirm tracking.'
@@ -644,9 +669,9 @@ class ChatService:
                     payload['market_answer_note']=answer
                     payload['citations']=[]
                     trace.event('Withhold incomplete comparison','decision',{'missing_quotes':unavailable},actor='Python',fallback=True)
-                    trace.finish(summary=trace.data.get('summary'))
             flow=_research_flow(routed,result,trace)
-            trace.data['summary'].update({'origin':'chat','conversation_id':job['session_id'],'flow':flow,'answer_kind':'research','answer':answer[:2500],'model_choice':job['model']});trace.flush()
+            trace.finish(summary={'origin':'chat','conversation_id':job['session_id'],'flow':flow,'answer_kind':'research','answer':answer[:2500],'risk_mode':result.risk_mode,'model_choice':job['model']})
+            payload['usage']=trace.data.get('usage')
             with self.lock:
                 check()
                 self.store.finish(job['id'],answer,payload,tickers,trace.data['status'])

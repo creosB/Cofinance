@@ -368,6 +368,40 @@ class TestGuardTelemetry(unittest.TestCase):
             self.assertIn("1/5 chat traces included", output.getvalue())
             self.assertIn("trace_storage_errors=1", output.getvalue())
 
+    def test_incomplete_span_summary_is_skipped_and_strict_cli_fails_on_unusable_corpus(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            incomplete_duration = {
+                "mode": "live", "status": "complete", "dropped_spans": 0, "storage_errors": 0,
+                "spans": [
+                    {"kind": "model", "name": "Narrate evidence", "actor": "Data Analyst", "duration_ms": None},
+                    {"kind": "gate", "name": "Number faithfulness", "actor": "Data Analyst",
+                     "outputs": {"passed": True, "fallback_used": False, "validation_reason": "numbers_matched"}},
+                ],
+            }
+            (root / "incomplete.json").write_text(json.dumps(incomplete_duration), encoding="utf-8")
+            rep = summarize_guard_directory(root, mode="live")
+            self.assertEqual(rep["coverage"]["included_traces"], 0)
+            self.assertEqual(rep["coverage"]["incomplete_traces"], 1)
+            self.assertEqual(rep["narrated_checks"], 0)
+            out = io.StringIO()
+            with redirect_stdout(out):
+                self.assertEqual(dev.guard_stats_cmd(str(root), mode="live", strict=True), 1)
+            self.assertIn("not benchmarkable", out.getvalue())
+
+            clean = {
+                "mode": "live", "status": "complete", "dropped_spans": 0, "storage_errors": 0,
+                "spans": [
+                    {"kind": "model", "name": "Narrate evidence", "actor": "Data Analyst", "duration_ms": 250.0},
+                    {"kind": "gate", "name": "Number faithfulness", "actor": "Data Analyst",
+                     "outputs": {"passed": True, "fallback_used": False, "validation_reason": "numbers_matched"}},
+                ],
+            }
+            (root / "incomplete.json").unlink()
+            (root / "clean.json").write_text(json.dumps(clean), encoding="utf-8")
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(dev.guard_stats_cmd(str(root), mode="live", strict=True), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

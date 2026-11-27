@@ -195,6 +195,11 @@ class TestProviderWorkflow(unittest.TestCase):
                                             self.assertFalse(any('/chart/' in e['path'] for e in provider))
                                         if capture and index == 1:
                                             expect(page.locator('.msg-answer').first).to_contain_text('Do you mean the share price')
+                                            expect(page.locator('.error-banner')).to_have_count(0)
+                                            expect(page.get_by_text('Trace incomplete:', exact=False)).to_have_count(0)
+                                            chat_text = page.locator('.chat-scroll').inner_text()
+                                            self.assertNotIn(' ? ', chat_text)
+                                            self.assertIn('AMZN market capitalization:', chat_text)
                                             page.mouse.move(3, 3)
                                             page.evaluate('document.fonts.ready')
                                             page.locator('.chat-scroll').evaluate('el => el.scrollTop = 0')

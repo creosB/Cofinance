@@ -148,6 +148,15 @@ class TestChatShellBrowser(unittest.TestCase):
         self.page.get_by_role('button',name='Remove q3-report.pdf').click()
         chip.wait_for(state='detached')
         self.assertEqual(self.service.store.session(sid)['documents'],[])
+        self.page.reload(wait_until='domcontentloaded')
+        self.choose('How much revenue')
+        self.assertEqual(self.page.get_by_role('list',name='Attached PDFs').count(),0)
+        box=self.page.get_by_role('textbox',name='Research question')
+        box.fill('How much revenue did the third quarter bring?'); box.press('Enter')
+        second=self.page.get_by_role('article',name='Research response').nth(1)
+        second.wait_for(timeout=10000)
+        self.assertEqual(second.get_by_label('Pages used').count(),0)
+        self.assertNotIn('q3-report.pdf',second.inner_text())
 
     def test_multi_pdf_grouped_sources_and_event_driven_sse(self):
         from tests.test_documents import make_pdf
@@ -494,6 +503,8 @@ class TestChatShellBrowser(unittest.TestCase):
         expect(answer.locator('.facts-asset')).to_contain_text('THYAO.IS')
         expect(answer.locator('.facts-quote')).to_have_text('303.50 TRY')
         expect(answer.locator('[data-quote-state="last_session"]')).to_contain_text('Yahoo Finance')
+        self.assertNotIn(' ? ', answer.inner_text())
+        self.assertIn(' \u00b7 ', answer.locator('[data-quote-state="last_session"]').inner_text())
         expect(answer.get_by_text('1Y high', exact=True)).to_be_hidden()
         expect(answer.get_by_role('link', name=re.compile('THYAO.IS market data'))).to_be_hidden()
         expect(answer.locator('figure.price-chart')).to_have_count(0)
@@ -502,11 +513,13 @@ class TestChatShellBrowser(unittest.TestCase):
         (sid,) = set(self.service.store.session_ids()) - before
         first_run = self.service.store.session(sid)['messages'][-1]['run_id']
 
-        draft = 'What was its previous close?'
+        draft = 'What did THY close at yesterday?'
         box = page.get_by_role('textbox', name='Research question')
         box.fill(draft)
         answer.get_by_role('button', name='Execution', exact=True).click()
         require_clean_execution(page, self.root/'traces', first_run, mode='live')
+        expect(page.locator('[data-map-stage="router"] .map-owner')).to_have_text('GLiNER')
+        expect(page.locator('[data-map-stage="data"] .map-owner')).to_have_text('Python')
         page.locator('.sidebar').get_by_role('button', name='Chat', exact=True).click()
         expect(box).to_have_value(draft)
         box.press('Enter')
@@ -544,6 +557,8 @@ class TestChatShellBrowser(unittest.TestCase):
             partial = self.submit_question(page, question)
             expect(partial.locator('.msg-body').first).to_contain_text('comparison is incomplete')
             expect(partial.locator('[data-quote-state="unavailable"]')).to_have_text(re.compile('Quote timed out'))
+            expect(partial.locator('[data-quote-state="unavailable"]')).to_contain_text('No values were substituted')
+            self.assertNotIn(' ? ', partial.inner_text())
             expect(partial.locator('.facts-quote')).to_have_text('2,810.00 JPY')
             london = partial.locator('.facts').filter(has_text='VOD.L')
             expect(london.locator('[data-quote-state="unavailable"]')).to_contain_text('Quote timed out')
@@ -605,6 +620,174 @@ class TestChatShellBrowser(unittest.TestCase):
             page.get_by_text('Deleted 0 conversations.', exact=True).wait_for()
         self.assertEqual(len(requests), 2)
         self.assertNotEqual(*requests)
+
+    def test_320px_mobile_drawer_navigation_and_execution_back_to_research(self):
+        from playwright.sync_api import expect
+
+        with self.browser.new_context(viewport={'width': 320, 'height': 740}, is_mobile=True, has_touch=True) as context:
+            page = context.new_page()
+            errors = []
+            page.on('pageerror', lambda exc: errors.append(str(exc)))
+            page.goto(self.origin, wait_until='domcontentloaded')
+            menu = page.get_by_role('button', name='Open sidebar')
+            expect(menu).to_be_visible()
+            self.assertGreaterEqual(menu.bounding_box()['width'], 44)
+            menu.tap()
+            drawer = page.locator('.navigation-drawer')
+            expect(drawer).to_be_visible()
+            drawer.get_by_role('button', name='Review TSLA', exact=False).first.tap()
+            expect(drawer).to_be_hidden()
+            box = page.get_by_role('textbox', name='Research question')
+            box.fill('TSLA phone draft')
+            menu.tap()
+            drawer.get_by_role('button', name='Review NVDA', exact=False).first.tap()
+            expect(box).to_have_value('')
+            menu.tap()
+            drawer.get_by_role('button', name='Review TSLA', exact=False).first.tap()
+            expect(box).to_have_value('TSLA phone draft')
+            menu.tap()
+            tools = drawer.locator('details.workspace-tools')
+            if not tools.evaluate('e => e.open'):
+                tools.locator('summary').tap()
+            drawer.get_by_role('button', name='Research', exact=True).tap()
+            expect(page.locator('main .breadcrumb[data-view="research"]')).to_be_visible()
+            page.get_by_role('button', name='View execution').tap()
+            expect(page.locator('main .breadcrumb[data-view="execution"]')).to_be_visible()
+            self.assertTrue(page.evaluate('document.documentElement.scrollWidth <= innerWidth'))
+            back = page.get_by_role('button', name='Back to research')
+            expect(back).to_be_visible()
+            for ctrl in (menu, back, page.get_by_role('button', name='Refresh local data')):
+                rect = ctrl.bounding_box()
+                self.assertGreaterEqual(rect['width'], 44)
+                self.assertGreaterEqual(rect['height'], 44)
+            back.tap()
+            expect(page.locator('main .breadcrumb[data-view="research"]')).to_be_visible()
+            self.assertEqual(errors, [])
+
+    def test_citations_all_fields_multi_ref_evidence_and_quote_quality_states(self):
+        from playwright.sync_api import expect
+
+        s = self.service.store.create_session(uuid.uuid4().hex)
+        job = self.service.store.create_job(uuid.uuid4().hex, uuid.uuid4().hex, s['id'], 'Citation and quote state check', 'facts')
+        content = 'THYAO.IS moved 1.76% from 298.25 to 303.50 on revenue beat 9.4.'
+        payload = {
+            'kind': 'research', 'mode': 'facts', 'tickers': ['THYAO.IS', 'DELY', 'STAL', 'UNKN', 'BADT', 'MISS'],
+            'charts': [], 'faithful_synthesis': True,
+            'snapshots': {
+                'THYAO.IS': {
+                    'price': 303.5, 'previous_session_close': 298.25, 'previous_session_date': '2026-11-26',
+                    'change_from_previous_session_pct': 1.76, 'currency': 'TRY', 'exchange': 'IST',
+                    'source': 'Yahoo Finance', 'price_as_of': '2026-11-27T15:30:00Z',
+                    'quote_status': {'state': 'last_session'},
+                },
+                'DELY': {'price': 10.0, 'currency': 'USD', 'source': 'Yahoo Finance', 'quote_status': {'state': 'delayed'}},
+                'STAL': {'price': 20.0, 'currency': 'USD', 'source': 'Yahoo Finance', 'quote_status': {'state': 'stale'}},
+                'UNKN': {'price': 30.0, 'currency': 'USD', 'source': 'Yahoo Finance', 'quote_status': {'state': 'timestamp_unknown'}},
+                'BADT': {'price': 40.0, 'currency': 'USD', 'source': 'Yahoo Finance', 'quote_status': {'state': 'timestamp_invalid'}},
+                'MISS': {'status': 'unavailable', 'fundamentals_status': 'unavailable', 'quote_status': {'state': 'unavailable'}},
+            },
+            'evidence': [
+                {'title': 'THY revenue beat 9.4 billion', 'url': 'https://example.com/thy-q3', 'source': 'Reuters', 'as_of': '2026-11-27T10:00:00Z'},
+                {'title': 'Unlinked wire 9.4', 'url': 'javascript:alert(1)', 'source': 'Wire', 'as_of': 'Unknown'},
+            ],
+            'citations': [
+                {'start': 15, 'end': 20, 'text': '1.76%', 'refs': [
+                    {'kind': 'fact', 'ticker': 'THYAO.IS', 'field': 'change_from_previous_session_pct', 'label': 'Change since previous session close (percent)', 'shown': '1.76%', 'source': 'Yahoo Finance', 'as_of': '2026-11-27'},
+                ]},
+                {'start': 26, 'end': 32, 'text': '298.25', 'refs': [
+                    {'kind': 'fact', 'ticker': 'THYAO.IS', 'field': 'price', 'label': 'Last price', 'shown': '303.50 TRY', 'source': 'Yahoo Finance', 'as_of': '2026-11-27'},
+                    {'kind': 'fact', 'ticker': 'THYAO.IS', 'field': 'previous_session_close', 'label': 'Previous session close', 'shown': '298.25 TRY', 'source': 'Yahoo Finance', 'as_of': '2026-11-26'},
+                ]},
+                {'start': 59, 'end': 62, 'text': '9.4', 'refs': [
+                    {'kind': 'evidence', 'index': 0, 'title': 'THY revenue beat 9.4 billion', 'source': 'Reuters', 'as_of': '2026-11-27T10:00:00Z'},
+                    {'kind': 'evidence', 'index': 1, 'title': 'Unlinked wire 9.4', 'source': 'Wire', 'as_of': 'Unknown'},
+                ]},
+            ],
+        }
+        self.service.store.progress(job['id'], 'Running', 'running')
+        self.service.store.finish(job['id'], content, payload, payload['tickers'], 'complete')
+        page = self.page
+        page.reload(wait_until='domcontentloaded')
+        self.choose('Citation and quote state check')
+        answer = page.get_by_role('article', name='Research response').first
+        self.assertNotIn(' ? ', answer.inner_text())
+
+        pct_chip = answer.get_by_role('button', name=re.compile(r'Source 1:.*Change since previous'))
+        pct_chip.click()
+        expect(answer.locator('[data-fact-field="change_from_previous_session_pct"]')).to_be_focused()
+
+        multi_chip = answer.get_by_role('button', name=re.compile(r'Source 2:.*Last price.*Previous session close'))
+        multi_chip.click()
+        expect(answer.locator('[data-fact-field="price"]').first).to_be_focused()
+        multi_chip.click()
+        expect(answer.locator('[data-fact-field="previous_session_close"]')).to_be_focused()
+
+        ev_chip = answer.get_by_role('button', name=re.compile(r'Source 3:.*THY revenue beat'))
+        ev_chip.click()
+        expect(answer.get_by_role('link', name=re.compile('THY revenue beat 9.4 billion'))).to_be_focused()
+        ev_chip.click()
+        expect(answer.locator('p.cite-target', has_text='Unlinked wire 9.4')).to_be_focused()
+
+        expect(answer.locator('[data-quote-state="delayed"]')).to_contain_text('Delayed quote')
+        expect(answer.locator('[data-quote-state="stale"]')).to_contain_text('Stale quote')
+        expect(answer.locator('[data-quote-state="timestamp_unknown"]')).to_contain_text('Quote time unknown')
+        expect(answer.locator('[data-quote-state="timestamp_invalid"]')).to_contain_text('Invalid quote time')
+        miss = answer.locator('.facts').filter(has_text='MISS')
+        expect(miss.locator('[data-quote-state="unavailable"]')).to_contain_text('No values were substituted')
+        miss.get_by_text('Market details', exact=True).click()
+        expect(miss.get_by_text('Fundamentals unavailable', exact=True)).to_be_visible()
+
+    def test_mid_run_switch_cancel_reload_and_deep_think_toggle(self):
+        from playwright.sync_api import expect
+
+        entered = threading.Event()
+        release = threading.Event()
+        market = JourneyMarket()
+
+        def gated_fetch(url):
+            if '/chart/' in url:
+                entered.set()
+                release.wait(timeout=10)
+            return market.fetch(url)
+
+        clock = patch('core.market.datetime', ResearchClock)
+        clock.start()
+        self.addCleanup(clock.stop)
+        self.service.router_factory = lambda: GlinerQueryRouter(JourneyRouter(), {'NVDA', 'VOD.L'})
+        self.service.market_factory = lambda cancel=None: MarketTools(fetch=gated_fetch, cancel=cancel)
+        orig_snapshot = self.service.models.snapshot
+        def snapshot_with_think():
+            snap = orig_snapshot()
+            snap['selected'] = 'fixture-model'
+            snap['think'] = {'budget': 512, 'qualified': True, 'loaded': False, 'report': {'passed': True}}
+            return snap
+
+        page = self.page
+        with patch.object(self.service.models, 'snapshot', side_effect=snapshot_with_think):
+            page.reload(wait_until='domcontentloaded')
+            page.get_by_role('button', name='New chat', exact=True).click()
+            think_btn = page.get_by_role('button', name=re.compile(r'Deep think'))
+            expect(think_btn).to_be_enabled()
+            think_btn.click()
+            expect(think_btn).to_have_attribute('aria-pressed', 'true')
+        page.reload(wait_until='domcontentloaded')
+        self.choose('Review NVDA')
+        box = page.get_by_role('textbox', name='Research question')
+        box.fill('Quote VOD.L in London.')
+        box.press('Enter')
+        self.assertTrue(entered.wait(timeout=8), 'Expected gated market fetch to start')
+        self.choose('Review TSLA')
+        box.fill('Draft while NVDA job is running')
+        self.assertEqual(box.input_value(), 'Draft while NVDA job is running')
+        self.choose('Review NVDA')
+        stop = page.get_by_role('button', name='Stop')
+        expect(stop).to_be_visible(timeout=5000)
+        stop.click()
+        release.set()
+        expect(page.get_by_text('Stopped by user', exact=False)).to_be_visible(timeout=8000)
+        page.reload(wait_until='domcontentloaded')
+        self.choose('Review NVDA')
+        expect(page.get_by_role('article', name='Research response')).to_have_count(1)
 
 
 if __name__=='__main__': unittest.main()

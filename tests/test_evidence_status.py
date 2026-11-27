@@ -1,9 +1,11 @@
 import unittest
 from datetime import datetime, timedelta, timezone
 
+from core.citations import shown_facts
 from core.claim_provenance import check_claim_provenance
-from core.evidence_status import claims_current_price, decision_assessment, quote_status
+from core.evidence_status import claims_current_price, decision_assessment, previous_close_request, quote_status
 from core.market import MarketTools, listing_timezone, resolve_yahoo_symbol
+from core.orchestrator import FACT_LABELS
 
 OBSERVED = datetime(2026, 11, 27, 14, 0, tzinfo=timezone.utc)
 
@@ -129,3 +131,38 @@ class TestQuoteClock(unittest.TestCase):
         self.assertIn('not establish whether to buy', verdict['text'])
         self.assertIn('Local news coverage is incomplete', verdict['text'])
         self.assertIn('VOD.L: last regular-session quote', verdict['text'])
+
+    def test_previous_close_request_matches_natural_phrasings_and_rejects_unrelated_queries(self):
+        positives = (
+            'What was its previous close?',
+            'What did THY close at yesterday?',
+            'Previous close for NVDA',
+            "Yesterday's close?",
+            "What was yesterday's closing price?",
+            'What did it close at in the last session?',
+            'Prior session close for VOD.L',
+            'What did THYAO.IS close at yesterday?',
+        )
+        for query in positives:
+            with self.subTest(positive=query):
+                self.assertTrue(previous_close_request(query))
+        negatives = (
+            'What is the previous quarter close?',
+            "How did yesterday's news affect NVDA?",
+            'Should I buy NVDA? What was its previous close?',
+            'How much did it move from yesterday?',
+            'What is NVDA trading at and what was its previous close?',
+        )
+        for query in negatives:
+            with self.subTest(negative=query):
+                self.assertFalse(previous_close_request(query))
+
+    def test_shown_facts_cites_only_canonical_fact_labels_including_change_pct(self):
+        snap = {
+            'price': 303.5, 'previous_session_close': 298.25, 'change_from_previous_session_pct': 1.76,
+            'unmapped_internal_metric': 42.0, 'source': 'Yahoo Finance', 'price_as_of': '2026-11-26',
+        }
+        facts = shown_facts({'THYAO.IS': snap})
+        fields = {f['field'] for f in facts}
+        self.assertEqual(fields, {'price', 'previous_session_close', 'change_from_previous_session_pct'})
+        self.assertTrue(fields.issubset({k for k, _ in FACT_LABELS}))

@@ -23,8 +23,11 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 TRACE_FORMAT = "cofinance-trace/1"
-TRACE_REPLACE_BACKOFF = (0.005, 0.015, 0.035, 0.075)
+TRACE_REPLACE_BACKOFF = (0.015, 0.035, 0.075, 0.15, 0.25)
 WINDOWS_REPLACE_CONTENTION = frozenset({5, 32, 33})
+_TRACE_GENERATION_LOCK = threading.Lock()
+_TRACE_IO_LOCK = threading.RLock()
+_TRACE_GENERATION = 0
 SECRET = re.compile(r"api.?key|token|cookie|password|secret|authorization|credential|session", re.I)
 SAFE_TRACE_KEYS = frozenset({
     "previous_session_close",
@@ -37,13 +40,22 @@ THINK = re.compile(r"<think(?:ing)?>.*?(?:</think(?:ing)?>|$)", re.I | re.S)
 
 
 TRACE_INTEGRITY_ISSUES = frozenset({
-    "trace_not_terminal", "trace_unverified_counters", "trace_storage_errors", "trace_dropped_spans",
+    "trace_not_terminal", "trace_unverified_counters", "trace_storage_errors", "trace_dropped_spans", "trace_running_spans",
 })
 
 
+def trace_generation() -> int:
+    with _TRACE_GENERATION_LOCK:
+        return _TRACE_GENERATION
+
+
+def _bump_trace_generation() -> None:
+    global _TRACE_GENERATION
+    with _TRACE_GENERATION_LOCK:
+        _TRACE_GENERATION += 1
+
+
 def trace_integrity_issue(trace: Mapping[str, Any]) -> str | None:
-    if trace.get("status") not in ("complete", "degraded"):
-        return "trace_not_terminal"
     dropped, storage = trace.get("dropped_spans"), trace.get("storage_errors")
     if any(type(value) is not int or value < 0 for value in (dropped, storage)):
         return "trace_unverified_counters"
@@ -51,6 +63,12 @@ def trace_integrity_issue(trace: Mapping[str, Any]) -> str | None:
         return "trace_storage_errors"
     if dropped:
         return "trace_dropped_spans"
+    status = trace.get("status")
+    if status not in ("complete", "degraded"):
+        return "trace_not_terminal"
+    spans = trace.get("spans")
+    if isinstance(spans, list) and any(isinstance(span, Mapping) and span.get("status") == "running" for span in spans):
+        return "trace_running_spans"
     return None
 
 
@@ -81,13 +99,47 @@ def utc() -> str:
 def replace_trace(temp: Path, destination: Path) -> None:
     for delay in TRACE_REPLACE_BACKOFF:
         try:
-            os.replace(temp, destination)
+            with _TRACE_IO_LOCK:
+                os.replace(temp, destination)
+            _bump_trace_generation()
             return
         except OSError as exc:
             if getattr(exc, 'winerror', None) not in WINDOWS_REPLACE_CONTENTION:
                 raise
             time.sleep(delay)
-    os.replace(temp, destination)
+    with _TRACE_IO_LOCK:
+        os.replace(temp, destination)
+    _bump_trace_generation()
+
+
+def read_trace_bytes(path: Path, *, max_bytes: int | None = None) -> bytes:
+    def _read() -> bytes:
+        with _TRACE_IO_LOCK:
+            if path.is_symlink():
+                raise ValueError("invalid trace size or link")
+            if max_bytes is not None and path.stat().st_size > max_bytes:
+                raise ValueError("invalid trace size or link")
+            return path.read_bytes()
+
+    for delay in TRACE_REPLACE_BACKOFF:
+        try:
+            return _read()
+        except OSError as exc:
+            if not (isinstance(exc, PermissionError) or getattr(exc, 'winerror', None) in WINDOWS_REPLACE_CONTENTION):
+                raise
+            time.sleep(delay)
+    return _read()
+
+
+def save_error_count(directory: Path, run_id: str) -> int:
+    marker = directory / (run_id + ".save-error")
+    if not marker.is_file():
+        return 0
+    try:
+        value = int(marker.read_text(encoding="utf-8").strip())
+        return value if value > 0 else 1
+    except (OSError, ValueError):
+        return 1
 
 
 class TraceRecorder:
@@ -107,11 +159,12 @@ class TraceRecorder:
                      "disclosure": "Observed calls and rule outcomes only. No private chain-of-thought. Local diagnostic traces may contain project data."}
         self.flush()
 
-    def flush(self) -> None:
+    def flush(self) -> bool:
         if self.directory is None:
-            return
+            return True
         with self.lock:
             temp = None
+            marker = self.directory / (self.run_id + ".save-error")
             try:
                 self.directory.mkdir(parents=True, exist_ok=True)
                 with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=self.directory,
@@ -119,13 +172,24 @@ class TraceRecorder:
                     temp = Path(file.name)
                     json.dump(self.data, file, ensure_ascii=True, allow_nan=False)
                 replace_trace(temp, self.directory / (self.run_id + ".json"))
+                try:
+                    marker.unlink(missing_ok=True)
+                except OSError:
+                    pass
+                return True
             except (OSError, ValueError):
-                self.data["storage_errors"] += 1  # recording must not change a business outcome
+                self.data["storage_errors"] += 1
+                try:
+                    marker.write_text(str(self.data["storage_errors"]), encoding="utf-8")
+                    _bump_trace_generation()
+                except OSError:
+                    pass
                 if temp:
                     try:
                         temp.unlink(missing_ok=True)
                     except OSError:
                         pass
+                return False
 
     @contextmanager
     def span(self, name: str, kind: str, *, actor: str = "Python", model: str = "", inputs: Any = None):
@@ -406,7 +470,7 @@ def run_traced_clock1(tickers, fetch, classifier, trace: TraceRecorder, *, cfg=N
 
 
 def run_traced_team(orchestrator, query: str, trace: TraceRecorder, *, session_id: str = "trace", fallback_tickers=(), context: str = "",
-                    documents=None):
+                    documents=None, finish: bool = True):
     """Instrument every called backend. Preserves existing tool side effects, so this is not a dry run."""
     from .gliner_decide import GlinerQueryRouter
     from .orchestrator import DataAnalystAgent, DocumentReaderAgent, EventBus, NewsResearcherAgent, TeamLeadOrchestrator
@@ -454,8 +518,10 @@ def run_traced_team(orchestrator, query: str, trace: TraceRecorder, *, session_i
                                                                 "conversation_context": "previous accepted answer" if context else "none"}) as span:
             result = clone.run(query, session_id, fallback_tickers, context=context, documents=documents)
             span.update(output={"answer": result.final_synthesis, "agents": result.delegated_agents}, fallback=not result.faithful_synthesis)
-        trace.finish(summary={"answer": result.final_synthesis, "risk_mode": result.risk_mode})
+        if finish:
+            trace.finish(summary={"answer": result.final_synthesis, "risk_mode": result.risk_mode})
         return result
     except BaseException:
-        trace.finish(error=True)
+        if finish:
+            trace.finish(error=True)
         raise

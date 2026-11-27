@@ -2,17 +2,23 @@ import hashlib
 import json
 from urllib.parse import urljoin
 
-from core.run_trace import trace_integrity_issue
+from core.run_trace import read_trace_bytes, save_error_count, trace_integrity_issue
 
 
 def require_saved_trace(traces, run_id, *, mode=None):
-    raw = (traces / (run_id + '.json')).read_bytes()
+    raw = read_trace_bytes(traces / (run_id + '.json'))
     saved = json.loads(raw)
     if not isinstance(saved, dict) or saved.get('id') != run_id:
         raise AssertionError('Saved trace does not identify the requested run')
-    saved['revision'] = int(hashlib.sha256(raw).hexdigest()[:12], 16)
+    marker_errors = save_error_count(traces, run_id)
+    if marker_errors:
+        saved['storage_errors'] = max(int(saved.get('storage_errors') or 0), marker_errors)
+    digest_input = raw + (f'|save-error:{marker_errors}'.encode('ascii') if marker_errors else b'')
+    saved['revision'] = int(hashlib.sha256(digest_input).hexdigest()[:12], 16)
     if issue := trace_integrity_issue(saved):
         raise AssertionError(f"{issue}: Execution proof requires a terminal trace saved with both counters at zero")
+    if not isinstance(saved.get('spans'), list) or not saved['spans']:
+        raise AssertionError('Saved trace has no recorded spans')
     if mode is not None and saved["mode"] != mode:
         raise AssertionError(f"Expected a {mode} trace, not {saved['mode']}")
     return saved

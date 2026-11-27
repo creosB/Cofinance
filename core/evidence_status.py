@@ -63,11 +63,25 @@ def decision_request(question: str) -> bool:
     return bool(_DECISION.search(question))
 
 
-_PREVIOUS_CLOSE = re.compile(r"^\s*(?:what\s+(?:was|is)\s+(?:the|its|their)\s+)?(?:previous|prior|last\s+session'?s?)\s+close[?.!\s]*$", re.I)
+_PREVIOUS_CLOSE = re.compile(
+    r"\b(?:(?:previous|prior|last\s+session(?:'s|s)?|yesterday(?:'s|s)?)\s+(?:session(?:'s|s)?\s+)?(?:close|closing\s+price)"
+    r"|close(?:d)?\s+(?:at\s+)?(?:yesterday|in\s+the\s+(?:previous|prior|last)\s+session|last\s+session)"
+    r"|(?:previous|prior)\s+day(?:'s|s)?\s+(?:close|closing\s+price))\b",
+    re.I,
+)
+_PREVIOUS_CLOSE_EXCLUDED = re.compile(
+    r"\b(?:news|headline|headlines|quarter|quarterly|year|annual|month|monthly|week|weekly|compare|versus|vs\.?"
+    r"|trading\s+at|current\s+(?:price|quote)|market\s+cap|valuation|enterprise\s+value|earnings|revenue|p/e|pe\s+ratio"
+    r"|move|moved|change|changed|percent|%|delta)\b",
+    re.I,
+)
 
 
 def previous_close_request(question: str) -> bool:
-    return bool(_PREVIOUS_CLOSE.fullmatch(question))
+    text = (question or '').strip()
+    if not text or len(text) > 140 or decision_request(text) or _PREVIOUS_CLOSE_EXCLUDED.search(text):
+        return False
+    return bool(_PREVIOUS_CLOSE.search(text))
 
 
 def previous_close_answer(tickers, snapshots) -> str:

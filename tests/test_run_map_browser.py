@@ -73,13 +73,16 @@ class TestRunMapBrowser(unittest.TestCase):
         with patch('core.run_trace.replace_trace', side_effect=PermissionError('fixture replacement failed')):
             trace.finish()
         self.assertEqual(trace.data['status'], 'complete')
-        with self.assertRaisesRegex(AssertionError, 'trace_not_terminal'):
+        self.assertEqual(read_trace(self.traces, trace.run_id)['storage_errors'], 1)
+        with self.assertRaisesRegex(AssertionError, 'trace_storage_errors'):
             capture_execution(self.page, self.traces, trace.run_id)
         trace.flush()
         saved = read_trace(self.traces, trace.run_id)
         self.assertEqual(saved['status'], 'complete')
         expect_rendered_trace(self.page, saved)
-        expect(self.page.get_by_text('Trace incomplete: 1 save error.')).to_be_visible()
+        notice = self.page.locator('.mode-notice[role="alert"]')
+        expect(notice).to_be_visible()
+        expect(notice).to_contain_text('Trace incomplete: 1 save error.')
         expect(self.page.locator('.error-banner')).to_have_count(0)
         with self.assertRaisesRegex(AssertionError, 'trace_storage_errors'):
             capture_execution(self.page, self.traces, trace.run_id)

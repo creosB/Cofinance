@@ -312,6 +312,7 @@ def summarize_guard_directory(
     skipped_by_mode = 0
     non_chat_traces = 0
     chat_traces = 0
+    included_traces = 0
     incomplete_traces = 0
     excluded_trace_integrity: Dict[str, int] = {}
     mode_counts: Dict[str, int] = {}
@@ -352,6 +353,8 @@ def summarize_guard_directory(
         summary = summarize_guards(data["spans"])
         if not summary["complete"]:
             incomplete_traces += 1
+            continue
+        included_traces += 1
         unmatched_narrator_passes += summary["unmatched_narrator_passes"]
 
         for k, v in summary["failure_reasons"].items():
@@ -408,7 +411,7 @@ def summarize_guard_directory(
         "coverage": {
             "total_files": len(files),
             "chat_traces": chat_traces,
-            "included_traces": chat_traces - sum(excluded_trace_integrity.values()),
+            "included_traces": included_traces,
             "excluded_trace_integrity": _sorted_counts(excluded_trace_integrity),
             "non_chat_traces": non_chat_traces,
             "skipped_by_mode": skipped_by_mode,
