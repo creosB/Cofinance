@@ -79,7 +79,7 @@ class TestTeamTrace(unittest.TestCase):
         result = run_traced_team(orch, "Review Tesla and NVDA", trace)
         self.assertEqual(len(llm.calls), 2)  # the News Researcher is a Python digest since 2026-11-17
         models = [n for n in trace.data["spans"] if n["kind"] == "model"]
-        self.assertEqual(len(models), 4)  # intent + entity resolution + Data Analyst + Team Lead
+        self.assertEqual(len(models), 3)  # intent + Data Analyst + Team Lead (deterministic tickers skip redundant NER)
         self.assertEqual({n["actor"] for n in models}, {"Routing executive", "Data Analyst", "Market Team Lead"})
         self.assertTrue(result.faithful_synthesis)
         self.assertTrue(any(n["kind"] == "gate" for n in trace.data["spans"]))

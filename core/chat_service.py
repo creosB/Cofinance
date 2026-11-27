@@ -14,6 +14,7 @@ import uuid
 from pathlib import Path
 from datetime import datetime, timezone
 
+from .chat_fastpath import conversational_reply, fast_route
 from .chat_store import ChatStore, ACTIVE, valid_id
 from .citations import cite
 from .entities import extract_tickers
@@ -113,6 +114,7 @@ class ChatService:
         self.think_runs=set()  # run ids that asked for deep think; the flag is a per-answer choice, not stored on the job
         # One router start at a time: the startup warm-up and a first chat must never launch two GLiNER processes.
         self.router_lock=threading.Lock();self.warm_thread=None;self.warm_cancel=threading.Event();self.warm={'state':'idle','seconds':None,'error':''}
+        self.narrator_lock=threading.Lock();self.narrator_warm_thread=None;self.narrator_warm={'state':'idle','seconds':None,'error':''}
         self.deleting=set()  # conversations being deleted: no run, note or forget may start in them
         # One explicit Clock 1 collection at a time. No scheduler: a person starts every run.
         self.news={'phase':'idle','stage':'','run_id':None,'error':'','started':None,'finished':None,'request_id':None}
@@ -222,14 +224,38 @@ class ChatService:
         self.warm_thread=threading.Thread(target=run,name='router-warmup',daemon=True);self.warm_thread.start()
         return self.warm_thread
 
+    def _load_narrator_locked(self):
+        with self.narrator_lock:
+            if self.closed:
+                return
+            self.models.load()
+            if self.closed:
+                self.models.close()
+
+    def warm_narrator(self):
+        if (os.environ.get('COFINANCE_NARRATOR_WARMUP','on').lower()=='off' or self.closed
+                or self.models.state.get('selected')=='facts' or not self.models.qualified()
+                or self.models.is_loaded() or (self.narrator_warm_thread and self.narrator_warm_thread.is_alive())):
+            self.narrator_warm['state']='skipped';return None
+        def run():
+            started=time.monotonic();self.narrator_warm['state']='loading'
+            try:
+                self._load_narrator_locked()
+                self.narrator_warm.update(state='loaded',seconds=round(time.monotonic()-started,1))
+            except BaseException as error:
+                self.narrator_warm.update(state='failed',error=type(error).__name__,seconds=round(time.monotonic()-started,1))
+        self.narrator_warm_thread=threading.Thread(target=run,name='narrator-warmup',daemon=True);self.narrator_warm_thread.start()
+        return self.narrator_warm_thread
+
+    def _query_universe(self,query):
+        explicit=set(re.findall(r'(?<![A-Za-z])\$?([A-Z][A-Z0-9.\-]{0,9})(?![A-Za-z])',query))
+        explicit-={'I','A','THE','AND','OR','USD','PE','EPS','ATH','CEO','API','AI'}
+        return UNIVERSE|explicit
+
     def router(self,query,trace,cancel):
         if self.router_factory:return self.router_factory()
         self.local_extractor(trace,cancel)
-        # Explicit uppercase ticker tokens can extend the fixed alias universe, without
-        # letting arbitrary paths, URLs or long strings reach a tool.
-        explicit=set(re.findall(r'(?<![A-Za-z])\$?([A-Z][A-Z0-9.\-]{0,9})(?![A-Za-z])',query))
-        explicit-={'I','A','THE','AND','OR','USD','PE','EPS','ATH','CEO','API','AI'}
-        return GlinerQueryRouter(self.extractor,UNIVERSE|explicit)
+        return GlinerQueryRouter(self.extractor,self._query_universe(query))
 
     def submit(self,session_id,query,request_id,model,think=False):
         valid_id(session_id);valid_id(request_id)
@@ -267,37 +293,47 @@ class ChatService:
         self.store.progress(job['id'],'Preparing local research','running')
         try:
             check()
-            if job['model']!= 'facts':
-                self.store.progress(job['id'],'Loading the selected narrator')
-                self.models.load()
             think=job['id'] in self.think_runs;deep={'requested':think,'used':False}
-            if think:
-                self.store.progress(job['id'],'Starting deep think')
-                try:self.models.load_thinker();deep['used']=True
-                except (ModelError,OSError) as exc:
-                    deep['note']='Deep think could not start ('+str(exc)[:120]+'), so this answer was written without it.'
-                    trace.event('Deep think unavailable','decision',{'reason':'start_failed','note':deep['note']},actor='Python')
-                check()
-            elif self.models.thinker_loaded():self.models.stop_thinker()  # not wanted for this answer: free its memory
-            router=self.router(job['query'],trace,cancel)
-            # Always validate routing output and require explicit context when none exists.
-            from .run_trace import TracedExtractor
-            if isinstance(router,GlinerQueryRouter):
-                router=GlinerQueryRouter(TracedExtractor(router.backend,trace,'fastino/GLiNER2.5-Decide','Routing executive'),router.universe,router.aliases)
-            routed=trace.call('Route conversational request','route',lambda:router.route(job['query']),actor='Routing executive',inputs={'query':job['query']})
+            session_tickers=list(session.get('tickers',[]))
+            documents=self.store.documents(session['id'])
+            conv=conversational_reply(job['query'],session_tickers=session_tickers,has_documents=bool(documents),
+                                      universe=UNIVERSE,aliases=DEFAULT_ALIASES)
+            if conv is not None:
+                conv_kind,answer=conv
+                if think:
+                    deep['note']='Direct conversational reply; no research narration needed.'
+                trace.event('Direct conversational reply','decision',{'reason':conv_kind,'preserved_tickers':session_tickers},actor='Python')
+                trace.finish(summary={'answer':answer,'risk_mode':'conversational'})
+                with self.lock:
+                    check()
+                    self.store.finish(job['id'],answer,{'kind':'conversation','charts':[],'evidence':[],'tickers':session_tickers,
+                                      'mode':job['model'],'usage':trace.data.get('usage'),'deep_think':deep},session_tickers,'complete')
+                return
+            fast=None
+            if self.router_factory is None and os.environ.get('COFINANCE_FAST_ROUTE','on').strip().lower()!='off':
+                known_universe=UNIVERSE|{r['ticker'].upper() for r in self.store.watchlist() if r.get('ticker')}
+                fast=fast_route(job['query'],known_universe,DEFAULT_ALIASES,has_documents=bool(documents))
+            if fast is not None:
+                routed=trace.call('Route conversational request','route',lambda:fast,actor='Fast router (Python)',
+                                  inputs={'query':job['query'],'fast_path':True})
+            else:
+                router=self.router(job['query'],trace,cancel)
+                from .run_trace import TracedExtractor
+                if isinstance(router,GlinerQueryRouter):
+                    router=GlinerQueryRouter(TracedExtractor(router.backend,trace,'fastino/GLiNER2.5-Decide','Routing executive'),router.universe,router.aliases)
+                routed=trace.call('Route conversational request','route',lambda:router.route(job['query']),actor='Routing executive',inputs={'query':job['query']})
             check()
             if routed.intent not in {'price_snapshot','news_catalysts','compare_assets','watchlist_add','thesis_review'}:
                 raise GlinerOutputError('Unsupported router intent.')
-            tickers=list(dict.fromkeys(routed.tickers or session.get('tickers',[])))
+            tickers=list(dict.fromkeys(routed.tickers or session_tickers))
             if not routed.tickers and tickers:
                 trace.event('Reuse conversation assets','decision',{'reason':'no_asset_in_query','tickers':tickers,
                             'note':'The question named no asset, so the assets of this conversation are reused.'},actor='Python')
             if routed.intent=='compare_assets' and len(tickers)==1:
-                tickers=list(dict.fromkeys(session.get('tickers',[])+tickers))
+                tickers=list(dict.fromkeys(session_tickers+tickers))
             if 'watchlist' in job['query'].lower() and not routed.tickers:
                 tickers=[r['ticker'] for r in self.store.watchlist()]
             if len(tickers)>6:raise ValueError('Limit a research run to six assets.')
-            # Read at run time, not from the submit snapshot, so a file removed meanwhile is not used.
             documents=self.store.documents(session['id'])
             if documents and not tickers:
                 trace.event('Answer from attached files','decision',{'reason':'no_asset_but_documents','documents':len(documents),
@@ -310,6 +346,26 @@ class ChatService:
                     check()
                     self.store.finish(job['id'],answer,{'kind':'clarification','charts':[],'evidence':[],'tickers':[],'mode':job['model'],'usage':trace.data.get('usage')},[], 'complete')
                 return
+            needs_narrator=job['model']!='facts' and not (routed.intent=='news_catalysts' and not documents)
+            if needs_narrator:
+                if not self.models.is_loaded():
+                    self.store.progress(job['id'],'Loading the selected narrator')
+                self._load_narrator_locked()
+                if think:
+                    self.store.progress(job['id'],'Starting deep think')
+                    try:self.models.load_thinker();deep['used']=True
+                    except (ModelError,OSError) as exc:
+                        deep['note']='Deep think could not start ('+str(exc)[:120]+'), so this answer was written without it.'
+                        trace.event('Deep think unavailable','decision',{'reason':'start_failed','note':deep['note']},actor='Python')
+                    check()
+                elif self.models.thinker_loaded():self.models.stop_thinker()
+            elif think:
+                if job['model']=='facts':
+                    deep['note']='Tool-only mode does not use Deep think.'
+                    trace.event('Deep think skipped','decision',{'reason':'facts_only','note':deep['note']},actor='Python')
+                else:
+                    deep['note']='News-only answers use the verified Python digest, so Deep think was not needed.'
+                    trace.event('Deep think skipped','decision',{'reason':'python_news_only','note':deep['note']},actor='Python')
             tools=self.market_factory(cancel=cancel)
             news=NewsReader(self.root/'news.db')
             narrator=self.models if job['model']!= 'facts' else FactsOnly()
@@ -930,6 +986,7 @@ class ChatService:
         self.closed=True;self.warm_cancel.set()
         self.notify_change()
         if self.warm_thread:self.warm_thread.join(timeout=2)
+        if self.narrator_warm_thread:self.narrator_warm_thread.join(timeout=2)
         if self.news_cancel:self.news_cancel.set()
         if self.news_thread:self.news_thread.join(timeout=2)
         with self.lock:
@@ -937,4 +994,5 @@ class ChatService:
         for thread in list(self.threads.values()):thread.join(timeout=2)
         if self.extractor and hasattr(self.extractor,"close"):self.extractor.close()
         if hasattr(self.memory,'close'):self.memory.close()  # stops the Hy-Memory worker and embedder when selected
-        self.models.close()
+        with self.narrator_lock:
+            self.models.close()

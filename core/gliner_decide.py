@@ -17,7 +17,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Protocol, Sequence, Set, Tuple
 
-from .entities import extract_tickers
+from .entities import extract_known_tickers
 from .signals import Classifier, Item, Judgment
 
 
@@ -237,31 +237,25 @@ class GlinerQueryRouter:
         intent, intent_conf = _unpack_label_conf(cls_res.get("intent"), "price_snapshot")
         horizon, _ = _unpack_label_conf(cls_res.get("horizon"), "swing_week")
 
-        tickers = extract_tickers(query, self.universe)
+        tickers = extract_known_tickers(query, self.universe, self.aliases)
         seen = set(tickers)
 
-        # Resolve company / crypto names extracted by GLiNER2.5 NER spans
-        try:
-            ner = self.backend.extract_entities(query, ["company", "cryptocurrency", "ticker"])
-            entities = (ner or {}).get("entities", ner or {})
-        except Exception:
-            entities = {}
+        needs_ner = not tickers or (intent == "compare_assets" and len(tickers) < 2)
+        if needs_ner:
+            try:
+                ner = self.backend.extract_entities(query, ["company", "cryptocurrency", "ticker"])
+                entities = (ner or {}).get("entities", ner or {})
+            except Exception:
+                entities = {}
 
-        for span_list in entities.values() if isinstance(entities, Mapping) else []:
-            for span in span_list or []:
-                norm = str(span).strip().lstrip("$")
-                upper = norm.upper()
-                mapped = self.aliases.get(norm.lower()) or (upper if upper in self.universe else None)
-                if mapped and mapped in self.universe and mapped not in seen:
-                    tickers.append(mapped)
-                    seen.add(mapped)
-
-        # Deterministic backstop: a registered company name written as a whole word always resolves, even when
-        # the NER pass returns no span (observed 2026-11-08: "What is the latest Apple news?" gave no entities).
-        for alias, mapped in self.aliases.items():
-            if mapped in self.universe and mapped not in seen and re.search(r"(?<![A-Za-z0-9])" + re.escape(alias) + r"(?![A-Za-z0-9])", query, re.IGNORECASE):
-                tickers.append(mapped)
-                seen.add(mapped)
+            for span_list in entities.values() if isinstance(entities, Mapping) else []:
+                for span in span_list or []:
+                    norm = str(span).strip().lstrip("$")
+                    upper = norm.upper()
+                    mapped = self.aliases.get(norm.lower()) or (upper if upper in self.universe else None)
+                    if mapped and mapped in self.universe and mapped not in seen:
+                        tickers.append(mapped)
+                        seen.add(mapped)
 
         return RoutedQuery(
             intent=intent,
