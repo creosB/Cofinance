@@ -113,7 +113,7 @@ def resolve_yahoo_symbol(term: str, fetch=None, *, context_query: str = "") -> d
             if qtype not in SEARCH_QUOTE_TYPES:
                 continue
             raw_sym = str(item.get("symbol") or "").strip().upper()
-            name = str(item.get("shortname") or item.get("longname") or "").strip()
+            name = " ".join(str(item.get("shortname") or item.get("longname") or "").split())
             if not raw_sym or not name:
                 continue
             sym = raw_sym[:-4] if qtype == "CRYPTOCURRENCY" and raw_sym.endswith("-USD") and raw_sym[:-4] in CRYPTO else raw_sym

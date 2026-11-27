@@ -595,7 +595,7 @@ class TeamLeadOrchestrator:
         "For a follow-up, answer that question directly and do not repeat the previous answer. "
         "Copy numbers exactly as written and never round. Do not add headings, dates, or numbers that are not in the reports. "
         "Do not call volume, momentum, or valuation high, low, strong, or weak: the reports contain no comparison data. "
-        "Use only names and terms that appear in the reports. "
+        "Use only names and terms that appear in the reports, and never repeat abbreviations from the user question that are not in the reports. "
         "Identify each asset using its full name and ticker symbol from the Data Analyst report. "
         "If a report says data or news is unavailable, say so plainly instead of guessing."
     )

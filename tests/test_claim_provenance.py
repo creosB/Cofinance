@@ -273,6 +273,31 @@ class TestClaimProvenance(unittest.TestCase):
         rep = DataAnalystAgent(llm, tools).run(["GC=F"], "fundamental_equity", EventBus(), "s3")
         self.assertTrue(rep.faithful_numbers, rep.validation)
 
+    def test_drawdown_from_that_high_and_try_currency_pass_claim_provenance(self):
+        facts = {
+            "THYAO.IS": {
+                "ticker": "THYAO.IS",
+                "name": "Türk Hava Yollari Anonim Ortakligi",
+                "currency": "TRY",
+                "status": "available",
+                "price": 312.0,
+                "previous_session_close": 309.75,
+                "change_from_previous_session_pct": 0.7264,
+                "high_52_week": 355.5,
+                "low_52_week": 242.2,
+                "all_time_high": 355.5,
+                "drawdown_from_all_time_high_pct": 12.2363,
+                "pe_ratio": 30.48,
+            }
+        }
+        good = (
+            "THYAO.IS last traded at 312.0 TRY, up 0.73% from the previous session close of 309.75 TRY, "
+            "and the all-time high in source history is 355.5 TRY, a drawdown from that high of 12.24%."
+        )
+        self.assertEqual(check_claim_provenance(good, facts), [])
+        bad_unit = "THYAO.IS trailing P/E is 30.48 TRY."
+        self.assertTrue(check_claim_provenance(bad_unit, facts))
+
 
 if __name__ == "__main__":
     unittest.main()

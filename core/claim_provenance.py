@@ -41,11 +41,16 @@ METRIC_CUES: Tuple[Tuple[re.Pattern[str], Tuple[str, ...], str], ...] = (
     ),
     (
         re.compile(
-            r"\b(?:drawdown|down|below|off)\s+(?:from\s+)?(?:its\s+|the\s+)?(?:52[- ]week|one[- ]year|1[- ]year)\s+high\b",
+            r"\b(?:drawdown|down|below|off)\s+(?:from\s+)?(?:its\s+|the\s+|that\s+)?(?:52[- ]week|one[- ]year|1[- ]year)\s+high\b",
             re.I,
         ),
         ("drawdown_from_52_week_high_pct",),
         "52_week_drawdown",
+    ),
+    (
+        re.compile(r"\bdrawdown\s+from\s+(?:its\s+|the\s+|that\s+)?high\b", re.I),
+        ("drawdown_from_all_time_high_pct", "drawdown_from_52_week_high_pct"),
+        "drawdown",
     ),
     (
         re.compile(r"\ball[- ]time high\b|\bath\b", re.I),
@@ -148,8 +153,8 @@ METRIC_CUES: Tuple[Tuple[re.Pattern[str], Tuple[str, ...], str], ...] = (
 _TEMPORAL_MODIFIER = re.compile(r"^\s*[- ]?(?:week|weeks|day|days|month|months|year|years|hour|hours)\b", re.I)
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+|;\s*")
 _SUBCLAUSE_SPLIT = re.compile(r",\s*(?:and\s+|while\s+|whereas\s+|but\s+)?|\s+\b(?:while|whereas|versus|vs\.?)\b\s+", re.I)
-_CURRENCY_BEFORE = re.compile(r"(?:[$€£])\s*$")
-_CURRENCY_AFTER = re.compile(r"^\s*(?:usd|eur|gbp|dollars?|euros?|pounds?)\b", re.I)
+_CURRENCY_BEFORE = re.compile(r"(?:[$€£₺¥])\s*$")
+_CURRENCY_AFTER = re.compile(r"^\s*(?:usd|eur|gbp|gbx|try|jpy|cad|chf|hkd|inr|krw|aud|brl|cny|sek|nok|pln|dollars?|euros?|pounds?|lira|yen|yuan)\b", re.I)
 _PERCENT_AFTER = re.compile(r"^\s*(?:%|percent|percentage)\b", re.I)
 _COUNT_AFTER = re.compile(r"^\s*(?:shares?|contracts?)\b", re.I)
 _NAME_STOP = frozenset({

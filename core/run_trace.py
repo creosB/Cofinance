@@ -29,6 +29,7 @@ SAFE_TRACE_KEYS = frozenset({
     "previous_session_date",
     "change_from_previous_session_pct",
     "output_token_limit",
+    "wasted_tokens",
 })
 THINK = re.compile(r"<think(?:ing)?>.*?(?:</think(?:ing)?>|$)", re.I | re.S)
 
