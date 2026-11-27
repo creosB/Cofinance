@@ -397,6 +397,7 @@ def verify_cmd(full=False, browser=True):
                 'tests.test_events_stream',
                 'tests.test_open_chat',
                 'tests.test_research_acceptance',
+                'tests.test_evidence_status',
                 'tests.test_outer_loop',
                 'tests.test_route_smoke',
             ],

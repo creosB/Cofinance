@@ -34,7 +34,8 @@ THY = [listing('THY', 'Toews Agility Shares', 'ETF', 'PCX', 10_009_500),
 
 class ModelFixture:
     def classify_text(self, text, schema, **kwargs):
-        return {'intent': {'label': 'compare_assets' if text.startswith('Compare') else 'price_snapshot', 'confidence': .9},
+        intent = 'compare_assets' if text.startswith('Compare') else 'open_conversation' if 'previous close' in text else 'price_snapshot'
+        return {'intent': {'label': intent, 'confidence': .9},
                 'horizon': {'label': 'intraday', 'confidence': .9}}
 
     def extract_entities(self, text, entity_types):
@@ -68,14 +69,15 @@ class TestResearchAcceptance(unittest.TestCase):
                 data = super().get_snapshot(ticker)
                 currency = {'THYAO.IS': 'TRY', '7203.T': 'JPY', 'BECK.L': 'GBp'}.get(ticker, 'USD')
                 data.update(ticker=ticker, name='Turkish Airlines' if ticker == 'THYAO.IS' else ticker,
-                            currency=currency, status='available')
+                            currency=currency, status='available', previous_session_close=130.0,
+                            previous_session_date='2026-11-26')
                 self.charts[ticker]['currency'] = currency
                 return data
 
         models = RecordingNarratorModels()
         models.state['selected'] = 'facts'
         self.svc = ChatService(REPO, self.root, models=models, market_factory=Market,
-                               router_factory=lambda: GlinerQueryRouter(ModelFixture(), {'NVDA', 'MSFT'}))
+                               router_factory=lambda: GlinerQueryRouter(ModelFixture(), {'NVDA', 'AMD', 'MSFT'}))
         self.addCleanup(self.svc.close)
         self.sid = self.svc.store.create_session(uuid.uuid4().hex)['id']
 
@@ -103,6 +105,7 @@ class TestResearchAcceptance(unittest.TestCase):
         self.assertEqual(msg['payload']['tickers'], ['NVDA'])
         self.assertEqual(self.searches, [])
         self.assertTrue(any(s['name'] == 'Reuse conversation assets' for s in trace['spans']))
+        self.assertEqual(msg['payload']['market_answer_note'], 'NVDA previous-session close: 130.0 USD on 2026-11-26.')
 
     def test_comparison_never_silently_omits_an_ambiguous_leg(self):
         msg, trace, _ = self.ask('Compare NVDA and Kando')
@@ -113,6 +116,13 @@ class TestResearchAcceptance(unittest.TestCase):
         self.assertEqual(self.quotes_read, [])
         self.assertEqual(trace['summary']['flow'], 'clarification')
 
+    def test_comparison_never_omits_a_third_ambiguous_leg(self):
+        msg, _, _ = self.ask('Compare NVDA, AMD, and Kando')
+        self.assertEqual(self.searches, ['Kando'])
+        self.assertEqual(msg['payload']['kind'], 'clarification')
+        self.assertIn('KANDOB.L', msg['content'])
+        self.assertEqual(self.quotes_read, [])
+
     def test_comparison_binds_market_and_type_per_mention(self):
         msg, _, _ = self.ask('Compare Hoku Japanese stock and Beck UK ETF')
         self.assertCountEqual(self.searches, ['Hoku', 'Beck'])
@@ -121,12 +131,40 @@ class TestResearchAcceptance(unittest.TestCase):
         self.assertEqual({chart['ticker']: chart['currency'] for chart in msg['payload']['charts']},
                          {'7203.T': 'JPY', 'BECK.L': 'GBp'})
 
+    def test_comparison_with_a_failed_quote_is_explicitly_incomplete(self):
+        original = self.svc.market_factory
+
+        def partial(cancel=None):
+            tools = original(cancel=cancel)
+            available = tools.get_snapshot
+
+            def snapshot(ticker):
+                if ticker != 'BECK.L':
+                    return available(ticker)
+                row = {'ticker': ticker, 'status': 'unavailable', 'error': 'fixture quote outage'}
+                tools.snapshots[ticker] = row
+                return row
+
+            tools.get_snapshot = snapshot
+            return tools
+
+        self.svc.market_factory = partial
+        msg, trace, _ = self.ask('Compare Hoku Japanese stock and Beck UK ETF')
+        self.assertIn('The comparison is incomplete', msg['content'])
+        self.assertIn('BECK.L', msg['payload']['market_answer_note'])
+        self.assertEqual(trace['status'], 'degraded')
+        self.assertTrue(any(s['name'] == 'Withhold incomplete comparison' for s in trace['spans']))
+        self.assertEqual([chart['ticker'] for chart in msg['payload']['charts']], ['7203.T'])
+
     def test_thy_known_control_checks_saved_answer_and_chart(self):
         msg, trace, _ = self.ask('THY, Turkish stock. Should I buy now?')
         self.assertEqual(self.searches, ['THY'])
         self.assertEqual(self.quotes_read, ['THYAO.IS'])
         self.assertEqual(msg['payload']['tickers'], ['THYAO.IS'])
         self.assertIn('TRY', msg['content'])
+        self.assertTrue(msg['content'].startswith('The available evidence does not establish whether to buy'))
+        self.assertEqual(msg['payload']['decision_assessment']['status'], 'insufficient_evidence')
+        self.assertTrue(any(s['name'] == 'Decision evidence assessment' for s in trace['spans']))
         self.assertEqual(msg['payload']['charts'][0]['currency'], 'TRY')
         self.assertTrue(any(s['name'] == 'Resolve asset symbol' for s in trace['spans']))
 

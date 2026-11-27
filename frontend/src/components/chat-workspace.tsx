@@ -33,8 +33,11 @@ function Facts({ticker,snap}:{ticker:string;snap:Snapshot}){
  const p=num(snap.price),cur=typeof snap.currency==='string'?snap.currency:''
  const name=typeof snap.name==='string'&&snap.name!==ticker?snap.name:''
  if(p===undefined)return <div className="facts"><div className="facts-asset"><strong>{ticker}</strong><span>Market data unavailable. No values were substituted.</span></div></div>
- const rows:[string,string][]=[['Last',price(p)+(cur?' '+cur:'')]]
- const prev=num(snap.previous_session_close);if(prev!==undefined)rows.push(['Previous close',price(prev)])
+ const receipt=snap.quote_status as unknown as {state?:string;as_of?:string}|undefined
+ const freshness:Record<string,string>={recent:'Recent provider quote, not guaranteed live',delayed:'Delayed quote, not live',last_session:'Last regular-session quote, not live',last_known:'Last known quote, freshness not confirmed',stale:'Stale quote, not a current price',timestamp_unknown:'Quote time unavailable',timestamp_invalid:'Source quote time is invalid'}
+ const identity=[snap.exchange,snap.quote_type].filter(v=>typeof v==='string'&&v).join(' / ')
+ const rows:[string,string][]=[['Last quote',price(p)+(cur?' '+cur:'')]]
+ const prev=num(snap.previous_session_close);if(prev!==undefined)rows.push(['Previous close',price(prev)+(cur?' '+cur:'')])
  const lo=num(snap.low_52_week),hi=num(snap.high_52_week);if(lo!==undefined&&hi!==undefined)rows.push(['1Y range',price(lo)+' to '+price(hi)])
  const vol=num(snap.volume);if(vol!==undefined)rows.push(['Volume',vol.toLocaleString()])
  const pe=num(snap.pe_ratio);if(pe!==undefined)rows.push(['Trailing P/E',pe.toFixed(2)])
@@ -53,11 +56,11 @@ function Facts({ticker,snap}:{ticker:string;snap:Snapshot}){
  const vola=num(snap.annualized_daily_log_volatility_pct);if(vola!==undefined)rows.push(['Volatility, annualized',vola+'%'])
  const fg=num(snap.fear_greed_index);if(fg!==undefined)rows.push(['Fear & Greed',fg+(typeof snap.fear_greed_label==='string'?' '+snap.fear_greed_label:'')])
  const source=[typeof snap.source==='string'?snap.source:'',when(snap.price_as_of)?'price as of '+when(snap.price_as_of):'',fundamentalsLine,historyLine,noFundamentals?'fundamentals not available':''].filter(Boolean).join(', ')
- return <div className="facts"><div className="facts-asset"><strong>{ticker}</strong>{name&&<span>{name}</span>}</div><dl className="facts-grid">{rows.map(([k,v])=><div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>{source&&<p className="facts-source">{source}</p>}</div>
+ return <div className="facts"><div className="facts-asset"><strong>{ticker}</strong>{name&&<span>{name}</span>}{identity&&<span>{identity}</span>}</div>{receipt?.state&&freshness[receipt.state]&&<p className="facts-source" data-quote-state={receipt.state}>{freshness[receipt.state]}</p>}<dl className="facts-grid">{rows.map(([k,v])=><div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>{source&&<p className="facts-source">{source}</p>}</div>
 }
 /** Says what conversation context the narrator saw. Context only: recalled numbers never pass the guard. */
 export const memoryLine=(m:Message['payload']['memory'])=>contextLine(m)
-const kind=(m:Message)=>m.payload.kind==='conversation'?'General chat (no live tools)':m.payload.kind!=='research'?'':m.payload.mode==='facts'?'Tool-only':m.payload.faithful_synthesis===false?'Narrator output replaced':'Narrated locally'
+const kind=(m:Message)=>m.payload.kind==='conversation'?'General chat (no live tools)':m.payload.kind!=='research'?'':m.payload.decision_assessment?'Evidence assessment':m.payload.mode==='facts'?'Tool-only':m.payload.faithful_synthesis===false?'Narrator output replaced':'Narrated locally'
 
 /** The answer text with a numbered chip after each number a tool value backs. Python chose the citations. */
 function Cited({message}:{message:Message}){
@@ -73,7 +76,7 @@ function Answer({message,inspect,chat}:{message:Message;inspect:(id:string,spanI
  const p=message.payload
  if(message.role==='user')return <article className="msg msg-user" aria-label="Your question"><div className="bubble">{message.content}</div></article>
  // When the synthesis was not narrated, show the accepted structure instead of the same facts twice.
- const structured=p.kind==='research'&&!!p.reports&&p.faithful_synthesis!==true&&!!(p.reports.data||p.reports.news)
+ const structured=!!p.decision_assessment||(p.kind==='research'&&!!p.reports&&p.faithful_synthesis!==true&&!!(p.reports.data||p.reports.news))
  // Answers saved before 2026-11-08 stored the raw key=value fallback. Show their snapshot as facts instead;
  // the original text stays in the export and the execution trace.
  const legacy=p.kind==='research'&&!p.reports&&!!p.snapshots&&/\bticker=\S+.*\bfetched_at=/s.test(message.content)
@@ -82,7 +85,8 @@ function Answer({message,inspect,chat}:{message:Message;inspect:(id:string,spanI
  const mem=p.kind==='research'?itemFor(chat.memory,chat.conversation?.id,message.run_id):undefined
  return <article className="msg msg-answer" aria-label="Research response">
   <div className="msg-meta"><span>{new Date(message.created*1000).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}</span>{label&&<span className="answer-kind">{label}</span>}<DeepThinkNote use={p.deep_think}/></div>
-  {!structured&&!legacy&&<div className="msg-body"><Cited message={message}/></div>}
+  {p.decision_assessment&&<p className="msg-body" data-decision-state={p.decision_assessment.status}>{p.decision_assessment.text}</p>}
+  {((!structured&&!legacy)||p.market_answer_note)&&<div className="msg-body"><Cited message={message}/></div>}
   {snaps.map(([t,s])=><div key={t} id={'facts-'+message.id+'-'+t} tabIndex={-1} className="cite-target"><Facts ticker={t} snap={s}/></div>)}
   {structured&&p.reports?.news&&<p className="msg-body news-summary">{p.reports.news}</p>}
   {legacy&&legacyNews&&<p className="msg-body news-summary">{legacyNews}</p>}
@@ -172,12 +176,12 @@ export function ChatWorkspace({chat,inspect,onOpenModels}:{chat:ChatController;i
  const conversation=chat.conversation,ownJob=conversation?.jobs.find(j=>activeStatuses.includes(j.status)),globalJob=chat.workspace?.active_job
  const model=chat.workspace?.models,newsRunning=chat.workspace?.news?.phase==='running',docs=conversation?.documents||[]
  const runningModel=!!model&&['downloading','verifying','qualifying','loading'].includes(model.phase)
- const blocked=chat.busy||!!globalJob||runningModel||newsRunning
+ const blocked=!chat.workspace||chat.busy||!!globalJob||runningModel||newsRunning
  const lastJob=conversation?.jobs[0],failed=!ownJob&&lastJob&&['error','interrupted','cancelled'].includes(lastJob.status)?lastJob:null
  useEffect(()=>{const el=scroller.current;if(el)el.scrollTop=el.scrollHeight},[conversation?.id,conversation?.messages.length,ownJob?.id])
  useEffect(()=>{setDraft('');textarea.current?.focus()},[chat.draftRevision])
- const send=async(retry=false)=>{if((!draft.trim()&&!retry)||chat.busy)return;try{await chat.send(draft.trim(),retry,think&&!!thinkOf(model)?.qualified&&model?.selected!=='facts');setDraft('');textarea.current?.focus()}catch{}}
- const notice=runningModel?(model?.stage||model?.phase)+'. Research can start when this finishes.':newsRunning?'News collection is running. Research can start when it finishes.':globalJob&&!ownJob?'A run in another conversation is active.':''
+ const send=async(retry=false)=>{if((!draft.trim()&&!retry)||blocked)return;try{await chat.send(draft.trim(),retry,think&&!!thinkOf(model)?.qualified&&model?.selected!=='facts');setDraft('');textarea.current?.focus()}catch{}}
+ const notice=!chat.workspace?'Connecting to the local workspace. Your question stays in the composer.':runningModel?(model?.stage||model?.phase)+'. Research can start when this finishes.':newsRunning?'News collection is running. Research can start when it finishes.':globalJob&&!ownJob?'A run in another conversation is active.':''
  return <div className="chat-view">
   <div className="chat-scroll" ref={scroller} role="log" aria-label="Conversation messages" aria-live="polite"><div className="chat-column">
    {chat.error&&<div role="alert" className="error-banner"><span>{chat.error}</span><Button variant="outline" onClick={chat.refresh}>Refresh</Button></div>}
@@ -194,7 +198,7 @@ export function ChatWorkspace({chat,inspect,onOpenModels}:{chat:ChatController;i
      {ownJob&&<Button variant="ghost" size="sm" disabled={chat.busy||ownJob.status==='cancelling'} onClick={()=>{void chat.post('/api/jobs/cancel',{id:ownJob.id}).catch(()=>{})}}><Square size={13}/>Stop run</Button>}
      {chat.hasRetry&&<Button variant="ghost" size="sm" disabled={blocked} onClick={()=>void send(true)}><RotateCcw size={13}/>Retry submission</Button>}
      <span className="composer-spacer"/>
-     <Tooltip><TooltipTrigger asChild><Button size="icon" className="send-button" aria-label="Send question" disabled={blocked||!draft.trim()||!chat.workspace} onClick={()=>void send()}><ArrowUp size={16}/></Button></TooltipTrigger><TooltipContent>Send with Enter. Shift+Enter adds a line.</TooltipContent></Tooltip>
+     <Tooltip><TooltipTrigger asChild><Button size="icon" className="send-button" aria-label="Send question" disabled={blocked||!draft.trim()} onClick={()=>void send()}><ArrowUp size={16}/></Button></TooltipTrigger><TooltipContent>Send with Enter. Shift+Enter adds a line.</TooltipContent></Tooltip>
     </div>
    </div>
   </div></div>

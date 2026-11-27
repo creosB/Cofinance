@@ -9,16 +9,29 @@ import re
 import statistics
 import time
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import quote, urlsplit
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+from .evidence_status import quote_status
 
 CRYPTO = {"BTC","ETH","SOL","ADA","DOGE","XRP","BNB","AVAX","DOT","LINK"}
 NUMERIC_LISTING = r"[0-9]{1,6}\.[A-Z]{1,4}"
 SYMBOL = re.compile(rf"(?:[A-Z^][A-Z0-9.\-=]{{0,14}}|{NUMERIC_LISTING})")
-QUALIFIED_NUMERIC_TICKER = re.compile(rf"(?<![\w.]){NUMERIC_LISTING}(?![\w]|\.[\w.])", re.I)
 SEARCH_QUOTE_TYPES = frozenset({"EQUITY", "ETF", "INDEX", "CRYPTOCURRENCY", "FUTURE", "CURRENCY", "MUTUALFUND"})
 _SYMBOL_CACHE: dict[str, tuple[float, dict | None]] = {}
 _SYMBOL_CACHE_TTL = 300.0
+
+
+def listing_timezone(meta):
+    zone=meta.get("exchangeTimezoneName")
+    if isinstance(zone,str) and zone:
+        try:
+            return ZoneInfo(zone)
+        except (ZoneInfoNotFoundError,ValueError):
+            pass
+    offset=meta.get("gmtoffset")
+    return timezone(timedelta(seconds=offset)) if finite(offset) and abs(offset)<86400 else timezone.utc
 
 
 def valid_symbol(symbol):
@@ -57,11 +70,21 @@ _MARKET_CUES: tuple[tuple[str, re.Pattern, frozenset[str], tuple[str, ...], tupl
 )
 
 
+_LISTING_SUFFIXES = '|'.join(sorted({re.escape(suffix[1:]) for _, _, _, suffixes, _ in _MARKET_CUES for suffix in suffixes}, key=lambda v: (-len(v), v)))
+QUALIFIED_TICKER = re.compile(rf"(?<![\w.])(?:{NUMERIC_LISTING}|[A-Z][A-Z0-9]{{0,8}}\.(?:{_LISTING_SUFFIXES}))(?![\w]|\.[\w.])", re.I)
+_NEGATED_KIND = re.compile(r"\b(?:not|instead\s+of|rather\s+than)\s+(?:(?:a|an|the)\s+)?$", re.I)
+
+
+def has_listing_constraint(context_query: str) -> bool:
+    return bool(_extract_query_cues(context_query)[1])
+
+
 def _extract_query_cues(context_query: str) -> tuple[str | None, tuple[str, frozenset[str], tuple[str, ...]] | None]:
     text = context_query or ""
     if not text:
         return None, None
-    kinds = {kind for pat, kind in _TYPE_CUES if pat.search(text)}
+    kinds = {kind for pat, kind in _TYPE_CUES for match in pat.finditer(text)
+             if not _NEGATED_KIND.search(text[:match.start()])}
     listing_text = re.split(r"\b(?:with\s+.+?\bexposure|exposure\s+to)\b", text, maxsplit=1, flags=re.I)[0]
     markets = [(code, exchanges, suffixes) for code, pat, exchanges, suffixes, _ in _MARKET_CUES if pat.search(listing_text)]
     return next(iter(kinds)) if len(kinds) == 1 else None, markets[0] if len(markets) == 1 else None
@@ -143,7 +166,9 @@ def resolve_yahoo_symbol(term: str, fetch=None, *, context_query: str = "") -> d
                     **({"score": round(score, 2)} if score is not None else {}),
                 },
             })
-        rows = [r for r in rows if (not want_market or r["market_match"]) and (not want_type or r["type_match"])]
+        exact_listing = bool(QUALIFIED_TICKER.fullmatch(query.lstrip('$')))
+        rows = [r for r in rows if (not want_market or r["market_match"]) and (not want_type or r["type_match"])
+                and (not exact_listing or r["exact_sym"])]
         if rows:
             top_score = max((r["score"] for r in rows if r["score"] is not None), default=None)
 
@@ -290,18 +315,34 @@ class MarketTools:
         valid_symbol(ticker);self.check()
         symbol=ticker+"-USD" if ticker in CRYPTO else ticker
         url="https://query1.finance.yahoo.com/v8/finance/chart/"+quote(symbol,safe="")+"?range=1y&interval=1d"
-        now=datetime.now(timezone.utc).isoformat()
-        snap={"ticker":ticker,"source":"Yahoo Finance chart API","fetched_at":now,"status":"unavailable"}
+        current=datetime.now(timezone.utc)
+        now=current.isoformat()
+        snap={"ticker":ticker,"source":"Yahoo Finance chart API","fetched_at":now,"status":"unavailable",
+              "quote_status":{"state":"unavailable","observed_at":now}}
         try:
             raw=self.fetch(url); self.check()
+            current=datetime.now(timezone.utc)
+            now=current.isoformat()
+            snap["fetched_at"]=now
             result=(raw.get("chart",{}).get("result") or [None])[0]
             if not isinstance(result,dict):raise ValueError("No market series returned.")
             meta=result.get("meta",{})
+            reported=meta.get("symbol")
+            if reported and str(reported).upper()!=symbol.upper():raise ValueError("Source returned a different instrument.")
             price=meta.get("regularMarketPrice")
             if not finite(price) or price<=0:raise ValueError("No valid source price.")
-            snap.update(price=price,currency=str(meta.get("currency") or "Unknown"),name=str(meta.get("longName") or meta.get("shortName") or ticker),status="available")
-            ts=meta.get("regularMarketTime")
-            snap["price_as_of"]=datetime.fromtimestamp(ts,timezone.utc).isoformat() if finite(ts) else "Not supplied by source"
+            qtype=str(meta.get("instrumentType") or "")
+            snap.update(price=price,currency=str(meta.get("currency") or "Unknown"),name=str(meta.get("longName") or meta.get("shortName") or ticker),status="available",
+                        exchange=str(meta.get("fullExchangeName") or meta.get("exchangeName") or ""),quote_type=qtype)
+            freshness=quote_status(meta,current,continuous=ticker in CRYPTO or qtype.upper()=="CRYPTOCURRENCY")
+            snap["quote_status"]=freshness
+            snap["price_as_of"]=freshness["as_of"] or "Not supplied by source"
+            if freshness["state"]=="timestamp_invalid":
+                snap.pop("price",None)
+                snap.update(status="unavailable",error="Source quote timestamp is in the future.")
+                self.snapshots[ticker]=snap
+                return snap
+            ts=meta.get("regularMarketTime") if freshness["as_of"] else None
             # chartPreviousClose is the close BEFORE the requested window (about a year ago for range=1y),
             # not yesterday's close. It is kept under an explicit name and never narrated as a previous close.
             for field,name in (("previousClose","previous_close"),("chartPreviousClose","close_before_window"),("fiftyTwoWeekHigh","high_52_week"),("fiftyTwoWeekLow","low_52_week"),("regularMarketVolume","volume")):
@@ -311,12 +352,14 @@ class MarketTools:
             points=[{"time":datetime.fromtimestamp(t,timezone.utc).isoformat(),"close":round(c,6)} for t,c in zip(timestamps,closes) if finite(t) and finite(c) and c>0][-400:]
             # Previous session close comes from the same daily series: the bar before the price's session.
             if points and finite(ts):
-                session=datetime.fromtimestamp(ts,timezone.utc).date().isoformat()
-                earlier=[p for p in points if p["time"][:10]<session]
+                zone=listing_timezone(meta)
+                session=datetime.fromtimestamp(ts,zone).date()
+                earlier=[(p, date) for p in points if (date:=datetime.fromisoformat(p["time"]).astimezone(zone).date())<session]
                 if earlier:
-                    close=earlier[-1]["close"]
+                    bar, bar_date=earlier[-1]
+                    close=bar["close"]
                     snap["previous_session_close"]=round(close,6 if close<1 else 4)
-                    snap["previous_session_date"]=earlier[-1]["time"][:10]
+                    snap["previous_session_date"]=bar_date.isoformat()
                     # Direction is computed here, never inferred by the narrator (live 2026-11-08: "186.64 (down from 181.6)").
                     snap["change_from_previous_session_pct"]=round((price/close-1)*100,4)
             self.charts[ticker]={"ticker":ticker,"currency":snap["currency"],"source":"Yahoo Finance","fetched_at":now,"points":points,"window":"1 year","adjustment":"Source Close, not total return"}

@@ -485,6 +485,11 @@ class TestOpenChatAndDynamicResolution(unittest.TestCase):
                 return "Türk Hava Yollari Anonim Ortakligi (THYAO.IS) last price is 312.0 TRY, up 0.73 percent from previous session close 309.75 TRY."
 
         class TryMarket(FakeMarket):
+            def resolve_symbol(self, term, context_query=''):
+                if term == 'THYAO.IS':
+                    return {'symbol': term, 'name': 'Turkish Airlines', 'exchange': 'IST', 'quote_type': 'EQUITY'}
+                return None
+
             def get_snapshot(self, ticker):
                 snap = {
                     "ticker": ticker,

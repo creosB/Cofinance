@@ -10,6 +10,7 @@ import re
 from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple
 
 from .numeric_guard import matches, number_spans
+from .evidence_status import claims_current_price
 
 FIELD_UNIT: Dict[str, str] = {
     "price": "currency",
@@ -468,7 +469,16 @@ def check_claim_provenance(
                 return False
             return denomination_ok(r)
 
-        if any(row_ok(r) for r in matched_rows):
+        supported = [r for r in matched_rows if row_ok(r)]
+        if supported:
+            price_rows = [r for r in supported if r["field"] == "price"]
+            states = [(raw_facts[r["asset"]].get("quote_status") or {}).get("state") for r in price_rows]
+            clause = text[sub_lo:sub_hi].strip()
+            if price_rows and any(states) and claims_current_price(clause):
+                conflicts.append({"kind":"quote_freshness", "span":[start,end], "text":text[start:end],
+                                  "claim":{"asset":claimed_asset,"fields":["price"],"clause":clause[:200]},
+                                  "matches":[{"asset":r["asset"],"field":"price","state":state}
+                                             for r,state in zip(price_rows,states)],"violations":["freshness"]})
             continue
 
         violations: List[str] = []

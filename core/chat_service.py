@@ -20,12 +20,13 @@ from .documents import select_excerpts
 from .entities import extract_tickers
 from .gliner_decide import DEFAULT_ALIASES, GlinerQueryRouter, GlinerOutputError
 from .local_models import LocalModels, MODEL_ID, ModelError, Cancelled, narrators
-from .market import MarketTools
+from .market import MarketTools, has_listing_constraint
 from .news_service import coverage_note, feed_tickers, news_health
+from .evidence_status import decision_assessment, decision_request, previous_close_answer, previous_close_request
 from .memory import HybridMemory, LocalKeywordMemory, MemoryHit, context_from
 # Aliased: chat_store.ACTIVE (job statuses) is a different thing; shadowing it broke Stop once (caught by tests).
 from .memory_items import ACTIVE as ITEM_ACTIVE, FORGOTTEN as ITEM_FORGOTTEN, NOTE_LIMIT, PENDING as ITEM_PENDING, MemoryLedger
-from .orchestrator import DataAnalystAgent, NewsResearcherAgent, TeamLeadOrchestrator, plain_text
+from .orchestrator import DataAnalystAgent, NewsResearcherAgent, TeamLeadOrchestrator, market_fact_lines, plain_text
 from .signals import Item, Outcome, Judgment, Action
 from .run_trace import TraceRecorder, run_traced_team
 
@@ -373,16 +374,31 @@ class ChatService:
             check()
             if routed.intent not in {'price_snapshot','news_catalysts','compare_assets','watchlist_add','thesis_review','open_conversation'}:
                 raise GlinerOutputError('Unsupported router intent.')
+            if routed.intent=='open_conversation' and session_tickers and previous_close_request(job['query']):
+                routed=dataclasses.replace(routed,intent='price_snapshot')
             tools=self.market_factory(cancel=cancel)
             resolved_tickers=list(dict.fromkeys(routed.tickers))
             resolution_gaps=[]
-            candidates=tuple(getattr(routed,'entity_candidates',()) or ())
-            if routed.intent!='open_conversation' and candidates and (not resolved_tickers or routed.intent=='compare_assets'):
-                clauses=re.split(r'\s+(?:and|versus|vs\.?)\s+',job['query'],flags=re.I) if routed.intent=='compare_assets' else [job['query']]
+            candidates=list(getattr(routed,'entity_candidates',()) or ())
+            comparing=routed.intent=='compare_assets'
+            clauses=re.split(r'\s+(?:and|versus|vs\.?)\s+|,\s+(?=\$?[A-Z]{2,})',job['query'],flags=re.I) if comparing else [job['query']]
+            def clause_for(term, aliases=()):
+                names=(term,*aliases)
+                matching=[c for c in clauses if any(re.search(r'(?<!\w)'+re.escape(name)+r'(?!\w)',c,re.I) for name in names)]
+                return matching[0] if len(matching)==1 else clauses[0] if len(clauses)==1 else ''
+            confirmations={}
+            if routed.intent!='open_conversation':
+                for symbol in resolved_tickers[:]:
+                    aliases=[name for name,value in DEFAULT_ALIASES.items() if value==symbol]
+                    context=clause_for(symbol,aliases)
+                    if has_listing_constraint(context):
+                        confirmations[symbol]=context
+                        resolved_tickers.remove(symbol)
+                candidates=list(dict.fromkeys([*confirmations,*candidates]))
+            if routed.intent!='open_conversation' and candidates and (not resolved_tickers or comparing or confirmations):
                 for term in candidates:
                     if len(resolved_tickers)>=6:raise ValueError('Limit a research run to six assets.')
-                    matching=[c for c in clauses if re.search(r'(?<!\w)'+re.escape(term)+r'(?!\w)',c,re.I)]
-                    context=matching[0] if len(matching)==1 else job['query'] if len(clauses)==1 else ''
+                    context=confirmations.get(term) or clause_for(term)
                     self.store.progress(job['id'],f'Resolving {term}')
                     def lookup():
                         resolver=getattr(tools,'resolve_symbol',None)
@@ -393,12 +409,14 @@ class ChatService:
                     check()
                     if isinstance(found,dict) and found.get('ambiguous'):
                         resolution_gaps.append((term,found.get('alternatives',[])))
-                    elif isinstance(found,dict) and found.get('symbol'):
+                    elif isinstance(found,dict) and found.get('symbol') and (term not in confirmations or found['symbol']==term):
                         if found['symbol'] not in resolved_tickers:resolved_tickers.append(found['symbol'])
                     else:
                         resolution_gaps.append((term,[]))
             documents=self.store.documents(session['id'])
             doc_match=bool(documents) and (routed.intent!='open_conversation' or any(e.get('matched') for e in select_excerpts(documents,job['query'],top=1)))
+            if comparing and resolved_tickers and len(set(resolved_tickers+session_tickers))<2 and not doc_match and not resolution_gaps:
+                resolution_gaps.append(('the second asset',[]))
             if resolution_gaps:
                 term,alts=resolution_gaps[0]
                 if alts:
@@ -498,7 +516,8 @@ class ChatService:
             news=NewsReader(self.root/'news.db')
             narrator=self.models if job['model']!= 'facts' else FactsOnly()
             # Routing is already recorded. Reuse the validated result without a second inference.
-            routed=dataclasses.replace(routed,tickers=tickers)
+            asked_for_decision=bool(tickers) and decision_request(job['query'])
+            routed=dataclasses.replace(routed,tickers=tickers,intent='thesis_review' if asked_for_decision else routed.intent)
             class FixedRouter:
                 def route(self,text):check();return routed
             class CheckedNarrator:
@@ -559,6 +578,16 @@ class ChatService:
                                         actor='Python',inputs={'served':{t:len(v) for t,v in served.items()}})
                 except Exception:headline=None  # an aid, never a blocker
             health=news_health(self.root/'news.db')
+            assessment=None
+            if asked_for_decision:
+                news_items=sum(len(rows) for rows in result.news_report.raw_facts.values()) if result.news_report else 0
+                covered={ticker for ticker, rows in (result.news_report.raw_facts.items() if result.news_report else ()) if rows}
+                assessment=decision_assessment(tickers,tools.snapshots,news_items=news_items,
+                                               news_complete=covered.issuperset(tickers),news_error=bool(health.get('error')),
+                                               news_collected=bool(health.get('collected')))
+                quote_lines=['. '.join(market_fact_lines(t,tools.snapshots.get(t,{}))[:2]).rstrip('.')+'.' for t in tickers]
+                answer=' '.join([assessment['text'],*quote_lines])
+                trace.event('Decision evidence assessment','decision',assessment,actor='Python')
             payload={'kind':'research','mode':job['model'],'tickers':tickers,'charts':list(tools.charts.values()),
                      'usage':trace.data.get('usage'),
                      'crowd_odds':odds if odds and (odds.get('markets') or odds.get('errors')) else None,
@@ -578,6 +607,21 @@ class ChatService:
                                          for e in result.document_report.raw_facts.get('excerpts',[])] if result.document_report else [],
                      'memory':{'backend':self.memory.backend,'used_previous':bool(previous),
                                'recalled':[{'question':h.question[:160],'run_id':h.run_id,'item_id':h.item_id,'kind':h.kind,'score':h.score,**({'found_by':h.sources} if h.sources else {})} for h in hits]}}
+            if assessment is not None:payload['decision_assessment']=assessment
+            if tickers and previous_close_request(job['query']):
+                answer=previous_close_answer(tickers,tools.snapshots)
+                payload['market_answer_note']=answer
+                payload['citations']=cite(answer[:16000],tools.snapshots,tools.evidence+news.evidence)
+                trace.event('Use dated previous close','decision',{'tickers':tickers},actor='Python')
+            if routed.intent=='compare_assets':
+                unavailable=[t for t in tickers if tools.snapshots.get(t,{}).get('status')=='unavailable'
+                             or tools.snapshots.get(t,{}).get('price') is None]
+                if unavailable:
+                    answer='The comparison is incomplete: no usable quote for '+', '.join(unavailable)+'. Any available quotes are shown separately.'
+                    payload['market_answer_note']=answer
+                    payload['citations']=[]
+                    trace.event('Withhold incomplete comparison','decision',{'missing_quotes':unavailable},actor='Python',fallback=True)
+                    trace.finish(summary=trace.data.get('summary'))
             flow=_research_flow(routed,result,trace)
             trace.data['summary'].update({'origin':'chat','conversation_id':job['session_id'],'flow':flow,'answer_kind':'research','answer':answer[:2500],'model_choice':job['model']});trace.flush()
             with self.lock:

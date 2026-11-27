@@ -319,6 +319,29 @@ class TestChatShellBrowser(unittest.TestCase):
             oc_thread.join(timeout=3)
             oc_service.close()
 
+    def test_early_enter_keeps_the_draft_until_workspace_connects(self):
+        page = self.context.new_page()
+        pending = []
+        page.route('**/api/state', lambda route: pending.append(route))
+        try:
+            page.goto(self.origin, wait_until='domcontentloaded')
+            box = page.get_by_role('textbox', name='Research question')
+            page.get_by_text('Connecting to the local workspace.', exact=False).wait_for()
+            box.fill('Review NVDA after startup')
+            box.press('Enter')
+            self.assertEqual(box.input_value(), 'Review NVDA after startup')
+            self.assertTrue(page.get_by_role('button', name='Send question').is_disabled())
+            self.assertEqual(len(self.service.store.session_ids()), 2)
+            self.assertTrue(pending)
+            for route in pending:
+                route.continue_()
+            page.unroute('**/api/state')
+            page.get_by_role('button', name='Send question').click()
+            page.locator('.msg-answer').wait_for()
+            self.assertEqual(len(self.service.store.session_ids()), 3)
+        finally:
+            page.close()
+
     def test_clear_all_failure_is_visible_and_can_be_retried_with_empty_history(self):
         clear = self.service.clear_conversations
         requests = []

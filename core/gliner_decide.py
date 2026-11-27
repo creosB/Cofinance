@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Protocol, Sequence, Set, Tuple
 
 from .entities import extract_known_tickers
-from .market import QUALIFIED_NUMERIC_TICKER
+from .market import QUALIFIED_TICKER
 from .signals import Classifier, Item, Judgment
 
 
@@ -277,12 +277,20 @@ class GlinerQueryRouter:
 
         tickers = extract_known_tickers(query, self.universe, self.aliases)
         seen = set(tickers)
-        candidates = list(dict.fromkeys(m.group().upper() for m in QUALIFIED_NUMERIC_TICKER.finditer(query or "")))[:6]
+        cue = bool(_ASSET_QUERY_RE.search(query or ""))
+        qualified = [m.group().upper() for m in QUALIFIED_TICKER.finditer(query or "")
+                     if cue or m.group().isupper()]
+        candidates = list(dict.fromkeys(qualified))[:6]
+        for term in candidates:
+            base = term.split('.',1)[0]
+            if base in tickers:
+                tickers.remove(base)
+                seen.discard(base)
         seen_candidates = {candidate.lower() for candidate in candidates}
-        has_asset_cue = bool(candidates or _ASSET_QUERY_RE.search(query or ""))
+        has_asset_cue = bool(candidates or cue)
 
         skip_ner = intent == "open_conversation" and not tickers and intent_conf >= 0.50 and not has_asset_cue
-        needs_ner = not skip_ner and (not tickers or (intent == "compare_assets" and len(tickers) < 2))
+        needs_ner = not skip_ner and (intent == "compare_assets" or not (tickers or candidates))
         if needs_ner:
             try:
                 ner = self.backend.extract_entities(query, ["company", "cryptocurrency", "ticker"])
@@ -293,7 +301,7 @@ class GlinerQueryRouter:
             for span_list in entities.values() if isinstance(entities, Mapping) else []:
                 for span in span_list or []:
                     norm = str(span).strip().lstrip("$")
-                    if not norm:
+                    if not norm or any(norm.casefold() in {q.casefold(),q.split('.',1)[0].casefold()} for q in qualified):
                         continue
                     upper = norm.upper()
                     mapped = self.aliases.get(norm.lower()) or (upper if upper in self.universe else None)
