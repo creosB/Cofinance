@@ -22,11 +22,11 @@ from .gliner_decide import DEFAULT_ALIASES, GlinerQueryRouter, GlinerOutputError
 from .local_models import LocalModels, MODEL_ID, ModelError, Cancelled, narrators
 from .market import MarketTools, has_listing_constraint
 from .news_service import coverage_note, feed_tickers, news_health
-from .evidence_status import decision_assessment, decision_request, previous_close_answer, previous_close_request
+from .evidence_status import decision_assessment, decision_request, previous_close_answer, previous_close_request, requested_valuation, valuation_answer
 from .memory import HybridMemory, LocalKeywordMemory, MemoryHit, context_from
 # Aliased: chat_store.ACTIVE (job statuses) is a different thing; shadowing it broke Stop once (caught by tests).
 from .memory_items import ACTIVE as ITEM_ACTIVE, FORGOTTEN as ITEM_FORGOTTEN, NOTE_LIMIT, PENDING as ITEM_PENDING, MemoryLedger
-from .orchestrator import DataAnalystAgent, NewsResearcherAgent, TeamLeadOrchestrator, market_fact_lines, plain_text
+from .orchestrator import DataAnalystAgent, NewsResearcherAgent, TeamLeadOrchestrator, market_fact_lines, plain_text, display_value
 from .signals import Item, Outcome, Judgment, Action
 from .run_trace import TraceRecorder, run_traced_team
 
@@ -374,7 +374,9 @@ class ChatService:
             check()
             if routed.intent not in {'price_snapshot','news_catalysts','compare_assets','watchlist_add','thesis_review','open_conversation'}:
                 raise GlinerOutputError('Unsupported router intent.')
-            if routed.intent=='open_conversation' and session_tickers and previous_close_request(job['query']):
+            measure=requested_valuation(job['query'],getattr(routed,'requested_value','other'))
+            concise_metric=re.fullmatch(r'\s*(?:market\s+cap(?:italization|italisation)?|share\s+price|enterprise\s+value)[,.?!\s]*(?:please[.!\s]*)?',job['query'],re.I)
+            if routed.intent=='open_conversation' and session_tickers and (previous_close_request(job['query']) or concise_metric):
                 routed=dataclasses.replace(routed,intent='price_snapshot')
             tools=self.market_factory(cancel=cancel)
             resolved_tickers=list(dict.fromkeys(routed.tickers))
@@ -431,6 +433,22 @@ class ChatService:
                     check()
                     self.store.finish(job['id'],answer,{'kind':'clarification','charts':[],'evidence':[],'tickers':session_tickers,'mode':job['model'],'usage':trace.data.get('usage')},session_tickers,'complete')
                 return
+            if not doc_match and routed.intent in {'price_snapshot','compare_assets'} and not decision_request(job['query']) and measure in {'ambiguous_value','enterprise_value'}:
+                prior=list(dict.fromkeys(resolved_tickers or session_tickers))
+                if prior:
+                    prefix=', '.join(prior)+': '
+                    if measure=='ambiguous_value':
+                        answer=prefix+'Do you mean the share price, the company?s market capitalization, or enterprise value? They are different measures.'
+                        reason='ambiguous_valuation'
+                    else:
+                        answer=prefix+'Enterprise value is not available from the configured evidence. The share price and market capitalization are different measures, not substitutes.'
+                        reason='unsupported_valuation'
+                    trace.event('Asset clarification required','decision',{'reason':reason,'tickers':prior,'measure':measure},actor='Python')
+                    trace.finish(summary={'origin':'chat','conversation_id':job['session_id'],'flow':'clarification','answer_kind':'clarification','answer':answer,'model_choice':job['model']})
+                    with self.lock:
+                        check()
+                        self.store.finish(job['id'],answer,{'kind':'clarification','charts':[],'evidence':[],'tickers':prior,'mode':job['model'],'usage':trace.data.get('usage')},prior,'complete')
+                    return
             if routed.intent=='open_conversation':
                 tickers=[]
             else:
@@ -613,6 +631,11 @@ class ChatService:
                 payload['market_answer_note']=answer
                 payload['citations']=cite(answer[:16000],tools.snapshots,tools.evidence+news.evidence)
                 trace.event('Use dated previous close','decision',{'tickers':tickers},actor='Python')
+            elif tickers and not doc_match and not asked_for_decision and routed.intent in {'price_snapshot','compare_assets'} and measure in {'share_price','market_cap'}:
+                answer=valuation_answer(measure,tickers,tools.snapshots,display_value)
+                payload['market_answer_note']=answer
+                payload['citations']=cite(answer[:16000],tools.snapshots,tools.evidence+news.evidence)
+                trace.event('Use requested market measure','decision',{'measure':measure,'tickers':tickers},actor='Python')
             if routed.intent=='compare_assets':
                 unavailable=[t for t in tickers if tools.snapshots.get(t,{}).get('status')=='unavailable'
                              or tools.snapshots.get(t,{}).get('price') is None]

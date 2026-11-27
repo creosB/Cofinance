@@ -38,6 +38,15 @@ JOURNEYS = (
 )
 
 
+VALUATION_REGRESSIONS = (
+    ('valuation', (
+        ('How much is Amazon worth?', 'clarification', {}, False),
+        ('Market cap, please.', 'research', {'AMZN': 'USD'}, False),
+        ('What is Amazon enterprise value?', 'clarification', {}, False),
+    )),
+)
+
+
 def stage_models(target):
     source = REPO / 'data' / 'local_models'
     target.mkdir()
@@ -58,6 +67,7 @@ class TestProviderWorkflow(unittest.TestCase):
 
         digest = hashlib.sha256(json.dumps(JOURNEYS, sort_keys=True).encode()).hexdigest()
         print(f'Provider journey protocol SHA-256: {digest}', flush=True)
+        print('Valuation regression SHA-256: '+hashlib.sha256(json.dumps(VALUATION_REGRESSIONS, sort_keys=True).encode()).hexdigest(), flush=True)
         events = []
 
         def yahoo(url):
@@ -98,7 +108,7 @@ class TestProviderWorkflow(unittest.TestCase):
                 with sync_playwright() as pw:
                     browser = pw.chromium.launch(executable_path='C:/Program Files/Google/Chrome/Application/chrome.exe', headless=True)
                     try:
-                        for name, turns in JOURNEYS:
+                        for name, turns in JOURNEYS + VALUATION_REGRESSIONS:
                             with browser.new_context(viewport={'width': 1440, 'height': 900}) as context:
                                 page = context.new_page()
                                 page.set_default_timeout(90000)
@@ -138,6 +148,16 @@ class TestProviderWorkflow(unittest.TestCase):
                                             self.assertRegex(payload.get('market_answer_note', ''), r'VOD\.L previous-session close: .+ GBp on \d{4}-\d{2}-\d{2}')
                                             self.assertIn(payload['market_answer_note'], answer['content'])
                                             self.assertFalse(any('/finance/search' in e['path'] for e in provider))
+                                        if name == 'valuation':
+                                            if index == 0:
+                                                self.assertIn('Do you mean the share price', answer['content'])
+                                            elif index == 1:
+                                                self.assertTrue(answer['content'].startswith('AMZN market capitalization:'))
+                                                self.assertGreater(payload['snapshots']['AMZN']['market_cap'], 0)
+                                            else:
+                                                self.assertIn('Enterprise value is not available', answer['content'])
+                                            if index != 1:
+                                                self.assertEqual(provider, [])
                                         if expected:
                                             self.assertTrue(any('/chart/' in e['path'] and 'response' in e for e in provider))
                                         if kind != 'research':

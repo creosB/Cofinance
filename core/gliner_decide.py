@@ -79,6 +79,13 @@ USER_QUERY_SCHEMA: Dict[str, Any] = {
         },
     },
     "horizon": ["intraday", "swing_week", "long_term"],
+    "requested_value": {"labels": {
+        "other": "Not asking for a monetary value of a security or its issuer: general concept, investment decision, performance, or unrelated metric",
+        "share_price": "Explicit trading quote or market price of one share or unit of a listed security",
+        "market_cap": "Explicit market capitalization or combined equity market value of all outstanding shares",
+        "enterprise_value": "Explicit enterprise value inclusive of debt and net of cash",
+        "ambiguous_value": "Asks what a particular company or asset is worth without specifying share price, market capitalization, enterprise value, or a valuation method",
+    }},
 }
 
 
@@ -113,6 +120,7 @@ class RoutedQuery:
     horizon: str
     tickers: List[str]
     entity_candidates: Tuple[str, ...] = ()
+    requested_value: str = "other"
 
 
 class GlinerDecideClassifier(Classifier):
@@ -274,6 +282,9 @@ class GlinerQueryRouter:
 
         intent, intent_conf = _unpack_label_conf(cls_res.get("intent"), "price_snapshot")
         horizon, _ = _unpack_label_conf(cls_res.get("horizon"), "swing_week")
+        requested, value_conf = _unpack_label_conf(cls_res.get("requested_value"), "other")
+        if requested not in _schema_labels(USER_QUERY_SCHEMA["requested_value"]) or value_conf < 0.50:
+            requested = "other"
 
         tickers = extract_known_tickers(query, self.universe, self.aliases)
         seen = set(tickers)
@@ -337,6 +348,7 @@ class GlinerQueryRouter:
             horizon=horizon,
             tickers=tickers,
             entity_candidates=tuple(candidates),
+            requested_value=requested,
         )
 
 

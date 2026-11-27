@@ -1,6 +1,18 @@
 # Cofinance
 
-Cofinance is an experimental, local research and decision-support system. Finance is its first domain: ask about an asset, inspect the evidence behind the answer, and see where the system had to fall back. The person makes the decision. Cofinance never trades.
+**Ask about a stock or crypto asset. Then see what the answer is based on.** Cofinance is an experimental finance research app that runs its models on your PC. It shows dated market quotes, source-linked facts, and the steps that led to the answer. You make the decision. Cofinance never trades.
+
+## See it in action
+
+**Chat: ask, clarify, compare.** Cofinance asks which measure you mean instead of treating share price and company valuation as the same thing. The answer pairs the requested figure with a facts card showing the listing, currency, and quote status.
+
+![Cofinance Chat showing an Amazon valuation clarification and a source-dated market capitalization answer](docs/screenshots/chat.png)
+
+**Execution: see what actually ran.** Open the run map from an answer to inspect which tools and local models ran, what they received, and whether an answer passed the checks or used a fallback.
+
+![Cofinance Execution run map and step inspector for the example research turn](docs/screenshots/execution.png)
+
+Screenshots are from the local app using a disposable example conversation and public market data. Prices and valuations are point-in-time examples, not live quotes or investment advice.
 
 **The research question:** with the same small model and the same evidence, does a structured investigation produce a better conclusion than a good direct answer? We have measured speed, numerical grounding, and several finance-specific tasks. We have **not** established that the overall workflow beats direct Q&A. Medical, academic and everyday research are possible applications of the idea, not supported or validated deployments.
 
@@ -14,7 +26,7 @@ This is not a verified clean-machine fresh-install recipe (see [docs/OPERATIONS.
 
 ## How it works
 
-1. **Gather evidence.** Python fetches independent market, sentiment, and read-only crowd-odds data concurrently and stores accepted news. GLiNER routes questions and classifies headlines (using a SHA-256 verified, parity-gated ONNX FP32 encoder cache with automatic PyTorch fallback, plus fail-closed batched Clock 1 judging). Users can attach text PDFs and inspect source-grouped page citations. Conversation memory provides context, not evidence.
+1. **Gather evidence.** Python fetches independent market, sentiment, and read-only crowd-odds data concurrently and stores accepted news. The pinned local GLiNER router classifies questions and headlines. It prefers the verified standalone ONNX FP32 runtime and uses the compatible cached fallback when needed. Users can attach text PDFs and inspect source-grouped page citations. Conversation memory provides context, not evidence.
 2. **Build reports.** The Data Analyst explains tool outputs using the local narrator. The News Researcher is deliberately Python: it quotes and groups headlines rather than asking a model to paraphrase them. A news-only question can be answered without a narrator call.
 3. **Check the answer.** On synthesis routes, the Team Lead combines reports. Number, wording, claim-provenance (asset, metric, and unit binding), and risk checks can reject a draft, permit a bounded retry or return a deterministic fallback. The trace distinguishes steps that ran from steps that were skipped. A retry is not an independent debate; matching a number or field is still not proof of external truth.
 
@@ -41,7 +53,8 @@ The [scorecard](docs/SCORECARD.md) indexes the experiments, including unsuccessf
 `core/` holds the active v2 research pipeline; `ui/` and `frontend/` serve the local dashboard. `qualify/` contains gates and experiments. `tests/` contains v2 regression and integrity checks. The archived Streamlit v1 app and its legacy tests live under [`v1/`](v1/README.md).
 
 ```text
-python -m unittest discover -s tests -t .
+python dev.py verify
+python dev.py verify --full
 python dev.py preflight
 python -B -m qualify.parity_oracle self-check
 cd frontend

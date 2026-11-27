@@ -84,7 +84,10 @@ export function interactiveStages(run:Run):MapStage[]{
   const clarifySpans=spans.filter(s=>s.name==='Asset clarification required')
   const reason=text(object(clarifySpans[0]?.outputs).reason)
   const lookupClarification=reason==='ambiguous_symbol'||reason==='unresolved_symbol'
-  const dispatchStage=stage('dispatch','Dispatch policy','Python coordinator','The request needs a confirmed asset before specialists can research it.',clarifySpans,run,lookupClarification?'Symbol lookup needs clarification':'Asset clarification required')
+  const measureClarification=reason==='ambiguous_valuation'||reason==='unsupported_valuation'
+  const detail=reason==='unsupported_valuation'?'Requested measure is unavailable':measureClarification?'Requested measure needs clarification':lookupClarification?'Symbol lookup needs clarification':'Asset clarification required'
+  const hint=measureClarification?'A share price cannot stand in for a different valuation measure.':'The request needs a confirmed asset before specialists can research it.'
+  const dispatchStage=stage('dispatch','Dispatch policy','Python coordinator',hint,clarifySpans,run,detail)
   const resultStage=stage('result','Accepted result','Local conversation','Saved the clarification without narrating a research answer.',clarifySpans,run,answerAccepted?'Clarification recorded (no narrator call)':'No accepted final answer recorded')
   if(answerAccepted&&resultStage.state==='not_observed')resultStage.state='complete'
   if(!answerAccepted)resultStage.state=run.status==='running'?'running':'not_reached'

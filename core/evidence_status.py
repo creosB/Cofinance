@@ -82,6 +82,41 @@ def previous_close_answer(tickers, snapshots) -> str:
     return ' '.join(lines)
 
 
+_VALUATION_FIELDS = (
+    ('enterprise_value', re.compile(r'\benterprise\s+value\b', re.I)),
+    ('market_cap', re.compile(r'\bmarket\s+cap(?:italization|italisation)?\b', re.I)),
+    ('share_price', re.compile(r'\b(?:share\s+price|(?:price|worth)\s+per\s+share)\b', re.I)),
+)
+
+
+def requested_valuation(query: str, proposed: str) -> str:
+    explicit = [label for label, pattern in _VALUATION_FIELDS if pattern.search(query)]
+    if len(explicit) > 1:
+        return 'other'
+    return explicit[0] if explicit else proposed
+
+
+def valuation_answer(metric, tickers, snapshots, display_value) -> str:
+    field = 'price' if metric == 'share_price' else 'market_cap'
+    lines = []
+    for ticker in tickers:
+        snap = snapshots.get(ticker, {})
+        if field == 'market_cap':
+            label = 'market capitalization'
+        else:
+            label = 'last quote per share' if snap.get('quote_type') in {'EQUITY', 'ETF'} else 'last quoted price'
+        amount, unit = snap.get(field), snap.get('currency')
+        if snap.get('error') or type(amount) not in (int, float) or not math.isfinite(amount) or amount <= 0:
+            lines.append(f'{ticker}: the source did not provide {label}.')
+            continue
+        time = (snap.get('quote_status') or {}).get('as_of') if field == 'price' else (
+            (snap.get('fundamentals_as_of') or {}).get(field) or {}).get('as_of')
+        qualifier = f' (source as of {time})' if time else ' (source time not supplied)'
+        shown = display_value(field, amount)[0]
+        lines.append(f'{ticker} {label}: {shown} {unit or "(currency not supplied)"}{qualifier}.')
+    return ' '.join(lines)
+
+
 def claims_current_price(clause: str) -> bool:
     return bool(_CURRENT_PRICE.search(_NEGATED_REALTIME.sub('', clause)))
 

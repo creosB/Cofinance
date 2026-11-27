@@ -36,8 +36,10 @@ THY = [listing('THY', 'Toews Agility Shares', 'ETF', 'PCX', 10_009_500),
 class ModelFixture:
     def classify_text(self, text, schema, **kwargs):
         intent = 'compare_assets' if text.startswith('Compare') else 'open_conversation' if 'previous close' in text else 'price_snapshot'
+        measure = 'ambiguous_value' if text == 'How much is Amazon worth?' else 'other'
         return {'intent': {'label': intent, 'confidence': .9},
-                'horizon': {'label': 'intraday', 'confidence': .9}}
+                'horizon': {'label': 'intraday', 'confidence': .9},
+                'requested_value': {'label': measure, 'confidence': .9}}
 
     def extract_entities(self, text, entity_types):
         return {'entities': {'company': [name for name in ('VEL', 'Kando', 'THY', 'Hoku', 'Beck') if name in text]}}
@@ -72,13 +74,16 @@ class TestResearchAcceptance(unittest.TestCase):
                 data.update(ticker=ticker, name='Turkish Airlines' if ticker == 'THYAO.IS' else ticker,
                             currency=currency, status='available', previous_session_close=130.0,
                             previous_session_date='2026-11-26')
+                if ticker == 'AMZN':
+                    data.update(quote_type='EQUITY', market_cap=1_250_000_000_000,
+                                fundamentals_as_of={'market_cap': {'as_of': '2026-11-26'}})
                 self.charts[ticker]['currency'] = currency
                 return data
 
         models = RecordingNarratorModels()
         models.state['selected'] = 'facts'
         self.svc = ChatService(REPO, self.root, models=models, market_factory=Market,
-                               router_factory=lambda: GlinerQueryRouter(ModelFixture(), {'NVDA', 'AMD', 'MSFT'}))
+                               router_factory=lambda: GlinerQueryRouter(ModelFixture(), {'NVDA', 'AMD', 'MSFT', 'AMZN'}))
         self.addCleanup(self.svc.close)
         self.sid = self.svc.store.create_session(uuid.uuid4().hex)['id']
 
@@ -220,6 +225,32 @@ class TestResearchAcceptance(unittest.TestCase):
         self.assertTrue(any(s['name'] == 'Decision evidence assessment' for s in trace['spans']))
         self.assertEqual(msg['payload']['charts'][0]['currency'], 'TRY')
         self.assertTrue(any(s['name'] == 'Resolve asset symbol' for s in trace['spans']))
+
+    def test_bare_valuation_asks_then_binds_the_followup_measure(self):
+        unclear, trace, session = self.ask('How much is Amazon worth?')
+        self.assertEqual(unclear['payload']['kind'], 'clarification')
+        self.assertIn('share price', unclear['content'])
+        self.assertIn('market capitalization', unclear['content'])
+        self.assertEqual(unclear['payload']['charts'], [])
+        self.assertEqual(session['tickers'], ['AMZN'])
+        self.assertEqual(self.quotes_read, [])
+        self.assertEqual(trace['summary']['flow'], 'clarification')
+        priced, _, _ = self.ask('Market cap, please.')
+        self.assertEqual(priced['content'], 'AMZN market capitalization: 1.25 trillion USD (source as of 2026-11-26).')
+        self.assertEqual(priced['payload']['market_answer_note'], priced['content'])
+        self.assertEqual(self.quotes_read, ['AMZN'])
+
+    def test_explicit_share_price_checks_the_share_price_field(self):
+        msg, _, _ = self.ask('What is Amazon worth per share?')
+        self.assertIn('AMZN last quote per share: 138.5 USD', msg['content'])
+        self.assertNotIn('trillion', msg['content'])
+
+    def test_enterprise_value_is_not_replaced_with_market_cap(self):
+        msg, meta, _ = self.ask('What is Amazon enterprise value?')
+        self.assertIn('Enterprise value is not available', msg['content'])
+        self.assertEqual(self.quotes_read, [])
+        self.assertEqual(meta['summary']['flow'], 'clarification')
+        self.assertFalse(msg['payload']['charts'])
 
     def test_explicit_market_and_type_constraints_do_not_fall_back(self):
         cases = [('VEL', 'VEL, Turkish stock', [VEL]),
