@@ -3,6 +3,7 @@ real local routing and optional qualified narrator. No legacy Streamlit imports.
 """
 from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
+import copy
 import dataclasses
 import json
 import os
@@ -165,7 +166,8 @@ class ChatService:
         self.ledger=MemoryLedger(self.root/'memory_v2.db');self.semantic_retry_after=0.0
         self._semantic_inflight=set()  # run ids whose vector copy is being written outside the ledger lock
         self.lock=threading.RLock();self.active=None;self.events={};self.threads={};self.extractor=None;self.closed=False
-        self.think_runs=set()  # run ids that asked for deep think; the flag is a per-answer choice, not stored on the job
+        self.think_runs=set()
+        self._live_preview={}
         # One router start at a time: the startup warm-up and a first chat must never launch two GLiNER processes.
         self.router_lock=threading.Lock();self.warm_thread=None;self.warm_cancel=threading.Event();self.warm={'state':'idle','seconds':None,'error':''}
         self.narrator_lock=threading.Lock();self.narrator_warm_thread=None;self.narrator_warm={'state':'idle','seconds':None,'error':''}
@@ -645,6 +647,18 @@ class ChatService:
                 is_thinking=True
                 def complete(self,*args,**kwargs):
                     check();result=narrator.complete(*args,think=True,**kwargs);check();return result
+            if hasattr(tools,'get_snapshot') and callable(tools.get_snapshot):
+                orig_get_snapshot=tools.get_snapshot
+                def preview_get_snapshot(ticker):
+                    snap=orig_get_snapshot(ticker)
+                    if isinstance(snap,dict) and not cancel.is_set():
+                        with self.lock:
+                            if self.active==job['id'] and job['session_id'] not in self.deleting and not self._clearing:
+                                cur=self._live_preview.setdefault(job['id'],{'job_id':job['id'],'session_id':job['session_id'],'tickers':list(tickers),'snapshots':{}})
+                                cur['snapshots'][ticker]=copy.deepcopy(snap)
+                        self.notify_change()
+                    return snap
+                tools.get_snapshot=preview_get_snapshot
             llm=CheckedNarrator()
             orch=TeamLeadOrchestrator(FixedRouter(),DataAnalystAgent(llm,tools),NewsResearcherAgent(llm,news),ThinkingNarrator() if deep['used'] else llm,tools)
             # Conversation context: the most recent accepted answer plus recalled earlier turns, this session only.
@@ -760,8 +774,8 @@ class ChatService:
             with self.lock,self.models.lock:
                 self.models.busy=False
                 if self.active==job['id']:self.active=None
-                self.events.pop(job['id'],None);self.think_runs.discard(job['id'])
-                if remember is None:self.threads.pop(job['id'],None)  # clarification, cancel and error paths
+                self.events.pop(job['id'],None);self.think_runs.discard(job['id']);self._live_preview.pop(job['id'],None)
+                if remember is None:self.threads.pop(job['id'],None)
             self.notify_change()
         if remember is None:return
         try:
@@ -1232,7 +1246,8 @@ class ChatService:
     def snapshot(self):
         with self.lock:
             watchlist=self.store.watchlist()
-            return {'sessions':self.store.sessions(),'models':self.models.snapshot(),'active_job':self.store.job(self.active) if self.active else None,'watchlist':watchlist,'news':self.news_snapshot(watchlist)}
+            preview=copy.deepcopy(self._live_preview.get(self.active)) if self.active and self.active in self._live_preview else None
+            return {'sessions':self.store.sessions(),'models':self.models.snapshot(),'active_job':self.store.job(self.active) if self.active else None,'active_preview':preview,'watchlist':watchlist,'news':self.news_snapshot(watchlist)}
 
     def news_snapshot(self,watchlist=None):
         watchlist=self.store.watchlist() if watchlist is None else watchlist
@@ -1280,7 +1295,7 @@ class ChatService:
             backend=self.news_backend_factory() if self.news_backend_factory else self.local_extractor(trace,cancel)
             fetch=FeedFetcher(self.feed_fetch,check=check) if self.feed_fetch else FeedFetcher(check=check)
             store=NewsStore(str(self.root/'news.db'))
-            summary=run_traced_clock1(feed_tickers(),fetch,GlinerDecideClassifier(backend),trace,store=store)
+            summary=run_traced_clock1(feed_tickers(),fetch,GlinerDecideClassifier(backend,include_urgency=False),trace,store=store)
             stage='Collected '+str(summary.fetched)+' items'+(' with source errors' if summary.errors or any(str(v).startswith('error') for s in summary.source_status.values() for v in s.values()) else '')
             headlines=self.judge_headlines(store,check)
             if headlines.get('judged'):stage+='; judged '+str(headlines['judged'])+' headlines'

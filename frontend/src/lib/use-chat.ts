@@ -3,7 +3,7 @@ import { object, text, numeric } from './domain'
 import { parseMemory } from './memory'
 import type { MemoryState } from './memory'
 import { liveSync } from './live-sync'
-import type { Connect } from './live-sync'
+import { sharedEvents } from './event-hub'
 
 export interface Job {id:string;session_id:string;query:string;model:string;status:string;stage:string;error:string;created:number;updated:number}
 export interface SessionMeta {id:string;title:string;created:number;updated:number}
@@ -29,7 +29,8 @@ export const PDF_LIMIT_BYTES=20*1024*1024
 export const PDF_LIMIT_COUNT=5
 export interface NarratorState {id:string;name:string;publisher:string;quantization:string;size_bytes:number;revision:string;source:string;note:string;downloaded:boolean;qualified:boolean;loaded:boolean;active:boolean;default?:boolean}
 export interface ModelState {id:string;name:string;narrators?:NarratorState[];loaded_model?:string|null;size_bytes:number;phase:string;stage:string;selected:string;preferred?:string;selection_note?:string;downloaded_bytes:number;total_bytes:number;speed_bps:number;error:string;loaded:boolean;can_select:boolean;busy:boolean;quantization:string;runtime:string;revision:string;router:string;router_model:string;license:string;license_note:string;source:string;qualification:null|{passed:boolean;n:number;gates:Record<string,{passed:boolean;got:number;required:number}>;evaluated_at:number}}
-export interface WorkspaceState {csrf:string;sessions:SessionMeta[];models:ModelState;active_job:Job|null;watchlist:{ticker:string;added:number}[];news?:NewsState}
+export interface ActivePreview {job_id:string;session_id:string;tickers:string[];snapshots:Record<string,Snapshot>}
+export interface WorkspaceState {csrf:string;sessions:SessionMeta[];models:ModelState;active_job:Job|null;active_preview?:ActivePreview|null;watchlist:{ticker:string;added:number}[];news?:NewsState}
 export function parseNews(value:unknown):NewsState|undefined{
  if(value===undefined)return undefined
  const v=object(value),h=object(v.health)
@@ -96,24 +97,27 @@ export function useChat(onMutation?:()=>void){
     if(!sid&&!newDraft.current&&state.sessions[0]){sid=state.sessions[0].id;select(sid)}
     if(sid){
      if(!state.sessions.some(s=>s.id===sid)){selectedRef.current='';newDraft.current=true;setSelected('');setConversation(null);setMemory(null);try{localStorage.removeItem('cofinance.chat')}catch{};if(!disposed)setError('');return}
-     const next=parseConversation(await request('/api/conversation?id='+sid,controller.signal))
+     const [convRes,memRes]=await Promise.all([
+      request('/api/conversation?id='+sid,controller.signal),
+      request('/api/memory?session_id='+sid,controller.signal).then(raw=>({ok:true as const,raw})).catch(e=>({ok:false as const,error:e})),
+     ])
+     const next=parseConversation(convRes)
      if(disposed||selectedRef.current!==sid)return
      setConversation(old=>JSON.stringify(old)===JSON.stringify(next)?old:next)
-     // Memory is an extra view: if it cannot load, chat keeps working and the memory controls simply wait.
-     try{
-      const mem=parseMemory(await request('/api/memory?session_id='+sid,controller.signal))
-      if(!disposed&&selectedRef.current===sid)setMemory(old=>JSON.stringify(old)===JSON.stringify(mem)?old:mem)
-     }catch(e){if(!disposed&&!(e instanceof Error&&e.name==='AbortError'))setMemory(null)}
+     if(memRes.ok){
+      try{
+       const mem=parseMemory(memRes.raw)
+       if(!disposed&&selectedRef.current===sid)setMemory(old=>JSON.stringify(old)===JSON.stringify(mem)?old:mem)
+      }catch{if(!disposed&&selectedRef.current===sid)setMemory(null)}
+     }else if(!disposed&&!(memRes.error instanceof Error&&memRes.error.name==='AbortError')){
+      setMemory(null)
+     }
     }
     if(!disposed)setError('')
    }catch(e){if(!disposed)setError(e instanceof Error&&e.name!=='AbortError'?e.message:'The local server did not respond. Your saved conversations are unchanged.')}
    finally{clearTimeout(timeout);stop.signal.removeEventListener('abort',abort)}
   }
-  const url='/api/events'+(selectedRef.current?'?session_id='+encodeURIComponent(selectedRef.current):'')
-  const connect:Connect|undefined=typeof EventSource==='undefined'?undefined:on=>{
-   const events=new EventSource(url);events.onopen=on.open;events.onerror=on.error;events.addEventListener('change',on.change)
-   return()=>events.close()
-  }
+  const connect=sharedEvents(selectedRef.current||undefined)
   const dispose=liveSync(poll,{connect})
   return()=>{disposed=true;stop.abort();dispose()}
  },[selected,version,select])

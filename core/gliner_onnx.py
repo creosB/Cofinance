@@ -11,6 +11,7 @@ import json
 import os
 import re
 import sys
+import threading
 import unicodedata
 from collections import OrderedDict
 from functools import lru_cache
@@ -306,6 +307,8 @@ class StandaloneGlinerOnnx:
             if tid is not None:
                 self._special_id_cache[tok] = [int(tid)]
         self._encode_piece = lru_cache(maxsize=50_000)(self._encode_piece_uncached)
+        self._schema_prefix_lock = threading.Lock()
+        self._schema_prefix_cache: Dict[Tuple[Tuple[str, ...], ...], Tuple[Tuple[int, ...], Tuple[Tuple[int, ...], ...]]] = {}
 
     def _encode_piece_uncached(self, piece: str) -> Tuple[int, ...]:
         return tuple(self.tokenizer.encode(piece, add_special_tokens=False).ids)
@@ -316,11 +319,15 @@ class StandaloneGlinerOnnx:
             return cached
         return self._encode_piece(token)
 
-    def _format_input(
+    def _compile_schema_prefix(
         self,
         schema_tokens_list: List[List[str]],
-        text_tokens: List[str],
-    ) -> Tuple[List[int], List[int], List[List[int]]]:
+    ) -> Tuple[Tuple[int, ...], Tuple[Tuple[int, ...], ...]]:
+        cache_key = tuple(tuple(struct) for struct in schema_tokens_list)
+        with self._schema_prefix_lock:
+            cached = self._schema_prefix_cache.get(cache_key)
+        if cached is not None:
+            return cached
         combined: List[str] = []
         for struct in schema_tokens_list:
             combined.extend(struct)
@@ -328,7 +335,6 @@ class StandaloneGlinerOnnx:
         if combined:
             combined.pop()
         combined.append(SEP_TEXT)
-        combined.extend(text_tokens)
 
         schema_marker_orig_indices = set()
         offset = 0
@@ -338,37 +344,39 @@ class StandaloneGlinerOnnx:
             schema_marker_orig_indices.update(range(offset + 4, offset + len(struct) - 2, 2))
             offset += len(struct) + 1
 
-        input_ids: List[int] = []
-        text_word_first_positions: List[int] = []
+        prefix_ids: List[int] = []
         schema_special_positions: List[List[int]] = [[] for _ in range(len(schema_tokens_list))]
-
         current_schema = 0
-        found_sep = False
-        last_text_orig = None
-
         for orig_idx, token in enumerate(combined):
+            subword_pos = len(prefix_ids)
+            prefix_ids.extend(self._ids_for_token(token))
             if token == SEP_TEXT:
-                seg_type = "sep"
-                found_sep = True
-            elif not found_sep:
-                seg_type = "schema"
-                schema_idx = current_schema
-                if token == SEP_STRUCT:
-                    current_schema += 1
-            else:
-                seg_type = "text"
-
-            subword_pos = len(input_ids)
-            sub_ids = self._ids_for_token(token)
-            input_ids.extend(sub_ids)
-
-            if seg_type == "text" and orig_idx != last_text_orig:
-                last_text_orig = orig_idx
-                text_word_first_positions.append(subword_pos)
-            elif seg_type == "schema" and orig_idx in schema_marker_orig_indices:
+                continue
+            schema_idx = current_schema
+            if token == SEP_STRUCT:
+                current_schema += 1
+            if orig_idx in schema_marker_orig_indices:
                 schema_special_positions[schema_idx].append(subword_pos)
 
-        return input_ids, text_word_first_positions, schema_special_positions
+        compiled = (tuple(prefix_ids), tuple(tuple(pos) for pos in schema_special_positions))
+        with self._schema_prefix_lock:
+            if len(self._schema_prefix_cache) >= 64:
+                self._schema_prefix_cache.clear()
+            self._schema_prefix_cache[cache_key] = compiled
+        return compiled
+
+    def _format_input(
+        self,
+        schema_tokens_list: List[List[str]],
+        text_tokens: List[str],
+    ) -> Tuple[List[int], List[int], List[List[int]]]:
+        prefix_ids, prefix_positions = self._compile_schema_prefix(schema_tokens_list)
+        input_ids = list(prefix_ids)
+        text_word_first_positions: List[int] = []
+        for token in text_tokens:
+            text_word_first_positions.append(len(input_ids))
+            input_ids.extend(self._ids_for_token(token))
+        return input_ids, text_word_first_positions, [list(pos) for pos in prefix_positions]
 
     def _run_encoder_batch(self, id_lists: List[List[int]]):
         import numpy as np

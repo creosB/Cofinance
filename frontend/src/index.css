@@ -104,8 +104,9 @@
 .facts-grid>div{background:var(--background);padding:10px 12px;display:grid;gap:2px;min-width:0}.facts-grid dt{color:var(--muted-foreground);font-size:14px}.facts-grid dd{margin:0;font-family:ui-monospace,"Cascadia Code",Consolas,monospace;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .facts-source{color:var(--quiet);font-size:14px}
 .price-chart{margin:16px 0 0;border:1px solid var(--card);border-radius:var(--radius);padding:12px 4px 8px;max-width:100%;min-width:0}
-.price-chart figcaption{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:0 10px;color:var(--quiet);font-size:14px}.price-chart figcaption strong{font-weight:500;color:var(--foreground)}
-.price-chart>div{width:100%;min-width:0;max-width:100%}.chart-loading{height:220px}
+.price-chart figcaption{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:6px 12px;padding:0 10px 6px;color:var(--quiet);font-size:14px}.price-chart figcaption strong{font-weight:500;color:var(--foreground)}.chart-readout{font-size:13px;color:var(--quiet)}
+.price-chart>div{width:100%;min-width:0;max-width:100%}.chart-canvas-wrap{height:220px;touch-action:pan-y;cursor:crosshair;border-radius:calc(var(--radius) - 4px);outline:none}.chart-canvas-wrap:focus-visible{box-shadow:0 0 0 2px var(--primary)}.chart-canvas-wrap canvas{display:block;width:100%;height:220px}.chart-loading{height:220px}
+.live-evidence{margin-top:10px;padding-top:10px;border-top:1px solid var(--card)}.live-evidence-label{margin:0 0 8px;font-size:12px}
 .chart-data{padding:6px 10px 0}.chart-data summary{cursor:pointer;color:var(--quiet);font-size:14px;min-height:28px;display:flex;align-items:center}.chart-data summary:hover{color:var(--foreground)}
 .price-chart .table-scroll{max-height:240px;margin-top:6px}.price-chart table:not(.score-table){min-width:0}.price-chart table:not(.score-table) td{padding:6px 8px}.price-chart .modebar{background:transparent!important}
 .sources{margin-top:14px;display:grid;border-top:1px solid var(--card)}

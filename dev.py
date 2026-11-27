@@ -425,6 +425,8 @@ def verify_cmd(full=False, browser=True):
                 'tests.test_route_smoke',
                 'tests.test_single_pass_data',
                 'tests.test_concurrent_io',
+                'tests.test_gliner_onnx',
+                'tests.test_gliner_decide',
             ],
             ROOT,
             env(),

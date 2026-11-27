@@ -197,6 +197,49 @@ class TestGlinerDecide(unittest.TestCase):
         decision_ids = {sp["id"] for sp in decisions}
         self.assertTrue(all(g.get("parent_id") in decision_ids for g in gates))
 
+    def test_fast_router_schema_omits_requested_value_unless_valuation_cue_is_present(self):
+        seen_schemas = []
+
+        class RecordingBackend(StubGlinerBackend):
+            def classify_text(self, text, schema, *, include_confidence=False):
+                seen_schemas.append(set(schema.keys()))
+                return super().classify_text(text, schema, include_confidence=include_confidence)
+
+        router = GlinerQueryRouter(RecordingBackend(), universe={"NVDA", "AMZN"})
+        router.route("What is NVDA trading at?")
+        router.route("Is NVDA worth buying?")
+        router.route("How much is Amazon worth?")
+        router.route("Market cap, please.")
+        router.route("What is Amazon's market value?")
+        router.route("What is Amazon EV?")
+        self.assertEqual(seen_schemas[0], {"intent", "horizon"})
+        self.assertEqual(seen_schemas[1], {"intent", "horizon"})
+        self.assertEqual(seen_schemas[2], {"intent", "horizon", "requested_value"})
+        self.assertEqual(seen_schemas[3], {"intent", "horizon", "requested_value"})
+        self.assertEqual(seen_schemas[4], {"intent", "horizon", "requested_value"})
+        self.assertEqual(seen_schemas[5], {"intent", "horizon", "requested_value"})
+
+    def test_classifier_rules_urgency_mode_omits_urgency_head(self):
+        seen_schemas = []
+
+        class NoUrgencyBackend:
+            def classify_text(self, text, schema, *, include_confidence=False):
+                seen_schemas.append(set(schema.keys()))
+                return {
+                    "materiality": {"label": "material", "confidence": 0.91},
+                    "direction": {"label": "bullish", "confidence": 0.85},
+                }
+
+            def extract_entities(self, text, entity_types):
+                return {"entities": {}}
+
+        clf = GlinerDecideClassifier(NoUrgencyBackend(), include_urgency=False)
+        judgment = clf.judge(Item("NVDA", "rss", "https://x/1", "NVDA raises guidance"))
+        self.assertEqual(seen_schemas, [{"materiality", "direction"}])
+        self.assertEqual(judgment.material, 0.91)
+        self.assertEqual(judgment.urgent, 0.0)
+        self.assertEqual(judgment.direction, "bullish")
+
 
 if __name__ == "__main__":
     unittest.main()

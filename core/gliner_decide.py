@@ -67,6 +67,10 @@ SIGNAL_SCHEMA: Dict[str, Any] = {
     },
 }
 
+SIGNAL_SCHEMA_RULES_URGENCY: Dict[str, Any] = {
+    k: v for k, v in SIGNAL_SCHEMA.items() if k != "urgency"
+}
+
 USER_QUERY_SCHEMA: Dict[str, Any] = {
     "intent": {
         "labels": {
@@ -87,6 +91,17 @@ USER_QUERY_SCHEMA: Dict[str, Any] = {
         "ambiguous_value": "Asks what a particular company or asset is worth without specifying share price, market capitalization, enterprise value, or a valuation method",
     }},
 }
+
+USER_QUERY_BASE_SCHEMA: Dict[str, Any] = {
+    k: v for k, v in USER_QUERY_SCHEMA.items() if k != "requested_value"
+}
+
+_VALUATION_HEAD_CUE_RE = re.compile(
+    r"(?i:\b(?:worth(?!\s+(?:buying|selling|holding|owning|investing|noting|mentioning|watching)\b)"
+    r"|val(?:ued|uation)|market\s+(?:cap(?:italization|italisation)?|value)"
+    r"|enterprise\s+value|share\s+price|per\s+share|how\s+expensive|total\s+value"
+    r"|how\s+much\s+(?:is|are|does|do)\b|how\s+big\s+(?:is|are)\b)\b)|\bEV\b"
+)
 
 
 def _unpack_label_conf(raw: Any, default_label: str = "") -> Tuple[str, float]:
@@ -128,8 +143,13 @@ class GlinerDecideClassifier(Classifier):
 
     BATCH_SIZE = 6
 
-    def __init__(self, backend: ExtractorBackend) -> None:
+    def __init__(self, backend: ExtractorBackend, *, include_urgency: bool = True) -> None:
         self.backend = backend
+        self.include_urgency = bool(include_urgency)
+
+    @property
+    def schema(self) -> Dict[str, Any]:
+        return SIGNAL_SCHEMA if self.include_urgency else SIGNAL_SCHEMA_RULES_URGENCY
 
     @classmethod
     def from_pretrained(cls, model_id: str = "fastino/GLiNER2.5-Decide") -> "GlinerDecideClassifier":
@@ -145,9 +165,10 @@ class GlinerDecideClassifier(Classifier):
         return passage
 
     @staticmethod
-    def _parse_judgment(res: Any) -> Judgment:
+    def _parse_judgment(res: Any, *, include_urgency: bool = True) -> Judgment:
+        required_heads = ("materiality", "urgency", "direction") if include_urgency else ("materiality", "direction")
         heads: Dict[str, Tuple[str, float]] = {}
-        for head in ("materiality", "urgency", "direction"):
+        for head in required_heads:
             raw = res.get(head) if isinstance(res, Mapping) else None
             if raw is None:
                 raise GlinerOutputError(f"GLiNER output has no {head!r} head")
@@ -156,7 +177,6 @@ class GlinerDecideClassifier(Classifier):
                 raise GlinerOutputError(f"GLiNER {head!r} label {label!r} is not in the schema")
             heads[head] = (label, conf)
         mat_label, mat_conf = heads["materiality"]
-        urg_label, urg_conf = heads["urgency"]
         dir_label, dir_conf = heads["direction"]
 
         if mat_label == "material":
@@ -164,12 +184,16 @@ class GlinerDecideClassifier(Classifier):
         else:
             material_p = max(0.0, 1.0 - mat_conf)
 
-        if urg_label == "immediate":
-            urgent_p = urg_conf
-        elif urg_label == "digest":
-            urgent_p = min(0.55, urg_conf * 0.55)
+        if include_urgency:
+            urg_label, urg_conf = heads["urgency"]
+            if urg_label == "immediate":
+                urgent_p = urg_conf
+            elif urg_label == "digest":
+                urgent_p = min(0.55, urg_conf * 0.55)
+            else:
+                urgent_p = max(0.0, (1.0 - urg_conf) * 0.25)
         else:
-            urgent_p = max(0.0, (1.0 - urg_conf) * 0.25)
+            urgent_p = 0.0
 
         return Judgment(
             material=round(material_p, 4),
@@ -180,11 +204,12 @@ class GlinerDecideClassifier(Classifier):
 
     def judge(self, item: Item) -> Judgment:
         passage = self._passage(item)
+        schema = self.schema
         try:
-            res = self.backend.classify_text(passage, SIGNAL_SCHEMA, include_confidence=True)
+            res = self.backend.classify_text(passage, schema, include_confidence=True)
         except TypeError:
-            res = self.backend.classify_text(passage, SIGNAL_SCHEMA)
-        return self._parse_judgment(res)
+            res = self.backend.classify_text(passage, schema)
+        return self._parse_judgment(res, include_urgency=self.include_urgency)
 
     def _safe_judge(self, item: Item) -> Judgment | Exception:
         try:
@@ -201,15 +226,16 @@ class GlinerDecideClassifier(Classifier):
             return [self._safe_judge(it) for it in batch_items]
 
         size = max(1, int(batch_size))
+        schema = self.schema
         out: List[Judgment | Exception] = []
         for start in range(0, len(batch_items), size):
             chunk = batch_items[start:start + size]
             passages = [self._passage(it) for it in chunk]
             try:
                 try:
-                    raw_list = batch_fn(passages, SIGNAL_SCHEMA, batch_size=len(passages), include_confidence=True)
+                    raw_list = batch_fn(passages, schema, batch_size=len(passages), include_confidence=True)
                 except TypeError:
-                    raw_list = batch_fn(passages, SIGNAL_SCHEMA)
+                    raw_list = batch_fn(passages, schema)
                 if not isinstance(raw_list, Sequence) or isinstance(raw_list, (str, bytes)) or len(raw_list) != len(chunk):
                     raise GlinerOutputError("GLiNER batch output length mismatch")
             except Exception:
@@ -217,7 +243,7 @@ class GlinerDecideClassifier(Classifier):
                 continue
             for raw in raw_list:
                 try:
-                    out.append(self._parse_judgment(raw))
+                    out.append(self._parse_judgment(raw, include_urgency=self.include_urgency))
                 except Exception as exc:
                     out.append(exc)
         return out
@@ -275,15 +301,20 @@ class GlinerQueryRouter:
         }
 
     def route(self, query: str) -> RoutedQuery:
+        use_valuation_head = bool(_VALUATION_HEAD_CUE_RE.search(query or ""))
+        schema = USER_QUERY_SCHEMA if use_valuation_head else USER_QUERY_BASE_SCHEMA
         try:
-            cls_res = self.backend.classify_text(query, USER_QUERY_SCHEMA, include_confidence=True)
+            cls_res = self.backend.classify_text(query, schema, include_confidence=True)
         except TypeError:
-            cls_res = self.backend.classify_text(query, USER_QUERY_SCHEMA)
+            cls_res = self.backend.classify_text(query, schema)
 
         intent, intent_conf = _unpack_label_conf(cls_res.get("intent"), "price_snapshot")
         horizon, _ = _unpack_label_conf(cls_res.get("horizon"), "swing_week")
-        requested, value_conf = _unpack_label_conf(cls_res.get("requested_value"), "other")
-        if requested not in _schema_labels(USER_QUERY_SCHEMA["requested_value"]) or value_conf < 0.50:
+        if use_valuation_head or "requested_value" in cls_res:
+            requested, value_conf = _unpack_label_conf(cls_res.get("requested_value"), "other")
+            if requested not in _schema_labels(USER_QUERY_SCHEMA["requested_value"]) or value_conf < 0.50:
+                requested = "other"
+        else:
             requested = "other"
 
         tickers = extract_known_tickers(query, self.universe, self.aliases)

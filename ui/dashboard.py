@@ -20,7 +20,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from core.run_trace import trace_generation
-from .workbench import ROOT, make_handler
+from .workbench import QuietThreadingHTTPServer, ROOT, make_handler
 
 DIST = ROOT / "frontend/dist"
 CSP = ("default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
@@ -338,7 +338,7 @@ def make_dashboard_handler(dist: Path, trace_dir: Path, corpus_dir: Path, servic
     return Handler
 
 
-class _DashboardServer(ThreadingHTTPServer):
+class _DashboardServer(QuietThreadingHTTPServer):
     def __init__(self, server_address, RequestHandlerClass, service=None):
         self._service = service
         self._handlers_lock = threading.Lock()

@@ -789,5 +789,112 @@ class TestChatShellBrowser(unittest.TestCase):
         self.choose('Review NVDA')
         expect(page.get_by_role('article', name='Research response')).to_have_count(1)
 
+    def test_single_sse_view_gated_dashboard_progressive_facts_and_canvas_chart(self):
+        from playwright.sync_api import expect
+
+        page = self.page
+        requests_seen = []
+        page.on('request', lambda req: requests_seen.append(req.url))
+
+        page.goto(self.origin, wait_until='domcontentloaded')
+        page.get_by_role('textbox', name='Research question').wait_for(timeout=10000)
+        page.wait_for_timeout(400)
+
+        event_streams = [u for u in requests_seen if '/api/events' in u]
+        self.assertEqual(len(event_streams), 1, f'Expected 1 shared SSE stream, got {event_streams}')
+        self.assertEqual([u for u in requests_seen if '/api/runs' in u or '/api/corpus' in u], [],
+                         f'Chat view must not poll inactive Execution/Dataset endpoints: {requests_seen}')
+        self.assertEqual([u for u in requests_seen if 'plotly' in u.lower()], [])
+
+        narrator_entered = threading.Event()
+        narrator_release = threading.Event()
+        self.addCleanup(narrator_release.set)
+
+        class SlowNarrator:
+            def __init__(self, base):
+                self._base = base
+                self.model_id = 'fixture/lfm3'
+                self.narrator_id = 'lfm3-1.7b-atomic-ad-q4km'
+                self.state = {**base.state, 'selected': 'lfm3-1.7b-atomic-ad-q4km', 'phase': 'ready'}
+                self.lock = base.lock
+                self.thread = None
+                self.busy = False
+
+            def __getattr__(self, name):
+                return getattr(self._base, name)
+
+            def is_loaded(self, model=None):
+                return True
+
+            def qualified(self, backend=None, model=None):
+                return True
+
+            def think_qualified(self, backend=None, model=None):
+                return False
+
+            def thinker_loaded(self, model=None, backend=None):
+                return False
+
+            def stop_thinker(self):
+                pass
+
+            def load(self, *args, **kwargs):
+                pass
+
+            def snapshot(self):
+                snap = self._base.snapshot()
+                snap['selected'] = 'lfm3-1.7b-atomic-ad-q4km'
+                snap['can_select'] = True
+                snap['loaded'] = True
+                return snap
+
+            def complete(self, system, prompt, *, max_tokens=256, **options):
+                narrator_entered.set()
+                narrator_release.wait(timeout=10)
+                return 'Vodafone Group trades at 84.20 GBp.'
+
+        market = JourneyMarket()
+        clock = patch('core.market.datetime', ResearchClock)
+        clock.start()
+        self.addCleanup(clock.stop)
+        orig_models = self.service.models
+        self.service.models = SlowNarrator(orig_models)
+        self.addCleanup(lambda: setattr(self.service, 'models', orig_models))
+        self.service.router_factory = lambda: GlinerQueryRouter(JourneyRouter(), {'NVDA', 'VOD.L'})
+        self.service.market_factory = lambda cancel=None: MarketTools(fetch=market.fetch, cancel=cancel)
+
+        page.reload(wait_until='domcontentloaded')
+        page.get_by_role('button', name='New chat', exact=True).click()
+        box = page.get_by_role('textbox', name='Research question')
+        box.fill('What is VOD.L trading at?')
+        box.press('Enter')
+
+        self.assertTrue(narrator_entered.wait(timeout=8), 'Expected narrator to start after snapshot')
+        live_ev = page.locator('.live-job [data-live-evidence="verified"]')
+        expect(live_ev).to_be_visible(timeout=5000)
+        expect(live_ev).to_contain_text('VOD.L')
+        expect(live_ev).to_contain_text('84.20 GBp')
+
+        narrator_release.set()
+        answer = page.get_by_role('article', name='Research response').last
+        expect(answer).to_be_visible(timeout=8000)
+
+        chart_toggle = answer.locator('details.answer-history summary')
+        chart_toggle.click()
+        chart = answer.locator('.chart-canvas-wrap[role="img"]')
+        expect(chart).to_be_visible(timeout=5000)
+        expect(answer.locator('canvas')).to_have_count(1)
+        before_val = chart.get_attribute('aria-description')
+        chart.focus()
+        chart.press('Home')
+        after_home = chart.get_attribute('aria-description')
+        self.assertNotEqual(before_val, after_home)
+        chart.press('End')
+        self.assertEqual(chart.get_attribute('aria-description'), before_val)
+
+        page.get_by_role('button', name='Execution', exact=True).click()
+        page.wait_for_timeout(400)
+        self.assertTrue(any('/api/runs' in u for u in requests_seen), 'Execution view must load /api/runs on demand')
+
 
 if __name__=='__main__': unittest.main()

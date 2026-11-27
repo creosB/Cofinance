@@ -2,13 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowUpRight, ChevronDown, Check, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { StepExplanation } from './step-explanation'
-import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { duration, evidenceUrl, label, numeric, object, reason, statusLabel, text, type Json, type Span } from '@/lib/domain'
-
-export function StateBadge({value}:{value:string}){
-  return <Badge variant="outline" className={'state-badge state-'+value}>{statusLabel(value)}</Badge>
-}
+import { StateBadge } from './state-badge'
+export { StateBadge }
 function Payload({name,value,initial=false}:{name:string;value:Json|undefined;initial?:boolean}){
   const [open,setOpen]=useState(initial)
   return <Collapsible open={open} onOpenChange={setOpen} className="payload">

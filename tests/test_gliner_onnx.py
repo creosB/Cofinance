@@ -272,6 +272,30 @@ class TestStandaloneGlinerOnnx(unittest.TestCase):
         res = subprocess.run([sys.executable, "-B", "-c", code], capture_output=True, text=True)
         self.assertEqual(res.returncode, 0, res.stderr)
 
+    def test_schema_prefix_cache_reuses_compiled_tokens_without_changing_output(self):
+        sess = mock.Mock()
+        tok = FakeTokenizer()
+        model = go.StandaloneGlinerOnnx(sess, tok, _synthetic_heads(4))
+        schema_tokens = [
+            go._transform_schema("intent", ["price_snapshot", "open_conversation"], go.L_TOKEN),
+            go._transform_schema("horizon", ["intraday", "swing_week"], go.L_TOKEN),
+        ]
+        ids1, tpos1, spos1 = model._format_input(schema_tokens, ["check", "nvda"])
+        self.assertEqual(len(model._schema_prefix_cache), 1)
+        spos1[0].append(9999)
+        with mock.patch.object(model, "_ids_for_token", wraps=model._ids_for_token) as spy:
+            ids2, tpos2, spos2 = model._format_input(schema_tokens, ["check", "nvda"])
+            self.assertEqual(spy.call_count, 2)
+            ids3, tpos3, spos3 = model._format_input(schema_tokens, ["compare", "aapl", "msft"])
+            self.assertEqual(spy.call_count, 5)
+        self.assertEqual(ids1, ids2)
+        self.assertEqual(tpos1, tpos2)
+        self.assertNotIn(9999, spos2[0])
+        self.assertEqual(len(model._schema_prefix_cache), 1)
+        self.assertEqual(spos2, spos3)
+        self.assertEqual(len(tpos3), 3)
+        self.assertEqual(ids3[:len(ids2) - 2], ids2[:len(ids2) - 2])
+
 
 if __name__ == "__main__":
     unittest.main()

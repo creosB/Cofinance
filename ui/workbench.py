@@ -279,14 +279,40 @@ def make_handler(trace_dir: Path, corpus_dir: Path):
                         self.reply(200, {k: safe(manifest.get(k)) for k in ("rows", "window_days", "collected_at", "by_source", "by_ticker")})
                 else:
                     self.reply(404, {"error": "not found"})
-            except (OSError, ValueError, TypeError, KeyError):
+            except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+                return
+            except (OSError, ValueError, TypeError, KeyError) as exc:
+                if is_client_disconnect(exc):
+                    return
                 self.reply(404, {"error": "local record unavailable"})
     return Handler
 
 
+_CLIENT_DISCONNECT_ERRNOS = frozenset({32, 54, 104, 10053, 10054})
+
+
+def is_client_disconnect(exc: BaseException | None) -> bool:
+    if isinstance(exc, (ConnectionAbortedError, ConnectionResetError, BrokenPipeError)):
+        return True
+    if isinstance(exc, OSError):
+        return getattr(exc, "winerror", None) in _CLIENT_DISCONNECT_ERRNOS or getattr(exc, "errno", None) in _CLIENT_DISCONNECT_ERRNOS
+    return False
+
+
+class QuietThreadingHTTPServer(ThreadingHTTPServer):
+    daemon_threads = True
+
+    def handle_error(self, request, client_address):
+        import sys
+        _, exc, _ = sys.exc_info()
+        if is_client_disconnect(exc):
+            return
+        super().handle_error(request, client_address)
+
+
 def create_server(*, port: int = 8876, trace_dir: Path | None = None, corpus_dir: Path | None = None):
-    return ThreadingHTTPServer(("127.0.0.1", port), make_handler(trace_dir or ROOT / "data/traces",
-                                                              corpus_dir or ROOT / "data/news_corpus_20261107"))
+    return QuietThreadingHTTPServer(("127.0.0.1", port), make_handler(trace_dir or ROOT / "data/traces",
+                                                                      corpus_dir or ROOT / "data/news_corpus_20261107"))
 
 
 def main():

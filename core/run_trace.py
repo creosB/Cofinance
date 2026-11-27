@@ -474,7 +474,10 @@ def instrument_classifier(classifier: Any, trace: TraceRecorder):
         return CascadeTrace()
     if isinstance(classifier, GlinerDecideClassifier):
         model = "fastino/GLiNER2.5-Decide"
-        clone = GlinerDecideClassifier(TracedExtractor(classifier.backend, trace, model))
+        clone = GlinerDecideClassifier(
+            TracedExtractor(classifier.backend, trace, model),
+            include_urgency=getattr(classifier, "include_urgency", True),
+        )
         return TracedClassifier(clone, trace, model)
     return TracedClassifier(classifier, trace, leaf_model=True)
 

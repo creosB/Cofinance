@@ -203,6 +203,23 @@ class TestEventDrivenSSE(unittest.TestCase):
         self.assertNotEqual(first, second)
         self.assertLess(elapsed, 0.25)
 
+    def test_quiet_server_suppresses_client_disconnect_but_logs_unexpected_errors(self):
+        from ui.workbench import QuietThreadingHTTPServer, is_client_disconnect
+        self.assertTrue(is_client_disconnect(ConnectionAbortedError(10053, 'aborted')))
+        self.assertTrue(is_client_disconnect(BrokenPipeError()))
+        self.assertFalse(is_client_disconnect(RuntimeError('boom')))
+        with mock.patch('http.server.ThreadingHTTPServer.handle_error') as base_err:
+            try:
+                raise ConnectionAbortedError(10053, 'client closed')
+            except ConnectionAbortedError:
+                QuietThreadingHTTPServer.handle_error(self.server, None, ('127.0.0.1', 1234))
+            base_err.assert_not_called()
+            try:
+                raise RuntimeError('real bug')
+            except RuntimeError:
+                QuietThreadingHTTPServer.handle_error(self.server, None, ('127.0.0.1', 1234))
+            base_err.assert_called_once()
+
 
 if __name__ == '__main__':
     unittest.main()
