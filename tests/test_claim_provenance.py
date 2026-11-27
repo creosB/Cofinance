@@ -203,6 +203,41 @@ class TestClaimProvenance(unittest.TestCase):
         self.assertEqual(gate_events[-1].payload["guard_retry"]["used"], "retry")
         self.assertTrue(any("190" in item for item in gate_events[-1].payload["guard_retry"]["rejected"]))
 
+    def test_drawdown_clause_with_direct_currency_high_accepted_while_misbindings_still_rejected(self):
+        good = (
+            "NVDA has a drawdown from its all-time high of 190 USD of 28.95 percent, "
+            "and a drawdown from its 52-week high of $150 of 10 percent."
+        )
+        self.assertEqual(check_claim_provenance(good, {"NVDA": SAMPLE_FACTS["NVDA"]}), [])
+
+        bad_pct = check_claim_provenance("NVDA has a drawdown from its all-time high of 190 percent.", {"NVDA": SAMPLE_FACTS["NVDA"]})
+        self.assertEqual(len(bad_pct), 1)
+        self.assertIn("metric", bad_pct[0]["violations"])
+        self.assertIn("unit", bad_pct[0]["violations"])
+
+        bad_usd = check_claim_provenance("NVDA has a drawdown from its all-time high of 28.95 USD.", {"NVDA": SAMPLE_FACTS["NVDA"]})
+        self.assertEqual(len(bad_usd), 1)
+        self.assertIn("unit", bad_usd[0]["violations"])
+
+        bad_wrong_high = check_claim_provenance("NVDA has a drawdown from its all-time high of $150.", {"NVDA": SAMPLE_FACTS["NVDA"]})
+        self.assertEqual(len(bad_wrong_high), 1)
+        self.assertEqual(bad_wrong_high[0]["kind"], "metric_misbinding")
+
+    def test_data_analyst_scales_token_budget_for_multi_asset_summaries(self):
+        seen_budgets = []
+
+        class BudgetLLM:
+            def complete(self, system, prompt, *, max_tokens=256, **kwargs):
+                seen_budgets.append(max_tokens)
+                return "NVDA trades at 135 USD and AAPL trades at 225 USD."
+
+        tools = _StubTools(SAMPLE_FACTS)
+        agent = DataAnalystAgent(BudgetLLM(), tools)
+        from core.orchestrator import EventBus
+        agent.run(["NVDA"], "fundamental_equity", EventBus(), "s1")
+        agent.run(["NVDA", "AAPL"], "fundamental_equity", EventBus(), "s2")
+        self.assertEqual(seen_budgets, [256, 384])
+
 
 if __name__ == "__main__":
     unittest.main()

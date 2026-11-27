@@ -25,15 +25,27 @@ def valid_symbol(symbol):
     return symbol
 
 
+_EXPLICIT_TICKER = re.compile(r"\$?[A-Z][A-Z0-9.\-=]{0,9}")
+_QUERY_STOP = frozenset({"the", "of", "and", "in", "for", "inc", "corp", "co", "ltd"})
+
+
+def _overlap_tokens(text: str) -> set[str]:
+    toks = {t for t in re.findall(r"[a-z0-9]+", (text or "").lower()) if t not in _QUERY_STOP}
+    longer = {t for t in toks if len(t) >= 2}
+    return longer or toks
+
+
 def resolve_yahoo_symbol(term: str, fetch=None) -> dict | None:
     query = " ".join((term or "").strip().split())
     if not query or len(query) > 80:
         return None
-    key = query.lower()
+    clean_key = query.lstrip("$").lower()
+    explicit_ticker = bool(_EXPLICIT_TICKER.fullmatch(query))
+    q_tokens = _overlap_tokens(query.lstrip("$"))
     use_cache = fetch is None or fetch is fetch_json
     now = time.monotonic()
     if use_cache:
-        cached = _SYMBOL_CACHE.get(key)
+        cached = _SYMBOL_CACHE.get(query)
         if cached and now - cached[0] < _SYMBOL_CACHE_TTL:
             return dict(cached[1]) if cached[1] is not None else None
     fn = fetch or fetch_json
@@ -42,7 +54,7 @@ def resolve_yahoo_symbol(term: str, fetch=None) -> dict | None:
     try:
         raw = fn(url)
         quotes = raw.get("quotes") if isinstance(raw, dict) else None
-        candidates = []
+        rows = []
         for idx, item in enumerate(quotes or []):
             if not isinstance(item, dict):
                 continue
@@ -58,22 +70,56 @@ def resolve_yahoo_symbol(term: str, fetch=None) -> dict | None:
                 valid_symbol(sym)
             except ValueError:
                 continue
-            exact = 0 if (sym.lower() == key or raw_sym.lower() == key or name.lower() == key) else 1
-            type_rank = {"EQUITY": 0, "ETF": 1, "CRYPTOCURRENCY": 2, "INDEX": 3, "FUTURE": 4, "CURRENCY": 5, "MUTUALFUND": 6}[qtype]
-            candidates.append((exact, type_rank, idx, {
-                "symbol": sym,
-                "name": name,
-                "quote_type": qtype,
-                "exchange": str(item.get("exchange") or ""),
-                "source": "Yahoo Finance search",
-            }))
-        if candidates:
-            candidates.sort(key=lambda row: (row[0], row[1], row[2]))
-            found = candidates[0][3]
+            raw_score = item.get("score")
+            score = float(raw_score) if finite(raw_score) and raw_score >= 0 else None
+            exact_sym = sym.lower() == clean_key or raw_sym.lower() == clean_key
+            cand_tokens = _overlap_tokens(f"{sym} {raw_sym} {name}")
+            overlap = bool(q_tokens & cand_tokens)
+            rows.append({
+                "idx": idx,
+                "score": score,
+                "exact_sym": exact_sym,
+                "overlap": overlap,
+                "entry": {
+                    "symbol": sym,
+                    "name": name,
+                    "quote_type": qtype,
+                    "exchange": str(item.get("exchange") or ""),
+                    "source": "Yahoo Finance search",
+                    **({"score": round(score, 2)} if score is not None else {}),
+                },
+            })
+        if rows:
+            has_scores = any(r["score"] is not None for r in rows)
+            top_score = max((r["score"] for r in rows if r["score"] is not None), default=0.0)
+
+            def rank_key(row):
+                sc = row["score"]
+                promote_exact = row["exact_sym"] and (
+                    explicit_ticker
+                    or (not has_scores)
+                    or (sc is not None and top_score > 0 and sc >= 0.85 * top_score)
+                )
+                return (0 if promote_exact else 1, -(sc if sc is not None else -1.0), row["idx"])
+
+            rows.sort(key=rank_key)
+            best = rows[0]
+            low_score_junk = (
+                best["score"] is not None
+                and best["score"] < 25000.0
+                and not best["exact_sym"]
+                and not best["overlap"]
+            )
+            if not low_score_junk:
+                found = dict(best["entry"])
+                found["alternatives"] = [
+                    {k: r["entry"][k] for k in ("symbol", "name", "quote_type", "exchange", "score") if k in r["entry"]}
+                    for r in rows[:3]
+                ]
     except (OSError, ValueError, KeyError, IndexError, TypeError, OverflowError, AttributeError):
         found = None
     if use_cache:
-        _SYMBOL_CACHE[key] = (now, dict(found) if found is not None else None)
+        _SYMBOL_CACHE[query] = (now, dict(found) if found is not None else None)
     return found
 
 

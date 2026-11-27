@@ -336,7 +336,8 @@ class DataAnalystAgent:
             "\n".join(market_fact_lines(tkr, snap)) for tkr, snap in facts.items())
         try:
             options = {"stop": self.stop} if self.stop else {}
-            raw = self.llm.complete(sys_prompt, prompt, max_tokens=256, **options) if allowed else ""
+            budget = 256 if len(facts) <= 1 else min(512, 256 + 128 * (len(facts) - 1))
+            raw = self.llm.complete(sys_prompt, prompt, max_tokens=budget, **options) if allowed else ""
             clean = clean_narration(final_answer(raw) or "")
         except Exception:
             clean = ""

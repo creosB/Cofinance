@@ -20,7 +20,43 @@ RISK_WORDS = re.compile(r"\b(risks?|concerns?|headwinds?|threats?|uncertain\w*|d
 # risks through ('not only drawdown but also supply-chain disruption', 'not without execution risk').
 NO_RISK = re.compile(r"\s*(?:the )?(?:reports?|data|evidence|sources?)\s+"
                      r"(?:do not|does not|cannot|can't)\s+(?:identify|name|show|establish|support|list|highlight)\s+"
-                     r"(?:(?:any|a|one|specific|additional)\s+)*risks?\s*[.,]?\s*", re.I)
+                     r"(?:(?:any|a|one|specific|additional)\s+)*risks?(?P<tail>.*)$", re.I)
+_NO_RISK_GENERIC_SCOPE = re.compile(
+    r"^(?:for\s+(?:(?:this|the)\s+(?:question|query|asset|company|stock|comparison|report|period)|"
+    r"(?:either|both|these)\s+(?:company|companies|asset|assets|stock|stocks))|here)\s*[.,]?$",
+    re.I,
+)
+_NO_RISK_ENTITY_SCOPE = re.compile(
+    r"^for\s+(?P<entities>[A-Z][A-Za-z0-9.&'-]*(?:\s+[A-Z][A-Za-z0-9.&'-]*){0,2}"
+    r"(?:\s+(?:or|and)\s+[A-Z][A-Za-z0-9.&'-]*(?:\s+[A-Z][A-Za-z0-9.&'-]*){0,2})?)\s*[.,]?$"
+)
+_NO_RISK_FORBIDDEN_ENTITY_WORDS = frozenset({
+    "beyond", "except", "only", "supply", "execution", "earnings", "regulatory", "short",
+    "pullback", "margin", "demand", "competition", "macro", "inflation", "tariff", "tariffs",
+    "lawsuit", "litigation", "outage", "debt", "liquidity", "valuation", "volatility",
+    "guidance", "downgrade", "recession", "geopolitical", "antitrust", "delay", "disruption",
+    "dependency", "dependencies", "bankruptcy", "fraud", "audit", "compliance", "concentration",
+    "dilution", "selloff", "crash", "ban", "sanctions", "recall", "layoffs", "investigation",
+})
+
+
+def _is_no_risk_clause(clause: str) -> bool:
+    m = NO_RISK.match(clause)
+    if not m:
+        return False
+    tail = m.group("tail").strip()
+    if not tail or tail in {".", ","}:
+        return True
+    if _NO_RISK_GENERIC_SCOPE.fullmatch(tail):
+        return True
+    ent = _NO_RISK_ENTITY_SCOPE.fullmatch(tail)
+    if not ent:
+        return False
+    entities_text = ent.group("entities")
+    if RISK_WORDS.search(entities_text):
+        return False
+    words = {w.lower() for w in re.findall(r"[A-Za-z]+", entities_text)}
+    return not (words & _NO_RISK_FORBIDDEN_ENTITY_WORDS)
 # Sentences and contrast clauses. Not colons: "Main risk: X" must stay one clause.
 CLAUSE = re.compile(r"\.(?=\s|$)|[;!?]|\s[\u2014\u2013-]\s|\u2014|,\s(?=(?:but|while|although|though|whereas|yet)\b)", re.I)
 # Content words of a headline that can anchor a risk about it ("the iPhone production stop").
@@ -103,7 +139,7 @@ def unsupported_risks(candidate: str, cues: List[Mapping[str, Any]]) -> List[str
     out: List[str] = []
     for clause in CLAUSE.split((candidate or "").replace("\u2011", "-").replace("\u2019", "'")):
         hit = RISK_WORDS.search(clause)
-        if not hit or NO_RISK.fullmatch(clause):
+        if not hit or _is_no_risk_clause(clause):
             continue
         # Split 'not only X but also Y' so an allowed X cannot authorize invented Y.
         clause = re.sub(r'\bnot only\s+', '', clause, flags=re.I)

@@ -114,16 +114,31 @@ class TestOpenChatAndDynamicResolution(unittest.TestCase):
             with self.assertRaises(ValueError, msg=bad):
                 valid_symbol(bad)
 
-    def test_resolve_yahoo_symbol_ranks_and_normalizes(self):
+    def test_resolve_yahoo_symbol_ranks_by_relevance_explicit_ticker_and_abstains_on_junk(self):
         def fake_fetch(url):
             if "Palantir" in url:
                 return {"quotes": [
-                    {"symbol": "SPLTR=F", "shortname": "Palantir Futures", "quoteType": "FUTURE", "exchange": "CME"},
-                    {"symbol": "PLTR", "shortname": "Palantir Technologies Inc.", "quoteType": "EQUITY", "exchange": "NMS"},
+                    {"symbol": "PLTR", "shortname": "Palantir Technologies Inc.", "quoteType": "EQUITY", "exchange": "NMS", "score": 166781.0},
+                    {"symbol": "SPLTR=F", "shortname": "Palantir Futures", "quoteType": "FUTURE", "exchange": "CME", "score": 30053.0},
+                ]}
+            if "q=gold" in url or "q=GOLD" in url or "q=%24GOLD" in url:
+                return {"quotes": [
+                    {"symbol": "GC=F", "shortname": "Gold Dec 26", "quoteType": "FUTURE", "exchange": "CMX", "score": 19244500.0},
+                    {"symbol": "GOLD", "shortname": "Gold.com, Inc.", "quoteType": "EQUITY", "exchange": "NYQ", "score": 12051500.0},
+                    {"symbol": "GLD", "shortname": "SPDR Gold Shares", "quoteType": "ETF", "exchange": "PCX", "score": 78588.0},
+                ]}
+            if "US%2010Y" in url:
+                return {"quotes": [
+                    {"symbol": "DE000SLA1029.SG", "shortname": None, "quoteType": "INDEX", "exchange": "STU", "score": 20003.0},
+                    {"symbol": "INFU.SW", "shortname": "AMU Inflation Expec ACC", "quoteType": "ETF", "exchange": "EBS", "score": 20001.0},
+                ]}
+            if "BIST%20100" in url:
+                return {"quotes": [
+                    {"symbol": "XU100.IS", "shortname": "BIST 100", "quoteType": "INDEX", "exchange": "IST", "score": 20549.0},
                 ]}
             if "Bitcoin" in url:
                 return {"quotes": [
-                    {"symbol": "BTC-USD", "shortname": "Bitcoin USD", "quoteType": "CRYPTOCURRENCY", "exchange": "CCC"},
+                    {"symbol": "BTC-USD", "shortname": "Bitcoin USD", "quoteType": "CRYPTOCURRENCY", "exchange": "CCC", "score": 498654.4},
                 ]}
             if "garbage" in url:
                 return {"quotes": [
@@ -135,6 +150,17 @@ class TestOpenChatAndDynamicResolution(unittest.TestCase):
         pltr = resolve_yahoo_symbol("Palantir", fetch=fake_fetch)
         self.assertEqual(pltr["symbol"], "PLTR")
         self.assertEqual(pltr["quote_type"], "EQUITY")
+        gold_future = resolve_yahoo_symbol("gold", fetch=fake_fetch)
+        self.assertEqual(gold_future["symbol"], "GC=F")
+        self.assertEqual(gold_future["quote_type"], "FUTURE")
+        self.assertEqual([a["symbol"] for a in gold_future["alternatives"]], ["GC=F", "GOLD", "GLD"])
+        gold_equity = resolve_yahoo_symbol("GOLD", fetch=fake_fetch)
+        self.assertEqual(gold_equity["symbol"], "GOLD")
+        gold_cashtag = resolve_yahoo_symbol("$GOLD", fetch=fake_fetch)
+        self.assertEqual(gold_cashtag["symbol"], "GOLD")
+        self.assertIsNone(resolve_yahoo_symbol("US 10Y", fetch=fake_fetch))
+        bist = resolve_yahoo_symbol("BIST 100", fetch=fake_fetch)
+        self.assertEqual(bist["symbol"], "XU100.IS")
         btc = resolve_yahoo_symbol("Bitcoin", fetch=fake_fetch)
         self.assertEqual(btc["symbol"], "BTC")
         self.assertIsNone(resolve_yahoo_symbol("garbage", fetch=fake_fetch))

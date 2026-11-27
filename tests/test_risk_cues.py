@@ -52,8 +52,22 @@ class TestUnsupportedRisks(unittest.TestCase):
                      "Main risk: NVDA trades well below its all-time high.",
                      "A risk is that the news comes only from company announcements.",
                      "The reports do not identify a specific risk.",
+                     "The reports do not identify a specific risk for this question.",
+                     "The reports do not identify a specific risk for either company.",
+                     "The reports do not identify a specific risk for Netflix or Gold.com.",
                      "NVIDIA trades at 186.64 USD with bullish headlines."):  # no risk statement at all
             self.assertEqual(unsupported_risks(text, self.CUES), [], text)
+
+    def test_no_risk_scope_rejects_invented_risks_and_lowercase_nouns(self):
+        for bad in (
+            "The reports do not identify a specific risk for supply-chain disruption.",
+            "The reports do not identify a specific risk for Execution Uncertainty.",
+            "The reports do not identify a specific risk for Regulatory Risk.",
+            "The reports do not identify a specific risk for Tariff Disruption.",
+            "The reports do not identify a specific risk beyond execution gaps.",
+            "The reports do not identify a specific risk, and supply-chain disruption.",
+        ):
+            self.assertTrue(unsupported_risks(bad, self.CUES), bad)
 
     def test_talk_about_the_list_is_not_a_risk(self):
         self.assertEqual(unsupported_risks("The main risk matches the listed one: NVDA trades well below its all-time high.", self.CUES), [])

@@ -292,6 +292,11 @@ _RIGHT_PREFIX_BREAK = re.compile(r"[\(\[:,;]|\b(?:from|with|and|or|for|versus|vs
 _INTRODUCES_NEXT_NUM = re.compile(r"^\s*(?:of|at|is|was|near|around|:|=|\$|€|£)?\s*$", re.I)
 
 
+_DIRECT_CURRENCY_BRIDGE = re.compile(r"^\s*(?:(?:of|at|near|around|:|=)\s*)?(?:\$|€|£)?\s*$", re.I)
+_DRAWDOWN_CUES = frozenset({"all_time_drawdown", "52_week_drawdown"})
+_HIGH_CUES = frozenset({"all_time_high", "52_week_high"})
+
+
 def _local_cues(
     text: str,
     start: int,
@@ -319,13 +324,26 @@ def _local_cues(
 
     def match_in(segment: str, prefer_rightmost: bool) -> List[Tuple[int, int, int, int, Tuple[str, ...], str]]:
         found: List[Tuple[int, int, int, int, Tuple[str, ...], str]] = []
-        occupied: List[Tuple[int, int]] = []
+        occupied: List[Tuple[int, int, str]] = []
         for pat, fields, label in METRIC_CUES:
             for m in pat.finditer(segment):
                 ms, me = m.span()
-                if any(ms >= os and me <= oe for os, oe in occupied):
-                    continue
-                occupied.append((ms, me))
+                direct_currency_high = (
+                    prefer_rightmost
+                    and claimed_unit == "currency"
+                    and label in _HIGH_CUES
+                    and bool(_DIRECT_CURRENCY_BRIDGE.match(segment[me:]))
+                )
+                enclosing = [o for o in occupied if ms >= o[0] and me <= o[1]]
+                if enclosing:
+                    if direct_currency_high and all(o[2] in _DRAWDOWN_CUES for o in enclosing):
+                        found = [
+                            item for item in found
+                            if not (item[5] in _DRAWDOWN_CUES and ms >= item[2] and me <= item[3])
+                        ]
+                    else:
+                        continue
+                occupied.append((ms, me, label))
                 dist = (len(segment) - me) if prefer_rightmost else ms
                 found.append((dist, -(me - ms), ms, me, fields, label))
         return found
