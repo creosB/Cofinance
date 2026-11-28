@@ -56,9 +56,12 @@ numeric allowlist; new traces record the guard evidence directly.
 ## Runtime boundaries
 
 React + TypeScript + Vite, real shadcn/Radix controls, Tailwind v4. Geist and Lucide are
-bundled, with no external browser assets. Plotly is lazy-loaded from the local build only
-when a price chart is shown. Linear-inspired composition, not an official Linear package.
-The dark identity and original keyboard controls are preserved.
+bundled, with no external browser assets. Price charts render with a zero-dependency accessible
+HTML Canvas component (`PriceChart`), and `Inspector` / `LabelWorkbench` are lazy-loaded.
+Chat and Execution share one multiplexed `/api/events` SSE hub (`event-hub.ts`), dashboard run
+and corpus fetches are view-gated while on Chat, and verified quote snapshots stream progressively
+into the active run card while narration runs. Linear-inspired composition, not an official Linear
+package. The dark identity and original keyboard controls are preserved.
 
 Managed narrators come only from the pinned catalog (AtomicChat LFM3 1.7B by default, base LFM3
 optional) on the pinned llama.cpp Vulkan GPU build, with a separately qualified CPU fallback.
@@ -67,13 +70,17 @@ Passing the synthetic smoke suite does not establish financial accuracy. Failed 
 qualification cannot enable the picker. Tool-only reporting does not count as model inference.
 No hosted-model fallback, arbitrary model URLs, arbitrary shell commands, or model tool authority.
 
-GLiNER runs from its pinned existing local cache in a bounded subprocess, using a SHA-256
-verified, parity-gated ONNX FP32 encoder cache (`COFINANCE_ROUTER_ONNX=auto|off|required`)
-with automatic PyTorch fallback, and fail-closed batched headline RPCs for Clock 1. Startup
-and inference can be cancelled without importing the ML stack into the HTTP server. Live
-`/api/events` SSE streams wake via `threading.Condition` on store, model, news, and close
-mutations rather than polling every 500 ms. A restart marks incomplete chat jobs interrupted
-rather than silently replaying user requests.
+The dashboard boots cold without starting local models; exact greetings and explicit quotes for
+known tickers bypass inference completely. On demand, GLiNER runs from its pinned local cache in a
+bounded subprocess using a SHA-256 verified, parity-gated standalone ONNX FP32 runtime
+(external-data `.onnx.data`, lazy/mmap heads, arena-off ORT options, no silent PyTorch fallback)
+with fail-closed batched headline RPCs for Clock 1 and 180 s idle auto-unload
+(`COFINANCE_ROUTER_IDLE_S`). Machine-wide Windows named mutexes, RAM/commit headroom guards, and
+separate kill-on-close Job Objects for Win32 and packaged Python workers prevent duplicate or
+orphaned local servers. Startup and inference can be cancelled without importing the ML stack into
+the HTTP server. Live `/api/events` SSE streams wake via `threading.Condition` on store, model,
+news, and close mutations rather than polling every 500 ms. A restart marks incomplete chat jobs
+interrupted rather than silently replaying user requests.
 
 Market tools fetch real provider data. Failures stay unavailable. A 52-week high is never
 called an all-time high, and missing sentiment does not become a default neutral score.
@@ -94,8 +101,9 @@ Read routes: `/api/runs`, `/api/run?id=...`, `/api/corpus`, `/api/state`,
 `/api/events` (live change stream, optional `session_id`).
 
 Explicit write actions: `/api/sessions`, `/api/sessions/delete`, `/api/sessions/clear`, `/api/chat`,
-`/api/jobs/cancel`, `/api/models/action`, `/api/models/select`, `/api/watchlist`, `/api/news/collect`,
-`/api/labels`, `/api/memory/note`, `/api/memory/forget` (`item_id` of `*` forgets the whole conversation).
+`/api/jobs/cancel`, `/api/models/action`, `/api/models/select`, `/api/watchlist`, `/api/watchlist/remove`,
+`/api/documents/upload`, `/api/documents/remove`, `/api/news/collect`, `/api/labels`,
+`/api/memory/note`, `/api/memory/forget` (`item_id` of `*` forgets the whole conversation).
 Memory actions are refused while a run in that conversation is active, and are idempotent per request id.
 
 Only the approved pinned catalog can download or execute a managed runtime. Downloads

@@ -19,7 +19,7 @@ python dev.py preflight --json
 2. Frozen qualification SHA-256 hashes (`qualify/scorers.py`, `qualify/cases.jsonl`, `qualify/gates_narrator.json`).
 3. `docs/feature-map.json` schema presence.
 4. `PRAGMA integrity_check` on every existing SQLite database (`chat_v2.db`, `news.db`, `memory_v2.db`).
-5. Pinned `GLiNER2.5-Decide` local cache presence, plus SHA-256 and parity verification for the optional `encoder_fp32` ONNX cache when present.
+5. Pinned `GLiNER2.5-Decide` local cache presence, plus SHA-256, ORT-version, external-data, and parity verification for the required standalone FP32 ONNX router cache (`gliner_standalone_fp32_*`; chat and news fail closed without silently falling back to PyTorch).
 6. Installed ML packages, Node/npm availability, built `frontend/dist/index.html`, `local_models/state.json` validity, and loopback port `127.0.0.1:8878`.
 
 Hard integrity failures return exit code `1`. Fresh-install warnings (such as not-yet-downloaded local models or unbuilt `frontend/dist`) return exit code `0` with explicit `WARN` rows.
@@ -60,6 +60,19 @@ To restore into `data/`:
    `python dev.py restore data/_backups/<snapshot> --force`
 3. `restore` verifies the full manifest first, writes a pre-restore safety backup under `data/_backups/pre_restore_<timestamp>`, atomically replaces each target file, clears stale `-wal` and `-shm` sidecars, and re-verifies every restored file's SHA-256 and SQLite integrity.
 4. Re-run `python dev.py preflight` before restarting the dashboard.
+
+## Local memory and model-slot management
+
+Cofinance is designed to stay bounded on a 16 GB Windows PC:
+
+- **Cold startup and model-free fast paths:** Launching the dashboard starts zero local models. Exact greetings and explicit quotes for known tickers run completely in Python without starting the router, narrator, or embedder.
+- **Standalone ONNX external-data and mmap heads:** Repack a verified embedded standalone router cache into an external-data graph (`.onnx` + `.onnx.data`) and 64-byte-aligned read-only `mmap` head sidecar (`.heads.bin` + `.heads.index.json`):
+
+```text
+python -B -m core.router_worker repack-standalone data/local_models
+```
+
+- **Bounded residency and single-owner slots:** Machine-wide Windows named mutexes and RAM/commit headroom checks (`< 85%` system commit) prevent duplicate `narrator`, `thinker`, `router`, and `embedder` processes across workspace roots. `RouterProcess` auto-unloads after 180 s idle (`COFINANCE_ROUTER_IDLE_S` overrides; `COFINANCE_ROUTER_PREPACK=off` optionally disables ORT weight prepacking), and the router unloads before Deep Think and cold Clock 1 headline judging. Optional Hy-Memory runs its CPU embedder at `--parallel 1 -c 2048`.
 
 ## Offline verification tools
 
