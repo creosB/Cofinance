@@ -393,6 +393,29 @@ class TestGlobalModelOwnerAndLeaks(unittest.TestCase):
             finally:
                 svc.close()
 
+    def test_spawn_managed_contains_mixed_win32_and_python_children(self):
+        if os.name != "nt":
+            self.skipTest("Windows Job Object containment check")
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        p_win32 = pg.spawn_managed(
+            ["cmd.exe", "/c", "ping -n 3 127.0.0.1 >nul"],
+            error_type=RuntimeError,
+            creationflags=flags,
+        )
+        p_py = None
+        try:
+            p_py = pg.spawn_managed(
+                [sys.executable, "-E", "-B", "-c", "import time; time.sleep(2)"],
+                error_type=RuntimeError,
+                creationflags=flags,
+            )
+            self.assertIsNone(p_py.poll())
+        finally:
+            for proc in (p_py, p_win32):
+                if proc is not None:
+                    proc.terminate()
+                    proc.wait(timeout=5)
+
 
 if __name__ == "__main__":
     unittest.main()
