@@ -283,6 +283,13 @@ def _finalize_greedy_spans(spans: List[Tuple[str, float, int, int]]) -> List[Tup
     return selected
 
 
+def _make_piece_encoder(tokenizer, maxsize: int = 8_192):
+    @lru_cache(maxsize=maxsize)
+    def encode_piece(piece: str) -> Tuple[int, ...]:
+        return tuple(tokenizer.encode(piece, add_special_tokens=False).ids)
+    return encode_piece
+
+
 class StandaloneGlinerOnnx:
     """Pure ONNX FP32 + NumPy GLiNER2.5-Decide backend with zero torch/transformers imports."""
 
@@ -306,12 +313,16 @@ class StandaloneGlinerOnnx:
             tid = self.tokenizer.token_to_id(tok)
             if tid is not None:
                 self._special_id_cache[tok] = [int(tid)]
-        self._encode_piece = lru_cache(maxsize=50_000)(self._encode_piece_uncached)
+        self._encode_piece = _make_piece_encoder(self.tokenizer)
         self._schema_prefix_lock = threading.Lock()
         self._schema_prefix_cache: Dict[Tuple[Tuple[str, ...], ...], Tuple[Tuple[int, ...], Tuple[Tuple[int, ...], ...]]] = {}
 
-    def _encode_piece_uncached(self, piece: str) -> Tuple[int, ...]:
-        return tuple(self.tokenizer.encode(piece, add_special_tokens=False).ids)
+    def close(self) -> None:
+        self._encode_piece.cache_clear()
+        with self._schema_prefix_lock:
+            self._schema_prefix_cache.clear()
+        self.heads.clear()
+        self.session = None
 
     def _ids_for_token(self, token: str) -> Sequence[int]:
         cached = self._special_id_cache.get(token)

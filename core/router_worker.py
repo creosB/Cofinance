@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 from types import SimpleNamespace
 from .local_models import Cancelled, ModelError
-from .process_guard import spawn_managed
+from .process_guard import global_slot_lock, require_memory_headroom, spawn_managed
 
 REVISION='9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90'
 ONNX_PARITY_MAX_ERR=1e-3
@@ -185,7 +185,7 @@ class RouterProcess:
     model_id='fastino/GLiNER2.5-Decide@'+REVISION
     def __init__(self,repo,logs,cancel=None):
         self.repo,self.logs=Path(repo),Path(logs);self.cancel=cancel
-        self.process=None;self.queue=queue.Queue();self.lock=threading.Lock();self.seq=0;self.backend=None
+        self.process=None;self.queue=queue.Queue();self.lock=threading.Lock();self.seq=0;self.backend=None;self._slot_lock=None
     def check(self):
         if self.cancel and self.cancel.is_set():self.close();raise Cancelled('Routing stopped.')
     def receive(self,timeout):
@@ -202,29 +202,39 @@ class RouterProcess:
     def start(self):
         if self.process and self.process.poll() is None:return
         self.queue=queue.Queue();self.logs.mkdir(parents=True,exist_ok=True)
-        env={k:v for k,v in os.environ.items() if k.upper() in {'SYSTEMROOT','WINDIR','PATH','TEMP','TMP','USERPROFILE','LOCALAPPDATA','APPDATA','COMSPEC','PROCESSOR_ARCHITECTURE'}}
-        env.update(
-            HF_HUB_OFFLINE='1',TRANSFORMERS_OFFLINE='1',HF_HUB_DISABLE_TELEMETRY='1',USE_TF='0',USE_FLAX='0',
-            OMP_NUM_THREADS='6',MKL_NUM_THREADS='6',
-            COFINANCE_ROUTER_CACHE=str(self.logs.resolve()),
-            COFINANCE_ROUTER_ONNX='required',
-        )
-        with (self.logs/'router.log').open('a',encoding='utf-8') as log:
-            self.process=spawn_managed([sys.executable,'-E','-B','-u','-m','core.router_worker'],error_type=ModelError,cwd=self.repo,env=env,
-                stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=log,text=True,encoding='utf-8',errors='replace',
-                creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
-        proc=self.process;out=self.queue
-        def reader():
-            try:
-                for line in proc.stdout:
-                    if len(line)>1024*1024:break
-                    try:out.put(json.loads(line))
-                    except ValueError:continue
-            finally:out.put(None)
-        threading.Thread(target=reader,daemon=True).start()
-        ready=self.receive(120)
-        if not ready.get('ready'):self.close();raise ModelError(ROUTER_CACHE_ERROR)
-        self.backend=ready.get('backend','pytorch_fp32')
+        require_memory_headroom(1600, 'routing model (GLiNER)', error_type=ModelError)
+        slot=global_slot_lock('router','Cofinance routing model',error_type=ModelError)
+        slot.acquire()
+        self._slot_lock=slot
+        try:
+            env={k:v for k,v in os.environ.items() if k.upper() in {'SYSTEMROOT','WINDIR','PATH','TEMP','TMP','USERPROFILE','LOCALAPPDATA','APPDATA','COMSPEC','PROCESSOR_ARCHITECTURE'}}
+            env.update(
+                HF_HUB_OFFLINE='1',TRANSFORMERS_OFFLINE='1',HF_HUB_DISABLE_TELEMETRY='1',USE_TF='0',USE_FLAX='0',
+                OMP_NUM_THREADS='6',MKL_NUM_THREADS='6',
+                COFINANCE_ROUTER_CACHE=str(self.logs.resolve()),
+                COFINANCE_ROUTER_ONNX='required',
+            )
+            if os.environ.get('COFINANCE_SKIP_MEM_CHECK','').strip()=='1':
+                env['COFINANCE_SKIP_MEM_CHECK']='1'
+            with (self.logs/'router.log').open('a',encoding='utf-8') as log:
+                self.process=spawn_managed([sys.executable,'-E','-B','-u','-m','core.router_worker'],error_type=ModelError,cwd=self.repo,env=env,
+                    stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=log,text=True,encoding='utf-8',errors='replace',
+                    creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+            proc=self.process;out=self.queue
+            def reader():
+                try:
+                    for line in proc.stdout:
+                        if len(line)>1024*1024:break
+                        try:out.put(json.loads(line))
+                        except ValueError:continue
+                finally:out.put(None)
+            threading.Thread(target=reader,daemon=True).start()
+            ready=self.receive(120)
+            if not ready.get('ready'):self.close();raise ModelError(ROUTER_CACHE_ERROR)
+            self.backend=ready.get('backend','pytorch_fp32')
+        except BaseException:
+            self.close()
+            raise
     def _rpc(self,payload,timeout=20):
         with self.lock:
             self.start();self.check();self.seq+=1
@@ -252,6 +262,9 @@ class RouterProcess:
                 except subprocess.TimeoutExpired:process.kill();process.wait(timeout=3)
             if process.stdin:process.stdin.close()
             if process.stdout:process.stdout.close()
+        if self._slot_lock is not None:
+            self._slot_lock.release()
+            self._slot_lock=None
 
 
 def _install_offline_guard():
@@ -281,6 +294,7 @@ def _load_worker_model(cache_dir: Path | None, mode: str, threads: int = 6):
             raise ModelError(ROUTER_CACHE_ERROR)
         return standalone, STANDALONE_FORMAT
 
+    require_memory_headroom(3200, "PyTorch router fallback (standalone ONNX cache missing)", error_type=ModelError)
     from gliner2 import AutoExtractor
     import torch
     torch.set_num_threads(threads)

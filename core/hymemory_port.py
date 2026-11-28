@@ -27,12 +27,34 @@ from pathlib import Path
 from typing import Iterator, List, Optional
 
 from .memory import MemoryHit, _namespace
-from .process_guard import spawn_managed
+from .process_guard import global_slot_lock, require_memory_headroom, spawn_managed
 
 MODEL_FILE = "Qwen3-Embedding-0.6B-Q8_0.gguf"
 MODEL_SIZE = 639150592
+EMBEDDER_CTX = 2048
+EMBEDDER_BATCH = 2048
+EMBEDDER_PARALLEL = 1
+EMBEDDER_THREADS = 4
 ALLOWED_ENV = {"SYSTEMROOT", "WINDIR", "PATH", "TEMP", "TMP", "USERPROFILE", "LOCALAPPDATA", "APPDATA", "COMSPEC"}
 CLOSED = "http://127.0.0.1:9"
+
+
+def embedder_command(server: Path, model: Path, port: int) -> list[str]:
+    return [
+        str(server),
+        "--model", str(model),
+        "--embedding",
+        "--pooling", "last",
+        "--host", "127.0.0.1",
+        "--port", str(port),
+        "--parallel", str(EMBEDDER_PARALLEL),
+        "-c", str(EMBEDDER_CTX),
+        "-b", str(EMBEDDER_BATCH),
+        "-ub", str(EMBEDDER_BATCH),
+        "--threads", str(EMBEDDER_THREADS),
+        "--no-webui",
+        "--alias", "qwen3-embedding-0.6b",
+    ]
 
 
 class HyMemoryError(RuntimeError):
@@ -61,6 +83,7 @@ class HyMemoryLite:
         self.write_lock = threading.Lock()
         self.embedder: Optional[subprocess.Popen] = None
         self.worker: Optional[subprocess.Popen] = None
+        self._embedder_lock = None
         self.replies: "queue.Queue[Optional[str]]" = queue.Queue()
         self.base.mkdir(parents=True, exist_ok=True)
         with self._db() as db:
@@ -191,53 +214,58 @@ class HyMemoryLite:
         if not self.available():
             raise HyMemoryError("Hy-Memory lite is not installed (venv, embedder model or llama-server missing).")
         self.close()
-        logs = self.base / "logs"
-        logs.mkdir(exist_ok=True)
-        port = _free_port()
-        self.embedder = spawn_managed(
-            [str(self.server), "--model", str(self.model), "--embedding", "--pooling", "last", "--host", "127.0.0.1",
-             "--port", str(port), "-c", "8192", "-ub", "8192", "--alias", "qwen3-embedding-0.6b"], error_type=HyMemoryError,
-            cwd=str(self.server.parent), stdin=subprocess.DEVNULL, stdout=(logs / "embedder.log").open("a"),
-            stderr=subprocess.STDOUT, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        until = time.monotonic() + 120
-        while time.monotonic() < until:
-            if self.embedder.poll() is not None:
-                raise HyMemoryError("Embedding server exited. See data/hymemory/logs/embedder.log.")
-            try:
-                with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=2) as r:
-                    if r.status == 200:
-                        break
-            except OSError:
-                time.sleep(0.5)
-        else:
-            raise HyMemoryError("Embedding server did not become ready.")
-        env = {k: v for k, v in os.environ.items() if k.upper() in ALLOWED_ENV}
-        env.update({
-            "MEMORY_MODE": "lite", "MEMORY_DATA_DIR": str(self.base / "store"), "MEMORY_LANGUAGE": "en", "MEMORY_VECTOR_STORE": "chroma",
-            "MEMORY_EMBEDDER_BASE_URL": f"http://127.0.0.1:{port}/v1", "MEMORY_EMBEDDER_API_KEY": "local-only",
-            "MEMORY_EMBEDDER_MODEL": "qwen3-embedding-0.6b", "MEMORY_EMBEDDING_DIMS": "1024", "MEMORY_EMBEDDER_TIMEOUT": "60",
-            "MEMORY_LLM_BASE_URL": CLOSED + "/v1", "MEMORY_LLM_API_KEY": "disabled", "MEMORY_LLM_MAX_RETRIES": "0",
-            "MEMORY_CODING_ENABLED": "false", "MEMORY_ENABLE_INTENTION": "false", "MEMORY_LOCAL_RERANK_ENABLED": "false",
-            "MEMORY_LOG_DIR": str(logs), "ANONYMIZED_TELEMETRY": "False", "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1",
-            "PYTHONIOENCODING": "utf-8", "HTTP_PROXY": CLOSED, "HTTPS_PROXY": CLOSED, "ALL_PROXY": CLOSED,
-            "NO_PROXY": "127.0.0.1,localhost"})
+        require_memory_headroom(1000, "Hy-Memory embedder", error_type=HyMemoryError)
+        slot = global_slot_lock("embedder", "Cofinance Hy-Memory embedder", error_type=HyMemoryError)
+        slot.acquire()
+        self._embedder_lock = slot
         try:
-            self.worker = spawn_managed(
-                [str(self.venv_python), "-u", str(self.repo / "core" / "hymemory_worker.py")], error_type=HyMemoryError,
-                cwd=str(self.base), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=(logs / "worker.log").open("a"),
-                env=env, text=True, encoding="utf-8", creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        except HyMemoryError:
+            logs = self.base / "logs"
+            logs.mkdir(exist_ok=True)
+            port = _free_port()
+            with (logs / "embedder.log").open("a", encoding="utf-8") as embed_log:
+                self.embedder = spawn_managed(
+                    embedder_command(self.server, self.model, port), error_type=HyMemoryError,
+                    cwd=str(self.server.parent), stdin=subprocess.DEVNULL, stdout=embed_log,
+                    stderr=subprocess.STDOUT, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            until = time.monotonic() + 120
+            while time.monotonic() < until:
+                if self.embedder.poll() is not None:
+                    raise HyMemoryError("Embedding server exited. See data/hymemory/logs/embedder.log.")
+                try:
+                    with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=2) as r:
+                        if r.status == 200:
+                            break
+                except OSError:
+                    time.sleep(0.5)
+            else:
+                raise HyMemoryError("Embedding server did not become ready.")
+            env = {k: v for k, v in os.environ.items() if k.upper() in ALLOWED_ENV}
+            env.update({
+                "MEMORY_MODE": "lite", "MEMORY_DATA_DIR": str(self.base / "store"), "MEMORY_LANGUAGE": "en", "MEMORY_VECTOR_STORE": "chroma",
+                "MEMORY_EMBEDDER_BASE_URL": f"http://127.0.0.1:{port}/v1", "MEMORY_EMBEDDER_API_KEY": "local-only",
+                "MEMORY_EMBEDDER_MODEL": "qwen3-embedding-0.6b", "MEMORY_EMBEDDING_DIMS": "1024", "MEMORY_EMBEDDER_TIMEOUT": "60",
+                "MEMORY_LLM_BASE_URL": CLOSED + "/v1", "MEMORY_LLM_API_KEY": "disabled", "MEMORY_LLM_MAX_RETRIES": "0",
+                "MEMORY_CODING_ENABLED": "false", "MEMORY_ENABLE_INTENTION": "false", "MEMORY_LOCAL_RERANK_ENABLED": "false",
+                "MEMORY_LOG_DIR": str(logs), "ANONYMIZED_TELEMETRY": "False", "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1",
+                "PYTHONIOENCODING": "utf-8", "HTTP_PROXY": CLOSED, "HTTPS_PROXY": CLOSED, "ALL_PROXY": CLOSED,
+                "NO_PROXY": "127.0.0.1,localhost"})
+            with (logs / "worker.log").open("a", encoding="utf-8") as worker_log:
+                self.worker = spawn_managed(
+                    [str(self.venv_python), "-u", str(self.repo / "core" / "hymemory_worker.py")], error_type=HyMemoryError,
+                    cwd=str(self.base), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=worker_log,
+                    env=env, text=True, encoding="utf-8", creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            self.replies = queue.Queue()
+            def pump(stream, q):
+                for line in stream:
+                    q.put(line)
+                q.put(None)
+            threading.Thread(target=pump, args=(self.worker.stdout, self.replies), daemon=True).start()
+            ready = self._reply()
+            if not ready.get("ready"):
+                raise HyMemoryError("Hy-Memory worker did not start: " + str(ready.get("error", ""))[:200])
+        except BaseException:
             self.close()
             raise
-        self.replies = queue.Queue()
-        def pump(stream, q):
-            for line in stream:
-                q.put(line)
-            q.put(None)
-        threading.Thread(target=pump, args=(self.worker.stdout, self.replies), daemon=True).start()
-        ready = self._reply()
-        if not ready.get("ready"):
-            raise HyMemoryError("Hy-Memory worker did not start: " + str(ready.get("error", ""))[:200])
 
     def _reply(self) -> dict:
         try:
@@ -260,17 +288,28 @@ class HyMemoryLite:
         return reply
 
     def close(self) -> None:
-        for proc in (self.worker, self.embedder):
+        worker, embedder = self.worker, self.embedder
+        self.worker = self.embedder = None
+        for proc in (worker, embedder):
             if proc and proc.poll() is None:
                 try:
-                    if proc is self.worker and proc.stdin:
+                    if proc is worker and proc.stdin:
                         proc.stdin.close()
                         proc.wait(timeout=10)
                     else:
                         proc.terminate(); proc.wait(timeout=10)
                 except (OSError, subprocess.TimeoutExpired):
                     proc.kill()
-        self.worker = self.embedder = None
+            if proc is not None and proc is worker:
+                for stream in (proc.stdin, proc.stdout):
+                    if stream is not None:
+                        try:
+                            stream.close()
+                        except OSError:
+                            pass
+        if self._embedder_lock is not None:
+            self._embedder_lock.release()
+            self._embedder_lock = None
 
     # -- MemoryPort ------------------------------------------------------------------------------------------------
     def count(self, namespace: str, session_id: str) -> int:

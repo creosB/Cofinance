@@ -20,7 +20,7 @@ import urllib.request
 import zipfile
 from pathlib import Path, PurePosixPath
 from urllib.parse import urlsplit
-from .process_guard import spawn_managed
+from .process_guard import global_slot_lock, require_memory_headroom, spawn_managed
 
 MODEL_ID = "lfm3-1.7b-q4km"
 REVISION = "cd0c74c575b5c416f3011b5b4c298077f26ca8c2"
@@ -286,6 +286,8 @@ class LocalModels:
         self.cancel = threading.Event()
         self.thread = None
         self.process = None
+        self._server_lock = None
+        self._thinker_lock = None
         self.loaded_model = None
         self.url = ""
         self.key = ""
@@ -628,13 +630,21 @@ class LocalModels:
             self.process.terminate()
             try: self.process.wait(timeout=8)
             except subprocess.TimeoutExpired: self.process.kill(); self.process.wait(timeout=3)
+        if self._server_lock is not None:
+            self._server_lock.release()
+            self._server_lock = None
 
     def stop_thinker(self):
         t, self.thinker = self.thinker, None
-        if t and t["process"].poll() is None:
-            t["process"].terminate()
-            try: t["process"].wait(timeout=8)
-            except subprocess.TimeoutExpired: t["process"].kill(); t["process"].wait(timeout=3)
+        try:
+            if t and t["process"].poll() is None:
+                t["process"].terminate()
+                try: t["process"].wait(timeout=8)
+                except subprocess.TimeoutExpired: t["process"].kill(); t["process"].wait(timeout=3)
+        finally:
+            if self._thinker_lock is not None:
+                self._thinker_lock.release()
+                self._thinker_lock = None
 
     def load_thinker(self, for_qualification=False, backend=None, model=None):
         """Start the deep-think server next to the qualified one, on the same runtime when the narrator is loaded.
@@ -649,20 +659,24 @@ class LocalModels:
         if self.thinker_loaded(model, backend):
             return
         self.stop_thinker()
+        require_memory_headroom(1800, "Deep think runtime", error_type=ModelError)
         if not (self.is_loaded(model) and self.state.get("backend") == backend):
             self.verify(backend, model)  # the loaded narrator's file and runtime were verified when it started
         executables = list(self.backend_dir(backend).rglob("llama-server.exe"))
         if len(executables) != 1: raise ModelError("Managed llama-server executable not found.")
-        with socket.socket() as sock:
-            sock.bind(("127.0.0.1", 0)); port = sock.getsockname()[1]
-        key, url = secrets.token_urlsafe(32), f"http://127.0.0.1:{port}"
-        command = server_command(executables[0], self.path_of(model), model, port, key, backend, flags=thinking_server_flags(backend))
-        env = {k:v for k,v in os.environ.items() if k.upper() in {"SYSTEMROOT","WINDIR","PATH","TEMP","TMP","USERPROFILE","LOCALAPPDATA","APPDATA","COMSPEC","PROCESSOR_ARCHITECTURE"}}
-        with (self.root / "llama-server-think.log").open("a", encoding="utf-8") as log:
-            process = spawn_managed(command, error_type=ModelError, cwd=self.backend_dir(backend), env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
-                                       creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
-        self.thinker = {"process": process, "url": url, "key": key, "model": model, "backend": backend}
+        slot = global_slot_lock("thinker", "Cofinance deep think runtime", error_type=ModelError)
+        slot.acquire()
+        self._thinker_lock = slot
         try:
+            with socket.socket() as sock:
+                sock.bind(("127.0.0.1", 0)); port = sock.getsockname()[1]
+            key, url = secrets.token_urlsafe(32), f"http://127.0.0.1:{port}"
+            command = server_command(executables[0], self.path_of(model), model, port, key, backend, flags=thinking_server_flags(backend))
+            env = {k:v for k,v in os.environ.items() if k.upper() in {"SYSTEMROOT","WINDIR","PATH","TEMP","TMP","USERPROFILE","LOCALAPPDATA","APPDATA","COMSPEC","PROCESSOR_ARCHITECTURE"}}
+            with (self.root / "llama-server-think.log").open("a", encoding="utf-8") as log:
+                process = spawn_managed(command, error_type=ModelError, cwd=self.backend_dir(backend), env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+                                           creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
+            self.thinker = {"process": process, "url": url, "key": key, "model": model, "backend": backend}
             for _ in range(180):
                 self.check_cancel()
                 if process.poll() is not None: raise ModelError("Deep think runtime exited. See the managed runtime log.")
@@ -705,31 +719,39 @@ class LocalModels:
         self.verify(backend, model)
         executables = list(self.backend_dir(backend).rglob("llama-server.exe"))
         if len(executables) != 1: raise ModelError("Managed llama-server executable not found.")
-        with socket.socket() as sock:
-            sock.bind(("127.0.0.1", 0)); port = sock.getsockname()[1]
-        self.key = secrets.token_urlsafe(32)
-        self.url = f"http://127.0.0.1:{port}"
-        command = server_command(executables[0], self.path_of(model), model, port, self.key, backend)
-        env = {k:v for k,v in os.environ.items() if k.upper() in {"SYSTEMROOT","WINDIR","PATH","TEMP","TMP","USERPROFILE","LOCALAPPDATA","APPDATA","COMSPEC","PROCESSOR_ARCHITECTURE"}}
-        label = BACKENDS[backend]["label"]
-        self.update(phase="loading", stage=f"Starting local {label} narrator", error="")
-        with (self.root / "llama-server.log").open("a", encoding="utf-8") as log:
-            self.process = spawn_managed(command, error_type=ModelError, cwd=self.backend_dir(backend), env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
-                                            creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
-        for _ in range(180):
-            self.check_cancel()
-            if self.process.poll() is not None: raise ModelError("Local narrator exited. See the managed runtime log.")
-            try:
-                local_json(self.url + "/health", key=self.key, timeout=2)
-                self.ready = True
-                self.loaded_model = model
-                note = ("Fell back to " + label + " (" + "; ".join(failures) + ")") if failures else ""
-                self.update(phase="qualifying" if for_qualification else "ready", backend=backend,
-                            stage=f"Local narrator loaded on {label}", runtime_note=note)
-                return
-            except (OSError, ValueError):
-                time.sleep(.5)
-        raise ModelError("Local narrator did not become ready within 90 seconds.")
+        require_memory_headroom(1400, "local narrator (llama-server)", error_type=ModelError)
+        slot = global_slot_lock("narrator", "Cofinance local narrator", error_type=ModelError)
+        slot.acquire()
+        self._server_lock = slot
+        try:
+            with socket.socket() as sock:
+                sock.bind(("127.0.0.1", 0)); port = sock.getsockname()[1]
+            self.key = secrets.token_urlsafe(32)
+            self.url = f"http://127.0.0.1:{port}"
+            command = server_command(executables[0], self.path_of(model), model, port, self.key, backend)
+            env = {k:v for k,v in os.environ.items() if k.upper() in {"SYSTEMROOT","WINDIR","PATH","TEMP","TMP","USERPROFILE","LOCALAPPDATA","APPDATA","COMSPEC","PROCESSOR_ARCHITECTURE"}}
+            label = BACKENDS[backend]["label"]
+            self.update(phase="loading", stage=f"Starting local {label} narrator", error="")
+            with (self.root / "llama-server.log").open("a", encoding="utf-8") as log:
+                self.process = spawn_managed(command, error_type=ModelError, cwd=self.backend_dir(backend), env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+                                                creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
+            for _ in range(180):
+                self.check_cancel()
+                if self.process.poll() is not None: raise ModelError("Local narrator exited. See the managed runtime log.")
+                try:
+                    local_json(self.url + "/health", key=self.key, timeout=2)
+                    self.ready = True
+                    self.loaded_model = model
+                    note = ("Fell back to " + label + " (" + "; ".join(failures) + ")") if failures else ""
+                    self.update(phase="qualifying" if for_qualification else "ready", backend=backend,
+                                stage=f"Local narrator loaded on {label}", runtime_note=note)
+                    return
+                except (OSError, ValueError):
+                    time.sleep(.5)
+            raise ModelError("Local narrator did not become ready within 90 seconds.")
+        except BaseException:
+            self.stop_process()
+            raise
 
     def complete(self, system, prompt, *, max_tokens=256, stop=None, think=False, messages=None, temperature=0, allow_truncated=False):
         """think=True (deep think, Lead answer only) goes to the deep-think server with THINK_BUDGET more tokens; the
@@ -909,12 +931,7 @@ class LocalModels:
     def unload(self, keep_choice=False):
         """Stop the narrator. A user unload also switches to tool-only; shutdown keeps the remembered choice."""
         if self.busy: raise ModelError("A research run is using the narrator.")
-        self.stop_thinker()
-        self.ready = False
-        if self.process and self.process.poll() is None:
-            self.process.terminate()
-            try: self.process.wait(timeout=8)
-            except subprocess.TimeoutExpired: self.process.kill(); self.process.wait(timeout=3)
+        self.stop_process()
         choice = {} if keep_choice else {"selected": "facts", "preferred": "facts", "selection_note": ""}
         self.update(phase="downloaded" if self.model_path.exists() else "not_downloaded", stage="Narrator unloaded", **choice)
 
