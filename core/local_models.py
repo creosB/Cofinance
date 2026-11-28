@@ -267,7 +267,7 @@ def local_json(url, body=None, key="", timeout=90):
             if response.will_close:
                 _close_local_conn(pool, pool_key)
             return json.loads(data)
-        except (http.client.RemoteDisconnected, http.client.BadStatusLine, ConnectionResetError, BrokenPipeError):
+        except (http.client.RemoteDisconnected, http.client.BadStatusLine, ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
             _close_local_conn(pool, pool_key)
             if reused and attempt == 0:
                 continue
@@ -776,6 +776,7 @@ class LocalModels:
             if not (self.thinker_loaded(self.loaded_model) and self.think_qualified(t["backend"], t["model"])):
                 raise ModelError("Deep think is not loaded.")
             url, key, timeout = t["url"], t["key"], 180
+            body.pop("stop", None)
             body.update(max_tokens=body["max_tokens"] + THINK_BUDGET, chat_template_kwargs={"enable_thinking": True})
         response = local_json(url + "/v1/chat/completions", body, key=key, timeout=timeout)
         from .usage import record_usage

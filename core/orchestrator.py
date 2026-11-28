@@ -374,7 +374,10 @@ class DataAnalystAgent:
             }
         else:
             multi = len(facts) > 1
+            has_quote_state = any((snap.get("quote_status") or {}).get("state") for snap in facts.values())
             sys_prompt = self.SYSTEM_CRYPTO if risk_mode == "risk_guardian_crypto" else self.SYSTEM_STOCK
+            if has_quote_state:
+                sys_prompt += " Write 'last traded at', not 'is trading at'."
             if multi:
                 sys_prompt += " Cover every listed asset in one compact paragraph with one short sentence per asset and no blank lines."
             prompt = "Facts from market-data tools:\n" + "\n\n".join(
@@ -656,15 +659,22 @@ class TeamLeadOrchestrator:
             items.extend(format_conflict_summary(validation["provenance_conflicts"]))
         return items[:6]
 
-    def feedback(self, validation: Mapping[str, Any]) -> str:
+    def feedback(self, validation: Mapping[str, Any], cues: Sequence[Mapping[str, Any]] = ()) -> str:
         reason, items = validation.get("validation_reason"), "; ".join(self.rejected(validation))
         if reason == "unsupported_risk":
+            if cues:
+                listed = "; ".join(str(c["text"]) for c in cues[:2] if c.get("text"))
+                return (
+                    self.STRICT_RISK
+                    + f" Write plain sentences with no headings or bullet lists, and state only: {listed}. Remove: {items}."
+                )
             return self.STRICT_RISK + f" Remove: {items}."
         if reason == "unsupported_terms":
             return (f"\nStrict: these words are not in the reports, so do not use them: {items}. "
                     "Use the reports' own words and do not abbreviate.")
         if reason == "unsupported_numeric_tokens":
-            return "\nStrict: some numbers in your draft are not in the reports. Copy numbers exactly from the reports, or leave them out."
+            return (f"\nStrict: these numbers are not in the current reports, so remove them: {items}. "
+                    "Only use numbers from the current specialist reports (never from conversation memory), or answer without numbers.")
         if reason == "claim_provenance":
             return (f"\nStrict: some numbers were attached to the wrong asset, metric, or unit: {items}. "
                     "Match each number to its exact asset, label, and unit from the reports, or leave it out.")
@@ -962,8 +972,9 @@ class TeamLeadOrchestrator:
             + cue_block(cues)
             # Last, because small narrators follow the most recent instruction (live 2026-11-08: placed before the
             # reports, it was ignored and every follow-up restated the full fact block).
-            + ("\n\nTask: this is a follow-up. The earlier answer already gave the figures. Answer only the user question "
-               "in at most two sentences, and use at most two numbers, only ones the question asks for." if previous else "")
+            + ("\n\nTask: this is a follow-up. Never copy numbers from conversation memory; only use numbers from the current "
+               "specialist reports. Answer only the user question in at most two sentences, and use at most two numbers, "
+               "only ones the question asks for." if previous else "")
         )
         allowed_numbers = [n for report in (data_rep, news_rep, doc_rep) if report for n in numbers_in(report.summary)
                            if any(abs(n-a) <= max(1e-9, abs(a)*1e-9) for a in report.allowed_numbers)]
@@ -979,20 +990,27 @@ class TeamLeadOrchestrator:
         earlier = numbers_in(previous) if previous else []
 
         multi_asset = len(tickers) > 1
+        lead_thinking = bool(getattr(self.lead_llm, "is_thinking", False))
+        has_quote_state = bool(data_rep and any((snap.get("quote_status") or {}).get("state") for snap in (data_rep.raw_facts or {}).values() if isinstance(snap, Mapping)))
+        lead_system = self.SYSTEM
+        if has_quote_state:
+            lead_system += " Write 'last traded at', not 'is trading at'."
+        if multi_asset:
+            lead_system += " Cover every requested asset in one compact plain-prose paragraph with no bullet points, no blank lines, and no copied section headers."
 
         def narrate(prompt: str, max_tokens: int) -> str:
             try:
                 if not (data_rep or news_rep or doc_rep):
                     raw = ""
-                elif self.stop and not multi_asset:
+                elif self.stop and not multi_asset and not lead_thinking:
                     try:
-                        raw = self.lead_llm.complete(self.SYSTEM, prompt, max_tokens=max_tokens, stop=self.stop)
+                        raw = self.lead_llm.complete(lead_system, prompt, max_tokens=max_tokens, stop=self.stop)
                     except TypeError as exc:
                         if "stop" not in str(exc):
                             raise
-                        raw = self.lead_llm.complete(self.SYSTEM, prompt, max_tokens=max_tokens)
+                        raw = self.lead_llm.complete(lead_system, prompt, max_tokens=max_tokens)
                 else:
-                    raw = self.lead_llm.complete(self.SYSTEM, prompt, max_tokens=max_tokens)
+                    raw = self.lead_llm.complete(lead_system, prompt, max_tokens=max_tokens)
                 return clean_narration(final_answer(raw) or "", single_paragraph=not multi_asset)
             except Exception:
                 return ""
@@ -1038,7 +1056,7 @@ class TeamLeadOrchestrator:
                 val["restated_numbers"] = sum(1 for n in numbers_in(text) if any(abs(n - p) <= max(1e-9, abs(p) * 1e-9) for p in earlier))
             return ok, val
 
-        lead_budget = 256 if len(tickers) <= 1 else min(448, 256 + 96 * (len(tickers) - 1))
+        lead_budget = 256 if len(tickers) <= 1 else min(512, 256 + 128 * (len(tickers) - 1))
         clean_synth = narrate(synth_prompt, lead_budget)
         faithful, validation = judge(clean_synth)
         retried = False
@@ -1052,7 +1070,7 @@ class TeamLeadOrchestrator:
         )
         if not faithful and clean_synth and reason in self.RETRY_REASONS and not hopeless_numbers:
             retried = True
-            retry = narrate(synth_prompt + self.feedback(validation), lead_budget)
+            retry = narrate(synth_prompt + self.feedback(validation, cues), lead_budget)
             retry_ok, retry_val = judge(retry)
             summary = {"reason": reason, "rejected": self.rejected(validation), "retry_passed_guards": retry_ok,
                        "used": "retry" if retry_ok else "fallback",

@@ -388,6 +388,231 @@ class TestAuditFixesCrashSafety(unittest.TestCase):
                 th.join(timeout=5)
             self.assertEqual(errors, [])
 
+    def test_non_live_quote_status_and_multi_asset_prose_guidance(self):
+        class _DatedTools:
+            def get_snapshot(self, ticker):
+                base = dict(AAPL_SNAP if ticker == "AAPL" else NVDA_SNAP)
+                base["quote_status"] = {"state": "last_known"}
+                return base
+
+            def plot_history(self, ticker):
+                return f"chart://{ticker}"
+
+        analyst_llm = _RecordingLLM([
+            "Apple Inc. (AAPL) last traded at 358.54 USD. NVIDIA Corporation (NVDA) last traded at 150.49 USD."
+        ])
+        rep = DataAnalystAgent(analyst_llm, _DatedTools()).run(["AAPL", "NVDA"], "fundamental_equity", EventBus(), "s4")
+        self.assertTrue(rep.faithful_numbers)
+        self.assertIn("last traded at", analyst_llm.calls[0]["system"])
+
+        lead_llm = _RecordingLLM([
+            "Apple Inc. (AAPL) last traded at 358.54 USD and NVIDIA Corporation (NVDA) last traded at 150.49 USD."
+        ])
+        orch = TeamLeadOrchestrator(
+            _FixedRouter(RoutedQuery("thesis_review", 0.9, "long_term", ["AAPL", "NVDA"])),
+            DataAnalystAgent(_RecordingLLM([
+                "Apple Inc. (AAPL) last traded at 358.54 USD. NVIDIA Corporation (NVDA) last traded at 150.49 USD."
+            ]), _DatedTools()),
+            NewsResearcherAgent(None, _EmptyNews()),
+            lead_llm,
+            _DatedTools(),
+        )
+        res = orch.run("Compare Apple and Nvidia")
+        self.assertTrue(res.faithful_synthesis)
+        self.assertIn("last traded at", lead_llm.calls[0]["system"])
+        self.assertIn("no bullet points", lead_llm.calls[0]["system"])
+
+    def test_followup_prompt_and_numeric_retry_name_rejected_memory_numbers(self):
+        lead_llm = _RecordingLLM([
+            "The earlier comparison was AAPL at 358.54 USD and NVDA at 150.49 USD.",
+            "NVIDIA Corporation (NVDA) last traded at 150.49 USD.",
+        ])
+        orch = TeamLeadOrchestrator(
+            _FixedRouter(RoutedQuery("compare_assets", 0.8, "intraday", ["NVDA"])),
+            DataAnalystAgent(_RecordingLLM(["NVIDIA Corporation (NVDA) last traded at 150.49 USD."]), _MultiTools()),
+            NewsResearcherAgent(None, _EmptyNews()),
+            lead_llm,
+            _MultiTools(),
+        )
+        res = orch.run("What did we compare earlier?", context="AAPL was 358.54 USD and NVDA was 150.49 USD.")
+        self.assertTrue(res.faithful_synthesis)
+        self.assertEqual(len(lead_llm.calls), 2)
+        self.assertIn("Never copy numbers from conversation memory", lead_llm.calls[0]["prompt"])
+        retry_suffix = lead_llm.calls[1]["prompt"].split("\nStrict:")[-1]
+        self.assertIn("358.54", retry_suffix)
+
+    def test_no_risk_clause_accepts_other_and_beyond_that_while_blocking_invented_nouns(self):
+        from core.risk_cues import unsupported_risks
+
+        cues = [{"text": "NVDA trades well below its all-time high", "anchors": ["all-time high", "drawdown"]}]
+        self.assertEqual(
+            unsupported_risks("NVDA trades well below its all-time high. The reports do not identify any other specific risk.", cues),
+            [],
+        )
+        self.assertEqual(
+            unsupported_risks("NVDA trades well below its all-time high. The reports do not identify a specific risk beyond that.", cues),
+            [],
+        )
+        self.assertTrue(
+            unsupported_risks("The reports do not identify a specific risk beyond supply-chain disruption.", cues)
+        )
+
+    def test_python_owned_market_overview_skips_semantic_memory_embedder(self):
+        from core.memory import HybridMemory
+
+        class _ExplodingSemantic:
+            backend = "exploding semantic"
+
+            def count(self, *args, **kwargs):
+                raise AssertionError("Semantic memory must not be started on python_owned turns")
+
+            def recall(self, *args, **kwargs):
+                raise AssertionError("Semantic recall must not run on python_owned turns")
+
+            def remember_turn(self, *args, **kwargs):
+                raise AssertionError("Semantic remember must not run on python_owned turns")
+
+            def close(self):
+                pass
+
+        class _IndexTools:
+            def __init__(self):
+                self.snapshots = {}
+                self.charts = {}
+                self.evidence = []
+
+            def get_snapshot(self, ticker):
+                snap = {
+                    "ticker": ticker,
+                    "name": f"Index {ticker}",
+                    "currency": "USD",
+                    "status": "available",
+                    "price": 5000.0,
+                    "change_from_previous_session_pct": 1.2,
+                    "fundamentals_status": "Not applicable for index",
+                }
+                self.snapshots[ticker] = snap
+                return snap
+
+            def plot_history(self, ticker):
+                return ""
+
+        with tempfile.TemporaryDirectory() as tmp:
+            svc = ChatService(
+                REPO,
+                root=Path(tmp),
+                market_factory=lambda cancel: _IndexTools(),
+                router_factory=lambda: _FixedRouter(RoutedQuery("price_snapshot", 0.9, "intraday", [], capability="market_overview")),
+                crowd_odds=lambda tickers: None,
+            )
+            svc.memory = HybridMemory(svc.keyword_memory, _ExplodingSemantic())
+            try:
+                sess = svc.store.create_session("c" * 32)
+                job = svc.submit(sess["id"], "How are the US markets doing today?", "d" * 32, "facts")
+                th = svc.threads.get(job["id"])
+                if th:
+                    th.join(timeout=10)
+                conv = svc.store.session(sess["id"])
+                msg = conv["messages"][-1]
+                self.assertEqual(msg["payload"]["memory"]["backend"], "keyword")
+                self.assertEqual(svc.keyword_memory.count("chat", sess["id"]), 1)
+            finally:
+                svc.close()
+
+    def test_local_json_retries_windows_connection_aborted_on_reused_socket(self):
+        from core import local_models as lm
+
+        calls = {"n": 0}
+
+        class _FakeResp:
+            status = 200
+            reason = "OK"
+            headers = {}
+            will_close = False
+
+            def read(self, _n=None):
+                return b'{"ok": true}'
+
+        class _FakeConn:
+            def __init__(self, host, port, timeout=90):
+                self.sock = None
+                self.timeout = timeout
+                self.closed = False
+
+            def request(self, method, target, body=None, headers=None):
+                calls["n"] += 1
+                if calls["n"] == 2:
+                    raise ConnectionAbortedError(10053, "An established connection was aborted")
+
+            def getresponse(self):
+                return _FakeResp()
+
+            def close(self):
+                self.closed = True
+
+        pool = lm._local_http_pool()
+        existing = pool.pop(("127.0.0.1", 51999), None)
+        if existing is not None:
+            existing.close()
+        try:
+            with patch("http.client.HTTPConnection", _FakeConn):
+                first = lm.local_json("http://127.0.0.1:51999/health")
+                second = lm.local_json("http://127.0.0.1:51999/v1/chat/completions", {"x": 1})
+            self.assertEqual(first, {"ok": True})
+            self.assertEqual(second, {"ok": True})
+            self.assertEqual(calls["n"], 3)
+        finally:
+            conn = pool.pop(("127.0.0.1", 51999), None)
+            if conn is not None:
+                conn.close()
+
+    def test_deep_think_drops_stop_sequence_through_traced_llm_and_local_models(self):
+        from core import local_models as lm
+        from core.run_trace import TracedLLM
+
+        class _ThinkingLLM(_RecordingLLM):
+            is_thinking = True
+
+        inner = _ThinkingLLM(["NVIDIA Corporation (NVDA) last traded at 150.49 USD."])
+        traced = TracedLLM(inner, TraceRecorder("deep think stop test"), "Market Team Lead")
+        self.assertTrue(traced.is_thinking)
+
+        orch = TeamLeadOrchestrator(
+            _FixedRouter(RoutedQuery("thesis_review", 0.9, "long_term", ["NVDA"])),
+            DataAnalystAgent(_RecordingLLM(["NVIDIA Corporation (NVDA) last traded at 150.49 USD."]), _MultiTools()),
+            NewsResearcherAgent(None, _EmptyNews()),
+            traced,
+            _MultiTools(),
+        )
+        res = orch.run("Give me the NVDA thesis")
+        self.assertTrue(res.faithful_synthesis)
+        self.assertNotIn("stop", inner.calls[0]["options"])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            m = lm.LocalModels(Path(tmp), REPO)
+            m.ready = True
+            m.loaded_model = lm.DEFAULT_NARRATOR
+            m.process = type("P", (), {"poll": lambda self: None})()
+            m.thinker = {
+                "url": "http://127.0.0.1:52001",
+                "key": "k",
+                "backend": "vulkan",
+                "model": lm.DEFAULT_NARRATOR,
+                "process": type("P", (), {"poll": lambda self: None})(),
+            }
+            seen_bodies = []
+
+            def fake_local_json(url, body=None, key="", timeout=90):
+                seen_bodies.append(dict(body or {}))
+                return {"choices": [{"finish_reason": "stop", "message": {"content": "OK"}}]}
+
+            with patch.object(m, "thinker_loaded", return_value=True), \
+                 patch.object(m, "think_qualified", return_value=True), \
+                 patch.object(lm, "local_json", side_effect=fake_local_json):
+                out = m.complete("sys", "usr", max_tokens=64, stop=["\n\n"], think=True)
+            self.assertEqual(out, "OK")
+            self.assertNotIn("stop", seen_bodies[0])
+
 
 if __name__ == "__main__":
     unittest.main()

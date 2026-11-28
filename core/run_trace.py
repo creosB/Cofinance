@@ -321,6 +321,7 @@ class TracedExtractor:
 class TracedLLM:
     def __init__(self, backend: Any, trace: TraceRecorder, actor: str) -> None:
         self.backend, self.trace, self.actor = backend, trace, actor
+        self.is_thinking = bool(getattr(backend, "is_thinking", False))
 
     def complete(self, system, prompt, *, max_tokens=256, **options):
         # Tool-only mode is a deterministic fallback, never counted as a model call.

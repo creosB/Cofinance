@@ -254,7 +254,7 @@ class TestClaimProvenance(unittest.TestCase):
         )
         res = orch.run("Compare NVDA and AAPL")
         self.assertTrue(res.faithful_synthesis)
-        self.assertEqual(lead_budgets, [352])
+        self.assertEqual(lead_budgets, [384])
 
     def test_asset_name_numbers_allowed_for_futures_and_indices(self):
         from core.orchestrator import EventBus, market_fact_numbers

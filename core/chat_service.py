@@ -765,7 +765,8 @@ class ChatService:
             # Context only from turns about the same assets: an NVDA risk must not leak into an Apple answer.
             same=lambda ts:bool(set(ts or [])&set(tickers))
             previous=research[-1]['content'] if research and same((research[-1].get('payload') or {}).get('tickers')) else ''
-            hits=[] if explicit_quote else self.recall_memory(session,job['query'],trace,exclude_run=research[-1].get('run_id') if research else None,tickers=tickers)
+            skip_semantic_memory=explicit_quote or python_owned
+            hits=[] if skip_semantic_memory else self.recall_memory(session,job['query'],trace,exclude_run=research[-1].get('run_id') if research else None,tickers=tickers)
             odds_pool=ThreadPoolExecutor(max_workers=1) if self.crowd_odds and not explicit_quote else None
             odds_future=odds_pool.submit(self.crowd_odds,tickers) if odds_pool else None
             try:
@@ -829,7 +830,7 @@ class ChatService:
                      # The pages the Document Reader quoted, so the answer can show where it came from.
                      'document_sources':[{'document_id':e['document_id'],'name':e['name'],'page':e['page'],'matched':e['matched']}
                                          for e in result.document_report.raw_facts.get('excerpts',[])] if result.document_report else [],
-                     'memory':{'backend':'keyword' if explicit_quote else self.memory.backend,'used_previous':bool(previous) and not explicit_quote,
+                     'memory':{'backend':'keyword' if skip_semantic_memory else self.memory.backend,'used_previous':bool(previous) and not skip_semantic_memory,
                                'recalled':[{'question':h.question[:160],'run_id':h.run_id,'item_id':h.item_id,'kind':h.kind,'score':h.score,**({'found_by':h.sources} if h.sources else {})} for h in hits]}}
             if assessment is not None:payload['decision_assessment']=assessment
             if tickers and previous_close_request(job['query']):
@@ -880,7 +881,7 @@ class ChatService:
         if remember is None:return
         try:
             if not self.closed:
-                if explicit_quote:self.remember(*remember,keyword_only=True)
+                if skip_semantic_memory:self.remember(*remember,keyword_only=True)
                 else:self.remember(*remember)
         finally:
             with self.lock:self.threads.pop(job['id'],None)  # tracked until memory is written, so close() waits for it

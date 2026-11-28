@@ -20,10 +20,11 @@ RISK_WORDS = re.compile(r"\b(risks?|concerns?|headwinds?|threats?|uncertain\w*|d
 # risks through ('not only drawdown but also supply-chain disruption', 'not without execution risk').
 NO_RISK = re.compile(r"\s*(?:the )?(?:reports?|data|evidence|sources?)\s+"
                      r"(?:do not|does not|cannot|can't)\s+(?:identify|name|show|establish|support|list|highlight)\s+"
-                     r"(?:(?:any|a|one|specific|additional)\s+)*risks?(?P<tail>.*)$", re.I)
+                     r"(?:(?:any|a|one|specific|additional|other)\s+)*risks?(?P<tail>.*)$", re.I)
 _NO_RISK_GENERIC_SCOPE = re.compile(
     r"^(?:for\s+(?:(?:this|the)\s+(?:question|query|asset|company|stock|comparison|report|period)|"
-    r"(?:either|both|these)\s+(?:company|companies|asset|assets|stock|stocks))|here)\s*[.,]?$",
+    r"(?:either|both|these)\s+(?:company|companies|asset|assets|stock|stocks))|"
+    r"beyond\s+(?:that|this|those)|here)\s*[.,]?$",
     re.I,
 )
 _ENTITY_PART = (
