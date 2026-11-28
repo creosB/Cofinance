@@ -254,6 +254,7 @@ class ChatService:
             if self.extractor is None:
                 if not self.gliner_path().exists():raise ModelError('The pinned GLiNER cache is missing. No unapproved download was attempted.')
                 self.extractor=RouterProcess(self.repo,self.root/'local_models',cancel)
+                self.extractor._on_close=lambda:self.models.update(router='cached')
             self.extractor.cancel=cancel
             if not self.extractor.process or self.extractor.process.poll() is not None:
                 self.models.update(router='loading')
@@ -264,6 +265,14 @@ class ChatService:
                     self.models.update(router='cached');raise  # never left showing 'loading' after a failed start
                 self.models.update(router='loaded')
             return self.extractor
+
+    def unload_router(self):
+        with self.router_lock:
+            ext=self.extractor
+            if ext and hasattr(ext,'close'):
+                ext.close()
+            if ext is not None and not self.router_factory:
+                self.models.update(router='cached')
 
     def warm_router(self):
         """Start the GLiNER routing process in the background at dashboard startup (live 2026-11-17: the first question
@@ -698,6 +707,7 @@ class ChatService:
                 self._load_narrator_locked()
                 if think:
                     self.store.progress(job['id'],'Starting deep think')
+                    self.unload_router()
                     try:self.models.load_thinker();deep['used']=True
                     except (ModelError,OSError) as exc:
                         deep['note']='Deep think could not start ('+str(exc)[:120]+'), so this answer was written without it.'
@@ -1383,12 +1393,15 @@ class ChatService:
         def check():
             if cancel.is_set():raise Cancelled('News collection stopped.')
         store=None
+        was_router_loaded=bool(self.extractor and getattr(self.extractor,'process',None) and self.extractor.process.poll() is None)
         try:
             backend=self.news_backend_factory() if self.news_backend_factory else self.local_extractor(trace,cancel)
             fetch=FeedFetcher(self.feed_fetch,check=check) if self.feed_fetch else FeedFetcher(check=check)
             store=NewsStore(str(self.root/'news.db'))
             summary=run_traced_clock1(feed_tickers(),fetch,GlinerDecideClassifier(backend,include_urgency=False),trace,store=store)
             stage='Collected '+str(summary.fetched)+' items'+(' with source errors' if summary.errors or any(str(v).startswith('error') for s in summary.source_status.values() for v in s.values()) else '')
+            if not self.news_backend_factory and not self.router_factory and not was_router_loaded:
+                self.unload_router()
             headlines=self.judge_headlines(store,check)
             if headlines.get('judged'):stage+='; judged '+str(headlines['judged'])+' headlines'
             with self.lock:self.news.update(phase='idle',stage=stage,finished=time.time(),headlines=headlines)

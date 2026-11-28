@@ -19,6 +19,17 @@ from .process_guard import global_slot_lock, require_memory_headroom, spawn_mana
 REVISION='9d1bfb848cd16d93ee56ccbc59cd92bf0f284d90'
 ONNX_PARITY_MAX_ERR=1e-3
 ONNX_FORMAT='encoder_fp32'
+DEFAULT_ROUTER_IDLE_S=180.0
+
+
+def _configured_idle_timeout(idle_timeout_s: float | None) -> float:
+    if idle_timeout_s is not None:
+        return max(0.0, float(idle_timeout_s))
+    raw=os.environ.get('COFINANCE_ROUTER_IDLE_S','').strip()
+    if raw:
+        try:return max(0.0, float(raw))
+        except ValueError:return DEFAULT_ROUTER_IDLE_S
+    return DEFAULT_ROUTER_IDLE_S
 
 
 def onnx_paths(cache_dir: Path) -> tuple[Path, Path]:
@@ -183,9 +194,42 @@ def export_onnx_encoder(cache_dir: Path, *, source_onnx: Path | None = None, thr
 
 class RouterProcess:
     model_id='fastino/GLiNER2.5-Decide@'+REVISION
-    def __init__(self,repo,logs,cancel=None):
+    def __init__(self,repo,logs,cancel=None,*,idle_timeout_s=None,on_close=None):
         self.repo,self.logs=Path(repo),Path(logs);self.cancel=cancel
         self.process=None;self.queue=queue.Queue();self.lock=threading.Lock();self.seq=0;self.backend=None;self._slot_lock=None
+        self.idle_timeout_s=_configured_idle_timeout(idle_timeout_s)
+        self._on_close=on_close
+        self._last_used=0.0
+        self._timer_lock=threading.Lock()
+        self._close_lock=threading.RLock()
+        self._idle_timer=None
+    def _cancel_idle_timer(self):
+        with self._timer_lock:
+            timer=self._idle_timer
+            self._idle_timer=None
+        if timer is not None:
+            timer.cancel()
+    def _arm_idle_timer(self):
+        self._last_used=time.monotonic()
+        self._cancel_idle_timer()
+        if self.idle_timeout_s<=0.0:
+            return
+        timer=threading.Timer(self.idle_timeout_s,self._maybe_idle_close)
+        timer.daemon=True
+        with self._timer_lock:
+            self._idle_timer=timer
+        timer.start()
+    def _maybe_idle_close(self):
+        if not self.lock.acquire(blocking=False):
+            return
+        try:
+            proc=self.process
+            if proc is None or proc.poll() is not None:
+                return
+            if time.monotonic()-self._last_used>=self.idle_timeout_s:
+                self.close()
+        finally:
+            self.lock.release()
     def check(self):
         if self.cancel and self.cancel.is_set():self.close();raise Cancelled('Routing stopped.')
     def receive(self,timeout):
@@ -200,7 +244,9 @@ class RouterProcess:
                 if self.process and self.process.poll() is not None:raise ModelError('Routing process exited. Check its local log.')
         self.close();raise ModelError('Routing operation exceeded its time budget.')
     def start(self):
-        if self.process and self.process.poll() is None:return
+        if self.process and self.process.poll() is None:
+            self._arm_idle_timer()
+            return
         self.queue=queue.Queue();self.logs.mkdir(parents=True,exist_ok=True)
         require_memory_headroom(1600, 'routing model (GLiNER)', error_type=ModelError)
         slot=global_slot_lock('router','Cofinance routing model',error_type=ModelError)
@@ -216,6 +262,9 @@ class RouterProcess:
             )
             if os.environ.get('COFINANCE_SKIP_MEM_CHECK','').strip()=='1':
                 env['COFINANCE_SKIP_MEM_CHECK']='1'
+            prepack=os.environ.get('COFINANCE_ROUTER_PREPACK','').strip()
+            if prepack:
+                env['COFINANCE_ROUTER_PREPACK']=prepack
             with (self.logs/'router.log').open('a',encoding='utf-8') as log:
                 self.process=spawn_managed([sys.executable,'-E','-B','-u','-m','core.router_worker'],error_type=ModelError,cwd=self.repo,env=env,
                     stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=log,text=True,encoding='utf-8',errors='replace',
@@ -232,15 +281,21 @@ class RouterProcess:
             ready=self.receive(120)
             if not ready.get('ready'):self.close();raise ModelError(ROUTER_CACHE_ERROR)
             self.backend=ready.get('backend','pytorch_fp32')
+            self._arm_idle_timer()
         except BaseException:
             self.close()
             raise
     def _rpc(self,payload,timeout=20):
         with self.lock:
+            self._cancel_idle_timer()
             self.start();self.check();self.seq+=1
             message={'id':self.seq,**payload}
             self.process.stdin.write(json.dumps(message,ensure_ascii=True)+'\n');self.process.stdin.flush()
-            value=self.receive(timeout)
+            try:
+                value=self.receive(timeout)
+            finally:
+                if self.process and self.process.poll() is None:
+                    self._arm_idle_timer()
             if value.get('id')!=self.seq or 'result' not in value:
                 raise ModelError('Routing inference failed or returned an invalid response.')
             return value['result']
@@ -254,17 +309,24 @@ class RouterProcess:
         return self._rpc({'method':'batch_classify_text','texts':items,'schema':schema,'kwargs':kwargs},timeout=timeout)
     def extract_entities(self,text,entity_types):return self.call('extract_entities',text,entity_types,{})
     def close(self):
-        process=self.process;self.process=None;self.backend=None
-        if process:
-            if process.poll() is None:
-                process.terminate()
-                try:process.wait(timeout=3)
-                except subprocess.TimeoutExpired:process.kill();process.wait(timeout=3)
-            if process.stdin:process.stdin.close()
-            if process.stdout:process.stdout.close()
-        if self._slot_lock is not None:
-            self._slot_lock.release()
-            self._slot_lock=None
+        with self._close_lock:
+            self._cancel_idle_timer()
+            process=self.process;self.backend=None
+            had_process=process is not None
+            if process:
+                if process.poll() is None:
+                    process.terminate()
+                    try:process.wait(timeout=3)
+                    except subprocess.TimeoutExpired:process.kill();process.wait(timeout=3)
+                if process.stdin:process.stdin.close()
+                if process.stdout:process.stdout.close()
+            if self._slot_lock is not None:
+                self._slot_lock.release()
+                self._slot_lock=None
+            self.process=None
+        if had_process and self._on_close is not None:
+            try:self._on_close()
+            except Exception:pass
 
 
 def _install_offline_guard():
@@ -320,6 +382,12 @@ def main():
             meta=export_standalone_onnx(Path(sys.argv[2]), source_onnx=src)
         print(json.dumps(meta, indent=2, sort_keys=True), flush=True)
         return
+    if len(sys.argv)>=3 and sys.argv[1]=='repack-standalone':
+        from .gliner_onnx import convert_standalone_to_external_data
+        with contextlib.redirect_stdout(sys.stderr):
+            meta=convert_standalone_to_external_data(Path(sys.argv[2]))
+        print(json.dumps(meta, indent=2, sort_keys=True), flush=True)
+        return
     protocol=sys.stdout
     try:
         with contextlib.redirect_stdout(sys.stderr):
@@ -333,19 +401,24 @@ def main():
         protocol.write(json.dumps({'ready':False})+'\n');protocol.flush()
         return
     protocol.write(json.dumps({'ready':True,'backend':backend})+'\n');protocol.flush()
-    for line in sys.stdin:
-        if len(line)>256000:break
-        message=json.loads(line)
-        try:
-            method=message['method']
-            with contextlib.redirect_stdout(sys.stderr):
-                if method=='classify_text':result=model.classify_text(message['text'],message['schema'],**message.get('kwargs',{}))
-                elif method=='batch_classify_text':result=model.batch_classify_text(message['texts'],message['schema'],**message.get('kwargs',{}))
-                elif method=='extract_entities':result=model.extract_entities(message['text'],message['schema'])
-                else:raise ValueError('Unsupported inference method')
-            value={'id':message['id'],'result':result}
-        except Exception as exc:value={'id':message.get('id'),'error':type(exc).__name__}
-        protocol.write(json.dumps(value,ensure_ascii=True)+'\n');protocol.flush()
+    try:
+        for line in sys.stdin:
+            if len(line)>256000:break
+            message=json.loads(line)
+            try:
+                method=message['method']
+                with contextlib.redirect_stdout(sys.stderr):
+                    if method=='classify_text':result=model.classify_text(message['text'],message['schema'],**message.get('kwargs',{}))
+                    elif method=='batch_classify_text':result=model.batch_classify_text(message['texts'],message['schema'],**message.get('kwargs',{}))
+                    elif method=='extract_entities':result=model.extract_entities(message['text'],message['schema'])
+                    else:raise ValueError('Unsupported inference method')
+                value={'id':message['id'],'result':result}
+            except Exception as exc:value={'id':message.get('id'),'error':type(exc).__name__}
+            protocol.write(json.dumps(value,ensure_ascii=True)+'\n');protocol.flush()
+    finally:
+        if hasattr(model,'close'):
+            try:model.close()
+            except Exception:pass
 
 
 if __name__=='__main__':main()

@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -295,6 +296,176 @@ class TestStandaloneGlinerOnnx(unittest.TestCase):
         self.assertEqual(spos2, spos3)
         self.assertEqual(len(tpos3), 3)
         self.assertEqual(ids3[:len(ids2) - 2], ids2[:len(ids2) - 2])
+
+    def test_build_ort_session_options_disables_arena_pattern_and_spinning(self):
+        import onnxruntime as ort
+
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("COFINANCE_ROUTER_PREPACK", None)
+            opts = go.build_ort_session_options(threads=4)
+            self.assertEqual(opts.intra_op_num_threads, 4)
+            self.assertEqual(opts.inter_op_num_threads, 1)
+            self.assertEqual(opts.graph_optimization_level, ort.GraphOptimizationLevel.ORT_DISABLE_ALL)
+            self.assertFalse(opts.enable_cpu_mem_arena)
+            self.assertFalse(opts.enable_mem_pattern)
+            self.assertEqual(opts.get_session_config_entry("session.intra_op.allow_spinning"), "0")
+            self.assertEqual(opts.get_session_config_entry("session.disable_prepacking"), "0")
+
+        with mock.patch.dict(os.environ, {"COFINANCE_ROUTER_PREPACK": "off"}):
+            opts_off = go.build_ort_session_options(threads=4)
+            self.assertEqual(opts_off.get_session_config_entry("session.disable_prepacking"), "1")
+
+        opts_explicit = go.build_ort_session_options(threads=4, disable_prepacking=True)
+        self.assertEqual(opts_explicit.get_session_config_entry("session.disable_prepacking"), "1")
+
+    def test_lazy_head_store_defers_ner_weights_until_needed_and_matches_eager(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            npz_path = Path(tmp) / "heads.npz"
+            eager = _synthetic_heads(4, count_target=1)
+            np.savez(str(npz_path), **eager)
+
+            store = go.LazyHeadStore.from_npz(npz_path)
+            self.assertEqual(store.mode, "lazy_npz")
+            self.assertEqual(store.loaded_keys(), ())
+
+            runner = go.StandaloneGlinerOnnx(RecordingSession(4), FakeTokenizer(), store)
+            self.assertEqual(store.loaded_keys(), ())
+
+            schema = {"intent": ["price_snapshot", "news_catalysts"]}
+            out_lazy = runner.classify_text("NVDA price", schema, include_confidence=True)
+            out_eager = go.StandaloneGlinerOnnx(RecordingSession(4), FakeTokenizer(), eager).classify_text(
+                "NVDA price", schema, include_confidence=True
+            )
+            self.assertEqual(out_lazy, out_eager)
+            loaded_after_cls = set(store.loaded_keys())
+            self.assertEqual(
+                loaded_after_cls,
+                {"classifier.0.weight", "classifier.0.bias", "classifier.2.weight", "classifier.2.bias"},
+            )
+
+            ner_lazy = runner.extract_entities("NVDA rises", ["ticker"], threshold=0.5)
+            ner_eager = go.StandaloneGlinerOnnx(RecordingSession(4), FakeTokenizer(), eager).extract_entities(
+                "NVDA rises", ["ticker"], threshold=0.5
+            )
+            self.assertEqual(ner_lazy, ner_eager)
+            self.assertGreater(len(store.loaded_keys()), 4)
+
+            runner.close()
+            self.assertEqual(store.loaded_keys(), ())
+            with self.assertRaises(RuntimeError):
+                _ = store["classifier.0.weight"]
+
+    def test_mmap_heads_aligned_verified_readonly_and_releases_handle_on_close(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            npz_path = root / "heads.npz"
+            eager = _synthetic_heads(4, count_target=1)
+            np.savez(str(npz_path), **eager)
+            src_sha = go.file_sha256(npz_path)
+
+            bin_path, index_path = go.standalone_mmap_head_paths(root)
+            index = go.build_mmap_heads(npz_path, bin_path=bin_path, index_path=index_path, source_heads_sha256=src_sha)
+            self.assertEqual(index["align"], go.STANDALONE_HEAD_ALIGN)
+            for key in go.HEAD_KEYS:
+                self.assertEqual(index["tensors"][key]["offset"] % go.STANDALONE_HEAD_ALIGN, 0)
+
+            verified = go.verify_mmap_heads(bin_path, index_path, expected_source_sha256=src_sha)
+            self.assertIsNotNone(verified)
+            self.assertIsNone(go.verify_mmap_heads(bin_path, index_path, expected_source_sha256="wrong-sha"))
+
+            store = go.LazyHeadStore.from_mmap(bin_path, verified)
+            self.assertEqual(store.mode, "mmap")
+            for key in ("classifier.0.weight", "span_rep.span_rep_layer.out_project.0.weight"):
+                arr = store[key]
+                self.assertFalse(arr.flags.writeable)
+                self.assertTrue(np.array_equal(arr, eager[key]))
+            store.close()
+
+            bad_idx = json.loads(index_path.read_text(encoding="utf-8"))
+            bad_idx["tensors"]["classifier.0.weight"]["offset"] = 4
+            index_path.write_text(json.dumps(bad_idx), encoding="utf-8")
+            self.assertIsNone(go.verify_mmap_heads(bin_path, index_path, expected_source_sha256=src_sha))
+
+            index_path.write_text(json.dumps(index), encoding="utf-8")
+            raw = bytearray(bin_path.read_bytes())
+            raw[0] ^= 0xFF
+            bin_path.write_bytes(bytes(raw))
+            self.assertIsNone(go.verify_mmap_heads(bin_path, index_path, expected_source_sha256=src_sha))
+            bin_path.unlink()
+
+    def test_external_data_conversion_verification_and_bit_exact_ort_output(self):
+        import onnx
+        import onnxruntime as ort
+        from onnx import TensorProto, helper, numpy_helper
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            onnx_path, heads_path, meta_path = go.standalone_paths(root)
+            tok_path = root / "tokenizer.json"
+            tok_path.write_text('{"version":"1.0"}', encoding="utf-8")
+
+            rng = np.random.default_rng(7)
+            w = rng.standard_normal((16, 16), dtype=np.float32)
+            graph = helper.make_graph(
+                [helper.make_node("MatMul", ["x", "w"], ["y"])],
+                "tiny_ext",
+                [helper.make_tensor_value_info("x", TensorProto.FLOAT, ["b", 16])],
+                [helper.make_tensor_value_info("y", TensorProto.FLOAT, ["b", 16])],
+                initializer=[numpy_helper.from_array(w, "w")],
+            )
+            model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 17)])
+            onnx.save(model, str(onnx_path))
+            np.savez(str(heads_path), **_synthetic_heads(4))
+
+            ort_ver = ort.__version__
+            meta = {
+                "revision": go.REVISION,
+                "format": go.STANDALONE_FORMAT,
+                "provider": go.STANDALONE_PROVIDER,
+                "ort_version": ort_ver,
+                "tokenizer_sha256": go.file_sha256(tok_path),
+                "onnx_bytes": onnx_path.stat().st_size,
+                "onnx_sha256": go.file_sha256(onnx_path),
+                "heads_bytes": heads_path.stat().st_size,
+                "heads_sha256": go.file_sha256(heads_path),
+                "max_abs_err": 0.0001,
+                "max_prob_diff": 0.00001,
+            }
+            meta_path.write_text(json.dumps(meta), encoding="utf-8")
+
+            x = rng.standard_normal((2, 16), dtype=np.float32)
+            ref_sess = ort.InferenceSession(str(onnx_path), providers=[go.STANDALONE_PROVIDER])
+            (ref_y,) = ref_sess.run(["y"], {"x": x})
+            del ref_sess
+
+            converted = go.convert_standalone_to_external_data(root, tokenizer_path=tok_path, ort_version=ort_ver, size_threshold=64)
+            data_path = root / go.standalone_external_data_name()
+            bin_path, index_path = go.standalone_mmap_head_paths(root)
+            self.assertTrue(data_path.is_file())
+            self.assertTrue(bin_path.is_file())
+            self.assertTrue(index_path.is_file())
+            self.assertEqual(converted["onnx_data_file"], data_path.name)
+            self.assertIsNotNone(go.verify_standalone_onnx_cache(root, tokenizer_path=tok_path, ort_version=ort_ver))
+
+            low_sess = ort.InferenceSession(
+                str(onnx_path),
+                sess_options=go.build_ort_session_options(threads=2, disable_prepacking=True),
+                providers=[go.STANDALONE_PROVIDER],
+            )
+            (ext_y,) = low_sess.run(["y"], {"x": x})
+            del low_sess
+            self.assertTrue(np.allclose(ref_y, ext_y, atol=1e-6))
+
+            bad_meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            bad_meta["onnx_data_file"] = "../escape.data"
+            meta_path.write_text(json.dumps(bad_meta), encoding="utf-8")
+            self.assertIsNone(go.verify_standalone_onnx_cache(root, tokenizer_path=tok_path, ort_version=ort_ver))
+
+            meta_path.write_text(json.dumps({k: v for k, v in converted.items() if not k.startswith("heads_mmap_")}), encoding="utf-8")
+            raw = bytearray(data_path.read_bytes())
+            raw[0] ^= 0xFF
+            data_path.write_bytes(bytes(raw))
+            self.assertIsNone(go.verify_standalone_onnx_cache(root, tokenizer_path=tok_path, ort_version=ort_ver))
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 import weakref
 from pathlib import Path
@@ -272,6 +273,125 @@ class TestGlobalModelOwnerAndLeaks(unittest.TestCase):
         self.assertIsNone(runner2.session)
         self.assertEqual(runner2.heads, {})
         self.assertEqual(runner2._encode_piece.cache_info().currsize, 0)
+
+    def test_router_idle_auto_unload_releases_process_and_global_slot_lock(self):
+        with tempfile.TemporaryDirectory() as d1, \
+             mock.patch("core.process_guard.memory_status", return_value={"avail_phys_mb": 6000, "commit_pct": 40}):
+            closed_events = []
+            proc = _FakeProcess(stdout_lines=['{"ready": true, "backend": "standalone_fp32"}\n'])
+            router = rw.RouterProcess(REPO, Path(d1), idle_timeout_s=0.12, on_close=lambda: closed_events.append("closed"))
+            with mock.patch.object(rw, "spawn_managed", return_value=proc):
+                router.start()
+                try:
+                    self.assertIsNotNone(router.process)
+                    self.assertIsNotNone(router._slot_lock)
+                    deadline = time.monotonic() + 2.0
+                    while not closed_events and time.monotonic() < deadline:
+                        time.sleep(0.03)
+                    self.assertIsNone(router.process)
+                    self.assertIsNone(router._slot_lock)
+                    self.assertEqual(proc.terminated, 1)
+                    self.assertEqual(closed_events, ["closed"])
+                finally:
+                    router.close()
+
+            proc2 = _FakeProcess(stdout_lines=['{"ready": true, "backend": "standalone_fp32"}\n'])
+            router2 = rw.RouterProcess(REPO, Path(d1), idle_timeout_s=0.05)
+            with mock.patch.object(rw, "spawn_managed", return_value=proc2):
+                router2.start()
+                with router2.lock:
+                    router2._last_used = 0.0
+                    router2._maybe_idle_close()
+                    self.assertIsNotNone(router2.process)
+                router2.close()
+
+    def test_chat_service_unloads_router_before_loading_deep_thinker(self):
+        from core.chat_service import ChatService
+        from core.gliner_decide import RoutedQuery
+
+        order = []
+
+        class FakeExtractor:
+            process = _FakeProcess()
+
+            def close(self):
+                order.append("unload_router")
+                self.process = None
+
+        class FakeModels:
+            state = {"selected": "lfm3-1.7b-atomic-ad-q4km", "phase": "ready", "router": "loaded"}
+            lock = mock.MagicMock()
+            thread = None
+            busy = False
+            model_id = "fixture/lfm3"
+            narrator_id = "lfm3-1.7b-atomic-ad-q4km"
+            active_backend = "vulkan"
+
+            def __init__(self):
+                import threading
+                self.lock = threading.RLock()
+
+            def is_loaded(self, model=None):
+                return True
+
+            def qualified(self, backend=None, model=None):
+                return True
+
+            def think_qualified(self, backend=None, model=None):
+                return True
+
+            def thinker_loaded(self):
+                return False
+
+            def load(self):
+                pass
+
+            def load_thinker(self):
+                order.append("load_thinker")
+
+            def stop_thinker(self):
+                pass
+
+            def update(self, **kwargs):
+                self.state.update(kwargs)
+
+            def complete(self, *args, **kwargs):
+                return "NVIDIA Corporation (NVDA) trades at 150.00 USD."
+
+            def close(self):
+                pass
+
+        class FakeTools:
+            def __init__(self):
+                self.snapshots = {}
+                self.charts = {}
+                self.evidence = []
+
+            def get_snapshot(self, ticker):
+                snap = {"ticker": ticker, "name": "NVIDIA Corporation", "currency": "USD", "status": "available", "price": 150.0}
+                self.snapshots[ticker] = snap
+                return snap
+
+            def plot_history(self, ticker):
+                return ""
+
+        with tempfile.TemporaryDirectory() as tmp:
+            svc = ChatService(
+                REPO,
+                root=Path(tmp),
+                models=FakeModels(),
+                market_factory=lambda cancel: FakeTools(),
+                router_factory=lambda: type("R", (), {"route": lambda self, q: RoutedQuery("thesis_review", 0.9, "long_term", ["NVDA"])})(),
+                crowd_odds=lambda tickers: None,
+            )
+            svc.extractor = FakeExtractor()
+            try:
+                sess = svc.store.create_session("a" * 32)
+                job = svc.submit(sess["id"], "Give me the NVDA thesis", "b" * 32, "lfm3-1.7b-atomic-ad-q4km", think=True)
+                svc.threads[job["id"]].join(timeout=10)
+                self.assertEqual(order, ["unload_router", "load_thinker"])
+            finally:
+                svc.close()
 
 
 if __name__ == "__main__":
