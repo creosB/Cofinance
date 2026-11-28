@@ -207,7 +207,7 @@ class RouterProcess:
             HF_HUB_OFFLINE='1',TRANSFORMERS_OFFLINE='1',HF_HUB_DISABLE_TELEMETRY='1',USE_TF='0',USE_FLAX='0',
             OMP_NUM_THREADS='6',MKL_NUM_THREADS='6',
             COFINANCE_ROUTER_CACHE=str(self.logs.resolve()),
-            COFINANCE_ROUTER_ONNX=os.environ.get('COFINANCE_ROUTER_ONNX','auto'),
+            COFINANCE_ROUTER_ONNX='required',
         )
         with (self.logs/'router.log').open('a',encoding='utf-8') as log:
             self.process=spawn_managed([sys.executable,'-E','-B','-u','-m','core.router_worker'],error_type=ModelError,cwd=self.repo,env=env,
@@ -223,7 +223,7 @@ class RouterProcess:
             finally:out.put(None)
         threading.Thread(target=reader,daemon=True).start()
         ready=self.receive(120)
-        if not ready.get('ready'):self.close();raise ModelError('Cached routing model failed to load.')
+        if not ready.get('ready'):self.close();raise ModelError(ROUTER_CACHE_ERROR)
         self.backend=ready.get('backend','pytorch_fp32')
     def _rpc(self,payload,timeout=20):
         with self.lock:
@@ -264,18 +264,22 @@ def _install_offline_guard():
     socket.socket.connect=guarded
 
 
+ROUTER_CACHE_ERROR = 'The verified standalone ONNX router is unavailable. Restore its local cache; no PyTorch fallback was started.'
+
+
 def _load_worker_model(cache_dir: Path | None, mode: str, threads: int = 6):
-    mode = (mode or 'auto').strip().lower()
-    if mode != 'off' and cache_dir is not None:
+    mode = (mode or 'required').strip().lower()
+    if mode != 'off':
         from .gliner_onnx import STANDALONE_FORMAT, load_standalone_onnx
+        if mode not in {'auto', 'required'} or cache_dir is None:
+            raise ModelError(ROUTER_CACHE_ERROR)
         try:
             standalone = load_standalone_onnx(cache_dir, threads=threads)
-        except Exception:
-            standalone = None
-            if mode == 'required':
-                raise
-        if standalone is not None:
-            return standalone, STANDALONE_FORMAT
+        except Exception as exc:
+            raise ModelError(ROUTER_CACHE_ERROR) from exc
+        if standalone is None:
+            raise ModelError(ROUTER_CACHE_ERROR)
+        return standalone, STANDALONE_FORMAT
 
     from gliner2 import AutoExtractor
     import torch
@@ -303,13 +307,17 @@ def main():
         print(json.dumps(meta, indent=2, sort_keys=True), flush=True)
         return
     protocol=sys.stdout
-    with contextlib.redirect_stdout(sys.stderr):
-        cache_env=os.environ.get('COFINANCE_ROUTER_CACHE')
-        model, backend = _load_worker_model(
-            Path(cache_env) if cache_env else None,
-            os.environ.get('COFINANCE_ROUTER_ONNX', 'auto'),
-            threads=6,
-        )
+    try:
+        with contextlib.redirect_stdout(sys.stderr):
+            cache_env=os.environ.get('COFINANCE_ROUTER_CACHE')
+            model, backend = _load_worker_model(
+                Path(cache_env) if cache_env else None,
+                os.environ.get('COFINANCE_ROUTER_ONNX', 'required'),
+                threads=6,
+            )
+    except ModelError:
+        protocol.write(json.dumps({'ready':False})+'\n');protocol.flush()
+        return
     protocol.write(json.dumps({'ready':True,'backend':backend})+'\n');protocol.flush()
     for line in sys.stdin:
         if len(line)>256000:break

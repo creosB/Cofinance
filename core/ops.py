@@ -14,6 +14,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
+from .gliner_onnx import standalone_paths, verify_standalone_onnx_cache
 from .router_worker import REVISION as GLINER_REVISION, onnx_paths, verify_onnx_cache
 
 BACKUP_FORMAT = "cofinance-backup/1"
@@ -164,18 +165,23 @@ def run_preflight(
         else f"Pinned GLiNER snapshot {GLINER_REVISION[:8]} missing (fresh install must stage cache)",
     )
 
-    onnx_file, onnx_meta = onnx_paths(data / "local_models")
-    if onnx_file.exists() or onnx_meta.exists():
+    model_dir = data / "local_models"
+    onnx_file, onnx_meta = onnx_paths(model_dir)
+    if any(p.exists() for p in standalone_paths(model_dir)):
+        verified = verify_standalone_onnx_cache(model_dir, tokenizer_path=gliner_dir / "tokenizer.json")
+        add("router_onnx_cache", "pass" if verified else "fail",
+            "Verified standalone FP32 router cache" if verified else "Standalone FP32 router cache is incomplete or failed verification")
+    elif onnx_file.exists() or onnx_meta.exists():
         verified = verify_onnx_cache(data / "local_models")
         add(
             "router_onnx_cache",
-            "pass" if verified is not None else "fail",
-            f"Verified encoder_fp32 ONNX cache ({verified.name})"
+            "warn" if verified is not None else "fail",
+            "Only the encoder-only lab cache is present; chat routing requires the standalone FP32 cache"
             if verified is not None
             else "ONNX FP32 router cache present but failed SHA-256, revision, or parity gate",
         )
     else:
-        add("router_onnx_cache", "warn", "No ONNX FP32 router cache (falls back to PyTorch)")
+        add("router_onnx_cache", "warn", "Standalone FP32 router cache missing; no PyTorch fallback")
 
     found_pkgs = [p for p in ML_PACKAGES if importlib.util.find_spec(p) is not None]
     missing_pkgs = [p for p in ML_PACKAGES if p not in found_pkgs]

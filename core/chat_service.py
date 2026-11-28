@@ -19,11 +19,11 @@ from .chat_store import ChatStore, ACTIVE, valid_id
 from .citations import cite
 from .documents import select_excerpts
 from .entities import extract_tickers
-from .gliner_decide import DEFAULT_ALIASES, GlinerQueryRouter, GlinerOutputError
+from .gliner_decide import DEFAULT_ALIASES, GlinerQueryRouter, GlinerOutputError, RoutedQuery
 from .local_models import LocalModels, MODEL_ID, ModelError, Cancelled, narrators
 from .market import MARKET_OVERVIEW_TICKERS, MarketTools, SnapshotCache, has_listing_constraint
 from .news_service import coverage_note, feed_tickers, news_health
-from .evidence_status import decision_assessment, decision_request, previous_close_answer, previous_close_request, requested_valuation, valuation_answer
+from .evidence_status import QUOTE_LABEL, decision_assessment, decision_request, previous_close_answer, previous_close_request, requested_valuation, valuation_answer
 from .memory import HybridMemory, LocalKeywordMemory, MemoryHit, context_from
 # Aliased: chat_store.ACTIVE (job statuses) is a different thing; shadowing it broke Stop once (caught by tests).
 from .memory_items import ACTIVE as ITEM_ACTIVE, FORGOTTEN as ITEM_FORGOTTEN, NOTE_LIMIT, PENDING as ITEM_PENDING, MemoryLedger
@@ -376,11 +376,31 @@ class ChatService:
             check()
             think=job['id'] in self.think_runs;deep={'requested':think,'used':False}
             session_tickers=list(session.get('tickers',[]))
-            router=self.router(job['query'],trace,cancel)
-            from .run_trace import TracedExtractor
-            if isinstance(router,GlinerQueryRouter):
-                router=GlinerQueryRouter(TracedExtractor(router.backend,trace,'fastino/GLiNER2.5-Decide','Routing executive'),router.universe,router.aliases)
-            routed=trace.call('Route conversational request','route',lambda:router.route(job['query']),actor='Routing executive',inputs={'query':job['query']})
+            query=job['query']
+            if re.fullmatch(r'(?:hi|hello|hey)[!.]?',query,re.I):
+                answer='Hi! What would you like to look into?'
+                trace.event('Answer greeting','decision',{'method':'python_greeting'},actor='Python')
+                trace.finish(summary={'origin':'chat','conversation_id':job['session_id'],'flow':'open_conversation',
+                                      'answer_kind':'conversation','answer':answer,'model_choice':job['model']})
+                with self.lock:
+                    check()
+                    self.store.finish(job['id'],answer,{'kind':'conversation','unverified_chat':False,'charts':[],'evidence':[],
+                                      'tickers':session_tickers,'mode':job['model'],'usage':trace.data.get('usage'),'deep_think':deep},
+                                      session_tickers,'complete')
+                return
+            documents=self.store.documents(session['id'])
+            quote=re.fullmatch(r'(?i:quote)[ \t]+\$?([A-Z][A-Z0-9]{0,5})[?!.]?',query) if not documents else None
+            explicit_quote=bool(quote and quote[1] in UNIVERSE)
+            if explicit_quote:
+                routed=trace.call('Route conversational request','route',
+                                  lambda:RoutedQuery('price_snapshot',1.0,'intraday',[quote[1]],requested_value='share_price'),
+                                  actor='Python',inputs={'query':query,'method':'explicit_quote'})
+            else:
+                router=self.router(query,trace,cancel)
+                from .run_trace import TracedExtractor
+                if isinstance(router,GlinerQueryRouter):
+                    router=GlinerQueryRouter(TracedExtractor(router.backend,trace,'fastino/GLiNER2.5-Decide','Routing executive'),router.universe,router.aliases)
+                routed=trace.call('Route conversational request','route',lambda:router.route(query),actor='Routing executive',inputs={'query':query})
             check()
             if routed.intent not in {'price_snapshot','news_catalysts','compare_assets','watchlist_add','thesis_review','open_conversation'}:
                 raise GlinerOutputError('Unsupported router intent.')
@@ -503,7 +523,6 @@ class ChatService:
                         if found['symbol'] not in resolved_tickers:resolved_tickers.append(found['symbol'])
                     else:
                         resolution_gaps.append((term,[]))
-            documents=self.store.documents(session['id'])
             doc_match=bool(documents) and (routed.intent!='open_conversation' or any(e.get('matched') for e in select_excerpts(documents,job['query'],top=1)))
             if comparing and resolved_tickers and len(set(resolved_tickers+session_tickers))<2 and not doc_match and not resolution_gaps:
                 resolution_gaps.append(('the second asset',[]))
@@ -722,8 +741,8 @@ class ChatService:
             # Context only from turns about the same assets: an NVDA risk must not leak into an Apple answer.
             same=lambda ts:bool(set(ts or [])&set(tickers))
             previous=research[-1]['content'] if research and same((research[-1].get('payload') or {}).get('tickers')) else ''
-            hits=self.recall_memory(session,job['query'],trace,exclude_run=research[-1].get('run_id') if research else None,tickers=tickers)
-            odds_pool=ThreadPoolExecutor(max_workers=1) if self.crowd_odds else None
+            hits=[] if explicit_quote else self.recall_memory(session,job['query'],trace,exclude_run=research[-1].get('run_id') if research else None,tickers=tickers)
+            odds_pool=ThreadPoolExecutor(max_workers=1) if self.crowd_odds and not explicit_quote else None
             odds_future=odds_pool.submit(self.crowd_odds,tickers) if odds_pool else None
             try:
                 result=run_traced_team(orch,job['query'],trace,session_id=job['session_id'],context=context_from(previous,hits),
@@ -786,7 +805,7 @@ class ChatService:
                      # The pages the Document Reader quoted, so the answer can show where it came from.
                      'document_sources':[{'document_id':e['document_id'],'name':e['name'],'page':e['page'],'matched':e['matched']}
                                          for e in result.document_report.raw_facts.get('excerpts',[])] if result.document_report else [],
-                     'memory':{'backend':self.memory.backend,'used_previous':bool(previous),
+                     'memory':{'backend':'keyword' if explicit_quote else self.memory.backend,'used_previous':bool(previous) and not explicit_quote,
                                'recalled':[{'question':h.question[:160],'run_id':h.run_id,'item_id':h.item_id,'kind':h.kind,'score':h.score,**({'found_by':h.sources} if h.sources else {})} for h in hits]}}
             if assessment is not None:payload['decision_assessment']=assessment
             if tickers and previous_close_request(job['query']):
@@ -796,6 +815,11 @@ class ChatService:
                 trace.event('Use dated previous close','decision',{'tickers':tickers},actor='Python')
             elif tickers and not doc_match and not asked_for_decision and routed.intent in {'price_snapshot','compare_assets'} and measure in {'share_price','market_cap'}:
                 answer=valuation_answer(measure,tickers,tools.snapshots,display_value)
+                if explicit_quote:
+                    quote_state=(tools.snapshots.get(tickers[0],{}).get('quote_status') or {}).get('state')
+                    label=QUOTE_LABEL.get(quote_state,'Quote freshness not confirmed')
+                    if quote_state!='unavailable':
+                        answer+=f' {label}.'
                 payload['market_answer_note']=answer
                 payload['citations']=cite(answer[:16000],tools.snapshots,tools.evidence+news.evidence)
                 trace.event('Use requested market measure','decision',{'measure':measure,'tickers':tickers},actor='Python')
@@ -831,7 +855,9 @@ class ChatService:
             self.notify_change()
         if remember is None:return
         try:
-            if not self.closed:self.remember(*remember)
+            if not self.closed:
+                if explicit_quote:self.remember(*remember,keyword_only=True)
+                else:self.remember(*remember)
         finally:
             with self.lock:self.threads.pop(job['id'],None)  # tracked until memory is written, so close() waits for it
             self.notify_change()
@@ -869,7 +895,7 @@ class ChatService:
             if len(out)>=5:break
         return out
 
-    def remember(self,session_id,question,answer,run_id,tickers):
+    def remember(self,session_id,question,answer,run_id,tickers,*,keyword_only=False):
         """Write one accepted research turn to every backend. Runs after the run slot is released.
         The keyword copy is written under the ledger lock (fast). The vector copy is written OUTSIDE it, because the
         first one starts the embedder (seconds), and a note or forget in another conversation must not wait for that.
@@ -886,7 +912,7 @@ class ChatService:
                     self.ledger.update(run_id,keyword_id=kid)
                 except (sqlite3.Error,ValueError) as exc:
                     errors.append('keyword: '+type(exc).__name__)
-            write=semantic is not None and not item['semantic_id'] and run_id not in self._semantic_inflight
+            write=not keyword_only and semantic is not None and not item['semantic_id'] and run_id not in self._semantic_inflight
             if write and time.monotonic()<self.semantic_retry_after:
                 errors.append('semantic: waiting after an earlier failure');write=False
             if not write:

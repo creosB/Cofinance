@@ -390,8 +390,6 @@ def main():
     from core.chat_service import ChatService
     service = ChatService(ROOT)
     server = create_server(port=args.port, service=service)
-    service.warm_router()  # loads the cached routing model in the background so the first question is not a cold start
-    service.warm_narrator()
     print(f"Cofinance React dashboard: http://127.0.0.1:{server.server_port}", flush=True)
     print("React chat + local research API. Loopback-only. Ctrl+C to stop.", flush=True)
     try:

@@ -280,4 +280,20 @@ class TestChatAPI(unittest.TestCase):
         self.assertEqual(len(self.request('/api/conversation?id='+session['id'])[1]['messages']),2)
 
 
+    def test_api_model_free_turns_need_no_router_or_narrator(self):
+        status, session=self.request('/api/sessions',{'request_id':uuid.uuid4().hex})
+        self.assertEqual(status,200)
+        with patch.object(self.service,'router',side_effect=AssertionError('Unexpected router load')) as router, \
+             patch.object(self.service.models,'load',side_effect=AssertionError('Unexpected narrator load')) as narrator:
+            for query, expected in (('hi','Hi!'),('Quote NVDA','138.5')):
+                status,job=self.request('/api/chat',{'session_id':session['id'],'query':query,
+                                          'request_id':uuid.uuid4().hex,'model':'facts'})
+                self.assertEqual(status,202)
+                self.assertEqual(wait(self.service,job)['status'],'complete')
+                _,saved=self.request('/api/conversation?id='+session['id'])
+                self.assertIn(expected,saved['messages'][-1]['content'])
+        router.assert_not_called()
+        narrator.assert_not_called()
+
+
 if __name__=='__main__':unittest.main()

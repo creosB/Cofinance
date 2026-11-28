@@ -420,6 +420,8 @@ def verify_cmd(full=False, browser=True):
                 'tests.test_dev_cli',
                 'tests.test_open_chat',
                 'tests.test_research_acceptance',
+                'tests.test_lazy_inference',
+                'tests.test_router_warmup',
                 'tests.test_evidence_status',
                 'tests.test_outer_loop',
                 'tests.test_route_smoke',

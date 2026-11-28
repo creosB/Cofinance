@@ -1,4 +1,3 @@
-"""Router warm-up at dashboard startup (2026-11-17: the first question after a restart spent 51 s of 57 loading GLiNER)."""
 import os
 import tempfile
 import threading
@@ -75,9 +74,18 @@ class TestRouterWarmup(unittest.TestCase):
         self.assertEqual(FakeRouter.starts, 0)
         self.assertEqual(self.service.warm["state"], "skipped")
 
-    def test_dashboard_main_starts_the_warmup(self):
-        source = (REPO / "ui" / "dashboard.py").read_text(encoding="utf-8")
-        self.assertIn("service.warm_router()", source)
+    def test_dashboard_main_keeps_both_runtimes_cold(self):
+        from ui import dashboard
+
+        service, server = mock.Mock(), mock.Mock(server_port=8878)
+        with mock.patch("sys.argv", ["dashboard"]), \
+             mock.patch.object(dashboard, "DIST", mock.MagicMock()), \
+             mock.patch("core.chat_service.ChatService", return_value=service), \
+             mock.patch.object(dashboard, "create_server", return_value=server):
+            dashboard.main()
+        server.serve_forever.assert_called_once_with()
+        service.warm_router.assert_not_called()
+        service.warm_narrator.assert_not_called()
 
 
 if __name__ == "__main__":
