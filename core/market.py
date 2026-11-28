@@ -467,9 +467,13 @@ class MarketTools:
                 snap.update(sent_fields)
                 if sent_ev:
                     local_evidence.append(sent_ev)
+            elif ticker.startswith("^") or qtype.upper() == "INDEX":
+                ath_out={}
+                self.add_all_time_high(ath_out,symbol,price)
+                snap["fundamentals_as_of"]={}
+                snap["fundamentals_status"]="Not applicable for index"
+                snap.update(ath_out)
             else:
-                # The chart response never carries fundamentals (the old reads here were always empty). Missing fields
-                # remain visibly absent; each present one keeps its own as-of date.
                 fund_out={"currency":snap.get("currency")}
                 ath_out={}
                 with ThreadPoolExecutor(max_workers=2) as pool:

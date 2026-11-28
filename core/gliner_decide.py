@@ -115,6 +115,67 @@ _VALUATION_HEAD_CUE_RE = re.compile(
     r"|enterprise\s+value|share\s+price|per\s+share|how\s+expensive|total\s+value"
     r"|how\s+much\s+(?:is|are|does|do)\b|how\s+big\s+(?:is|are)\b)\b)|\bEV\b"
 )
+_TRIVIAL_GREETING_RE = re.compile(
+    r"^\s*(?:hi|hello|hey|yo|sup|good\s+(?:morning|afternoon|evening)|thanks|thank\s+you)[!.,?\s]*$",
+    re.I,
+)
+_LIVE_CAPABILITY_CUE_RE = re.compile(
+    r"\b(?:watchlist|watch\s+list|tracked|tracking|portfolio|markets?|ind(?:ex|ices)|"
+    r"s&p|nasdaq|dow|fear|greed|sentiment|overall|broader\s+market)\b",
+    re.I,
+)
+_WATCHLIST_MUTATION_RE = re.compile(r"\b(?:add|track|follow|remove|untrack)\b", re.I)
+_NON_ENTITY_ACRONYMS = frozenset({
+    "P/E", "PE", "EPS", "IPO", "GDP", "CPI", "PPI", "ETF", "ETFS", "APR", "APY", "ROI", "ROE", "ROA",
+    "EBITDA", "DCF", "FED", "SEC", "USD", "EUR", "GBP", "JPY", "TRY", "CAD", "AUD", "CHF", "CNY", "HKD",
+    "US", "USA", "UK", "EU", "AI", "EV", "ADR", "IRA", "HSA", "ESG", "YTD", "TTM", "YOY", "QOQ", "ATH",
+    "RSI", "MACD", "FX", "OTC", "NAV", "AUM", "CAGR", "PEG", "PS", "PB", "FCF",
+})
+_NON_ENTITY_PROPER_WORDS = frozenset({
+    "I", "A", "An", "The", "US", "USA", "UK", "EU", "Fear", "Greed", "Crypto", "Index", "Indices",
+    "Market", "Markets", "Dow", "Nasdaq", "Today", "Now", "Monday", "Tuesday", "Wednesday",
+    "Thursday", "Friday", "Saturday", "Sunday", "January", "February", "March", "April", "May",
+    "June", "July", "August", "September", "October", "November", "December",
+    "Turkish", "American", "German", "British", "Japanese", "Chinese", "Indian", "European",
+})
+_COMPARE_SPLIT_RE = re.compile(r"\s+(?:and|versus|vs\.?|or)\s+|,\s+", re.I)
+
+
+def _has_plausible_entity_token(query: str) -> bool:
+    text = (query or "").strip()
+    if not text:
+        return False
+    if re.search(r"(?<![A-Za-z0-9])\$[A-Za-z][A-Za-z0-9.\-]{0,11}\b", text):
+        return True
+    if QUALIFIED_TICKER.search(text):
+        return True
+    tokens = re.findall(r"[A-Za-z][A-Za-z0-9/'.-]*", text)
+    for idx, tok in enumerate(tokens):
+        clean = tok.strip("'.-")
+        if not clean:
+            continue
+        if clean.isupper() and len(clean) >= 2 and clean not in _NON_ENTITY_ACRONYMS:
+            return True
+        if idx > 0 and clean[0].isupper() and clean not in _NON_ENTITY_PROPER_WORDS and clean.upper() not in _NON_ENTITY_ACRONYMS:
+            return True
+    return False
+
+
+def _compare_all_clauses_resolved(query: str, tickers: Sequence[str], aliases: Mapping[str, str]) -> bool:
+    if len(tickers) < 2:
+        return False
+    clauses = [c.strip() for c in _COMPARE_SPLIT_RE.split(query or "") if c.strip()]
+    if len(clauses) < 2:
+        return False
+    ticker_set = {t.upper() for t in tickers}
+    alias_hits = [name for name, sym in aliases.items() if sym in ticker_set]
+    for clause in clauses:
+        matched = any(re.search(rf"(?<!\w)\$?{re.escape(t)}(?!\w)", clause, re.I) for t in ticker_set)
+        if not matched:
+            matched = any(re.search(rf"(?<!\w){re.escape(name)}(?!\w)", clause, re.I) for name in alias_hits)
+        if not matched:
+            return False
+    return True
 
 
 def _unpack_label_conf(raw: Any, default_label: str = "") -> Tuple[str, float]:
@@ -315,6 +376,16 @@ class GlinerQueryRouter:
         }
 
     def route(self, query: str) -> RoutedQuery:
+        if _TRIVIAL_GREETING_RE.fullmatch(query or ""):
+            return RoutedQuery(
+                intent="open_conversation",
+                intent_confidence=1.0,
+                horizon="intraday",
+                tickers=[],
+                entity_candidates=(),
+                requested_value="other",
+                capability="none",
+            )
         use_valuation_head = bool(_VALUATION_HEAD_CUE_RE.search(query or ""))
         schema = USER_QUERY_SCHEMA if use_valuation_head else USER_QUERY_BASE_SCHEMA
         try:
@@ -345,8 +416,36 @@ class GlinerQueryRouter:
         seen_candidates = {candidate.lower() for candidate in candidates}
         has_asset_cue = bool(candidates or cue)
 
-        skip_ner = intent == "open_conversation" and not tickers and intent_conf >= 0.50 and not has_asset_cue
-        needs_ner = not skip_ner and (intent == "compare_assets" or not (tickers or candidates))
+        capability = "none"
+        words = re.findall(r"[A-Za-z0-9]+", query or "")
+        cap_cue = bool(_LIVE_CAPABILITY_CUE_RE.search(query or ""))
+        if not tickers and not candidates and not use_valuation_head and len(words) >= 2 and cap_cue:
+            try:
+                cap_res = self.backend.classify_text(query, ZERO_TICKER_CAPABILITY_SCHEMA, include_confidence=True)
+            except TypeError:
+                cap_res = self.backend.classify_text(query, ZERO_TICKER_CAPABILITY_SCHEMA)
+            except Exception:
+                cap_res = {}
+            if isinstance(cap_res, Mapping) and "capability" in cap_res:
+                cap_label, cap_conf = _unpack_label_conf(cap_res.get("capability"), "general_chat")
+                if cap_label in LIVE_CAPABILITIES and cap_conf >= 0.55:
+                    capability = cap_label
+
+        plausible_entity = _has_plausible_entity_token(query)
+        capability_skips_ner = (
+            capability in LIVE_CAPABILITIES
+            and not _WATCHLIST_MUTATION_RE.search(query or "")
+            and not plausible_entity
+        )
+        open_skips_ner = (
+            intent == "open_conversation"
+            and not tickers
+            and not has_asset_cue
+            and (intent_conf >= 0.50 or (intent_conf >= 0.30 and not plausible_entity))
+        )
+        skip_ner = capability_skips_ner or open_skips_ner
+        compare_needs_ner = intent == "compare_assets" and not _compare_all_clauses_resolved(query, tickers, self.aliases)
+        needs_ner = not skip_ner and (compare_needs_ner or not (tickers or candidates))
         if needs_ner:
             try:
                 ner = self.backend.extract_entities(query, ["company", "cryptocurrency", "ticker"])
@@ -369,7 +468,7 @@ class GlinerQueryRouter:
                         candidates.append(norm)
                         seen_candidates.add(norm.lower())
 
-        if not tickers and not candidates and has_asset_cue:
+        if not tickers and not candidates and has_asset_cue and capability not in LIVE_CAPABILITIES:
             for cand in _fallback_asset_candidates(query):
                 upper = cand.upper()
                 mapped = self.aliases.get(cand.lower()) or (upper if upper in self.universe else None)
@@ -381,25 +480,14 @@ class GlinerQueryRouter:
                     candidates.append(cand)
                     seen_candidates.add(cand.lower())
 
+        if tickers or candidates:
+            capability = "none"
+
         if intent == "open_conversation":
             if tickers and intent_conf < 0.55:
                 intent = "price_snapshot"
             elif has_asset_cue and candidates:
                 intent = "thesis_review" if _THESIS_CUE_RE.search(query or "") else "price_snapshot"
-
-        capability = "none"
-        words = re.findall(r"[A-Za-z0-9]+", query or "")
-        if not tickers and not candidates and not use_valuation_head and len(words) >= 2:
-            try:
-                cap_res = self.backend.classify_text(query, ZERO_TICKER_CAPABILITY_SCHEMA, include_confidence=True)
-            except TypeError:
-                cap_res = self.backend.classify_text(query, ZERO_TICKER_CAPABILITY_SCHEMA)
-            except Exception:
-                cap_res = {}
-            if isinstance(cap_res, Mapping) and "capability" in cap_res:
-                cap_label, cap_conf = _unpack_label_conf(cap_res.get("capability"), "general_chat")
-                if cap_label in LIVE_CAPABILITIES and cap_conf >= 0.55:
-                    capability = cap_label
 
         return RoutedQuery(
             intent=intent,

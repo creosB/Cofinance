@@ -144,7 +144,8 @@ def save_error_count(directory: Path, run_id: str) -> int:
 
 class TraceRecorder:
     def __init__(self, title: str, *, mode: str = "live", directory: str | Path | None = None,
-                 clock: Callable[[], float] = time.perf_counter, max_spans: int = 2000) -> None:
+                 clock: Callable[[], float] = time.perf_counter, max_spans: int = 2000,
+                 flush_interval_s: float = 0.0) -> None:
         if mode not in {"live", "fixture", "replay"}:
             raise ValueError("mode must be live, fixture or replay")
         self.clock, self.started = clock, clock()
@@ -152,17 +153,22 @@ class TraceRecorder:
         self.parent = contextvars.ContextVar("trace_parent_" + self.run_id, default=None)
         self.lock = threading.RLock()
         self.max_spans = max_spans
+        self.flush_interval_s = max(0.0, float(flush_interval_s))
+        self._last_flush = 0.0
         self.directory = Path(directory) if directory is not None else None
         self.data = {"format": TRACE_FORMAT, "id": self.run_id, "title": safe(title), "mode": mode,
                      "started_at": utc(), "status": "running", "duration_ms": None, "spans": [],
                      "dropped_spans": 0, "storage_errors": 0,
                      "disclosure": "Observed calls and rule outcomes only. No private chain-of-thought. Local diagnostic traces may contain project data."}
-        self.flush()
+        self.flush(force=True)
 
-    def flush(self) -> bool:
+    def flush(self, *, force: bool = True) -> bool:
         if self.directory is None:
             return True
         with self.lock:
+            now = time.monotonic()
+            if not force and self.flush_interval_s > 0.0 and (now - self._last_flush) < self.flush_interval_s:
+                return True
             temp = None
             marker = self.directory / (self.run_id + ".save-error")
             try:
@@ -172,6 +178,7 @@ class TraceRecorder:
                     temp = Path(file.name)
                     json.dump(self.data, file, ensure_ascii=True, allow_nan=False)
                 replace_trace(temp, self.directory / (self.run_id + ".json"))
+                self._last_flush = time.monotonic()
                 try:
                     marker.unlink(missing_ok=True)
                 except OSError:
@@ -204,7 +211,7 @@ class TraceRecorder:
                         "start_ms": round((start - self.started) * 1000, 3), "duration_ms": None,
                         "inputs": safe(inputs), "outputs": None}
                 self.data["spans"].append(node)
-                self.flush()
+                self.flush(force=False)
         token = self.parent.set(node["id"]) if node else None
         result: dict = {}
         try:
@@ -224,7 +231,7 @@ class TraceRecorder:
                     self.data["usage"] = summarize(self.data["spans"], self.data["dropped_spans"])
                 node["duration_ms"] = round(max(0, self.clock() - start) * 1000, 3)
                 self.parent.reset(token)
-                self.flush()
+                self.flush(force=node["status"] in {"error", "fallback"})
 
     def call(self, name: str, kind: str, fn: Callable, *, actor: str = "Python", model: str = "", inputs: Any = None):
         with self.span(name, kind, actor=actor, model=model, inputs=inputs) as result:
@@ -259,7 +266,7 @@ class TraceRecorder:
             if error_type:
                 node["error_type"] = safe(error_type)
             self.data["spans"].append(node)
-            self.flush()
+            self.flush(force=bool(error_type or fallback))
 
     def finish(self, *, error: bool = False, summary: Any = None) -> dict:
         with self.lock:
@@ -271,7 +278,7 @@ class TraceRecorder:
             from .guard_telemetry import summarize_guards
             self.data["usage"] = summarize(self.data["spans"], self.data["dropped_spans"])
             self.data["guard_telemetry"] = summarize_guards(self.data["spans"], self.data["dropped_spans"])
-            self.flush()
+            self.flush(force=True)
             return self.data
 
 

@@ -20,10 +20,11 @@ export function useDashboard(options: DashboardOptions = {}){
   const [runs,setRuns]=useState<RunMeta[]>([]),[run,setRun]=useState<Run|null>(null),[corpus,setCorpus]=useState<Corpus|null>(null)
   const [selected,setSelected]=useState(''),[loading,setLoading]=useState(active),[error,setError]=useState('')
   const current=useRef<Run|null>(null),selectedRef=useRef(''),pinnedRef=useRef(false),triggerRef=useRef<(()=>void)|null>(null)
+  const selectionGenRef=useRef(0)
   const activeRef=useRef(active),needCorpusRef=useRef(needCorpus)
   activeRef.current=active
   needCorpusRef.current=needCorpus
-  const select=useCallback((id:string)=>{pinnedRef.current=Boolean(id);selectedRef.current=id;setSelected(id);setRun(null);current.current=null;setLoading(Boolean(id));if(activeRef.current)triggerRef.current?.()},[])
+  const select=useCallback((id:string)=>{selectionGenRef.current+=1;pinnedRef.current=Boolean(id);selectedRef.current=id;setSelected(id);setRun(null);current.current=null;setLoading(Boolean(id));if(activeRef.current)triggerRef.current?.()},[])
   const followLatest=useCallback(()=>{pinnedRef.current=false;if(activeRef.current)triggerRef.current?.()},[])
   const refresh=useCallback(()=>{triggerRef.current?.()},[])
   useEffect(()=>{
@@ -59,8 +60,9 @@ export function useDashboard(options: DashboardOptions = {}){
         if(id){
           const meta=list.find(r=>r.id===id)
           if(meta&&(!current.current||current.current.id!==id||current.current.revision!==meta.revision)){
+            const gen=selectionGenRef.current
             const next=parseRun(await get('/api/run?id='+encodeURIComponent(id),deadline.signal))
-            if(disposed||selectedRef.current!==id)return
+            if(disposed||selectedRef.current!==id||selectionGenRef.current!==gen)return
             current.current=next;setRun(next)
           }
         }else{

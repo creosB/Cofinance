@@ -88,7 +88,7 @@ def risk_cues(data_facts: Mapping[str, Any], news_facts: Mapping[str, Any]) -> L
         if _num(change) and change < 0:
             cues.append({"text": f"{ticker} is down since the previous session close",
                          "anchors": ["previous session", "previous close", "down since", "decline", "fell", "lower"]})
-        if snap.get("fundamentals_status") and not snap.get("fundamentals_as_of"):
+        if snap.get("fundamentals_status") and snap.get("fundamentals_status") != "Not applicable for index" and not snap.get("fundamentals_as_of"):
             cues.append({"text": f"fundamentals for {ticker} are not available from the source",
                          "anchors": ["fundamental", "valuation data", "earnings data", "financial data"]})
         fg = snap.get("fear_greed_index")

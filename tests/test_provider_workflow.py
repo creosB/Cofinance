@@ -169,6 +169,13 @@ class TestProviderWorkflow(unittest.TestCase):
                                             self.assertIn(unit, card.inner_text())
                                             self.assertTrue(payload['snapshots'][symbol].get('exchange'))
                                             self.assertTrue(payload['snapshots'][symbol].get('quote_type'))
+                                            if len(expected) > 1:
+                                                snap_name = str(payload['snapshots'][symbol].get('name') or '').lower()
+                                                body_low = str(answer.get('content') or '').lower()
+                                                self.assertTrue(
+                                                    symbol.lower() in body_low or (snap_name and snap_name in body_low),
+                                                    f'Multi-asset answer omitted {symbol}: {answer.get("content")}',
+                                                )
                                         self.assertEqual(card.locator('[data-quote-state]').count(), len(expected))
                                         self.assertEqual(card.locator('[data-decision-state="insufficient_evidence"]').count(), int(decision))
                                         if name == 'london_followup' and index == 1:

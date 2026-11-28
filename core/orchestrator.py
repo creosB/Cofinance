@@ -168,9 +168,25 @@ def plain_text(text: str) -> str:
     return re.sub(r",\s*([,.;:!?])", r"\1", text).replace(" ,", ",")
 
 
-def clean_narration(text: str) -> str:
+def clean_narration(text: str, *, single_paragraph: bool = True) -> str:
     """Role tag echoed from the system prompt, markdown emphasis, word counts, dashes and repeated blocks are removed."""
-    return first_paragraph(plain_text(ROLE_TAG.sub("", THINK.sub("", text or "").lstrip().replace("**", ""))))
+    cleaned = plain_text(ROLE_TAG.sub("", THINK.sub("", text or "").lstrip().replace("**", "")))
+    if single_paragraph:
+        return first_paragraph(cleaned)
+    return " ".join(part.strip() for part in cleaned.splitlines() if part.strip())
+
+
+def missing_available_tickers(tickers: Sequence[str], summary: str, raw_facts: Mapping[str, Any]) -> List[str]:
+    low = (summary or "").lower()
+    missing: List[str] = []
+    for tkr in tickers:
+        snap = (raw_facts or {}).get(tkr) if isinstance(raw_facts, Mapping) else None
+        if isinstance(snap, Mapping) and (snap.get("status") == "unavailable" or snap.get("price") is None):
+            continue
+        name = str(snap.get("name") or "").strip().lower() if isinstance(snap, Mapping) else ""
+        if tkr.lower() not in low and not (name and name in low):
+            missing.append(tkr)
+    return missing
 
 
 def check_wording(clean: str, evidence: str, faithful: bool, validation: Dict[str, Any]) -> bool:
@@ -293,7 +309,7 @@ def market_fact_lines(ticker: str, snap: Mapping[str, Any]) -> List[str]:
         if key in known or key in NOT_NARRATED or isinstance(value, bool) or not isinstance(value, (int, float)):
             continue
         lines.append(f"{key.replace('_', ' ').capitalize()}: {display_value(key, value)[0]}")
-    if snap.get("fundamentals_status") and not any(k in snap for k in FUNDAMENTAL_FIELDS):
+    if snap.get("fundamentals_status") and snap.get("fundamentals_status") != "Not applicable for index" and not any(k in snap for k in FUNDAMENTAL_FIELDS):
         lines.append("Fundamentals: not available from this source")
     return lines
 
@@ -342,7 +358,10 @@ class DataAnalystAgent:
 
         any_unavailable = any(snap.get("status") == "unavailable" or snap.get("price") is None for snap in facts.values())
         if collect_only or (skip_if_any_unavailable and any_unavailable):
-            clean = self._deterministic_fallback(facts)
+            if collect_only and collect_reason == "market_overview":
+                clean = self._market_overview_summary(facts)
+            else:
+                clean = self._deterministic_fallback(facts)
             reason = "incomplete_comparison" if (skip_if_any_unavailable and any_unavailable) else (collect_reason or "python_market_answer")
             faithful = bool(allowed) and not any_unavailable
             validation = {
@@ -354,14 +373,17 @@ class DataAnalystAgent:
                 "validation_reason": reason if faithful else ("incomplete_comparison" if (skip_if_any_unavailable and any_unavailable) else "no_available_quote"),
             }
         else:
+            multi = len(facts) > 1
             sys_prompt = self.SYSTEM_CRYPTO if risk_mode == "risk_guardian_crypto" else self.SYSTEM_STOCK
+            if multi:
+                sys_prompt += " Cover every listed asset in one compact paragraph with one short sentence per asset and no blank lines."
             prompt = "Facts from market-data tools:\n" + "\n\n".join(
                 "\n".join(market_fact_lines(tkr, snap)) for tkr, snap in facts.items())
             try:
-                options = {"stop": self.stop} if self.stop else {}
-                budget = 256 if len(facts) <= 1 else min(512, 256 + 128 * (len(facts) - 1))
+                options = {"stop": self.stop} if (self.stop and not multi) else {}
+                budget = 256 if not multi else min(512, 256 + 128 * (len(facts) - 1))
                 raw = self.llm.complete(sys_prompt, prompt, max_tokens=budget, **options) if allowed else ""
-                clean = clean_narration(final_answer(raw) or "")
+                clean = clean_narration(final_answer(raw) or "", single_paragraph=not multi)
             except Exception:
                 clean = ""
             faithful = bool(clean) and bool(allowed) and score_numbers_faithful(clean, allowed)
@@ -373,6 +395,11 @@ class DataAnalystAgent:
             if invented_risks:
                 validation["unsupported_risks"] = invented_risks
                 validation["validation_reason"] = "unsupported_risk"
+                faithful = False
+            missing = missing_available_tickers(ordered, clean, facts) if faithful and multi else []
+            if missing:
+                validation["missing_tickers"] = missing
+                validation["validation_reason"] = "missing_tickers"
                 faithful = False
             if not faithful:
                 clean = self._deterministic_fallback(facts)
@@ -407,6 +434,27 @@ class DataAnalystAgent:
                 parts.append(lines[0])
             else:
                 parts.append(lines[0] + ". " + ". ".join(lines[1:]) + ".")
+        return " ".join(parts) or "Market data unavailable. No values were substituted."
+
+    @staticmethod
+    def _market_overview_summary(facts: Mapping[str, Any]) -> str:
+        parts = []
+        for tkr, snap in facts.items():
+            head = _asset_header(tkr, snap)
+            if snap.get("error") or snap.get("status") == "unavailable" or not _numeric(snap.get("price")):
+                parts.append(f"{head}: market data unavailable.")
+                continue
+            currency = str(snap.get("currency") or "")
+            unit = f" {currency}" if currency else ""
+            price_txt = display_value("price", snap["price"])[0]
+            bits = [f"{head}: {price_txt}{unit}"]
+            if _numeric(snap.get("change_from_previous_session_pct")):
+                chg_txt = display_value("change_from_previous_session_pct", snap["change_from_previous_session_pct"])[0]
+                bits.append(f"({chg_txt}% since previous close)" if chg_txt != "unchanged" else "(unchanged since previous close)")
+            lo, hi = snap.get("low_52_week"), snap.get("high_52_week")
+            if _numeric(lo) and _numeric(hi):
+                bits.append(f"one-year range {display_value('low_52_week', lo)[0]} to {display_value('high_52_week', hi)[0]}{unit}")
+            parts.append(" ".join(bits) + ".")
         return " ".join(parts) or "Market data unavailable. No values were substituted."
 
 
@@ -596,13 +644,13 @@ class TeamLeadOrchestrator:
     MAX_RESTATED = 2
     STRICT_RISK = ("\nStrict: name a risk only from the listed risks, in their words, or say the reports do not identify "
                    "a specific risk. Do not mention execution, supply chain, competition, valuation or any other risk that is not listed.")
-    RETRY_REASONS = {"unsupported_risk", "unsupported_terms", "unsupported_numeric_tokens", "direction_conflict", "claim_provenance"}
+    RETRY_REASONS = {"unsupported_risk", "unsupported_terms", "unsupported_numeric_tokens", "direction_conflict", "claim_provenance", "missing_tickers"}
     MAX_RECOVERABLE_REJECTED_NUMBERS = 3
 
     @staticmethod
     def rejected(validation: Mapping[str, Any]) -> List[str]:
         """What a guard rejected, as short strings (shown in the trace and fed back to the retry)."""
-        items = [str(x)[:80] for key in ("unsupported_risks", "unsupported_terms", "rejected_numbers", "direction_conflicts")
+        items = [str(x)[:80] for key in ("unsupported_risks", "unsupported_terms", "rejected_numbers", "direction_conflicts", "missing_tickers")
                  for x in (validation.get(key) or [])]
         if validation.get("provenance_conflicts"):
             items.extend(format_conflict_summary(validation["provenance_conflicts"]))
@@ -620,6 +668,9 @@ class TeamLeadOrchestrator:
         if reason == "claim_provenance":
             return (f"\nStrict: some numbers were attached to the wrong asset, metric, or unit: {items}. "
                     "Match each number to its exact asset, label, and unit from the reports, or leave it out.")
+        if reason == "missing_tickers":
+            return (f"\nStrict: your draft omitted requested assets: {items}. "
+                    "Cover every requested asset in one compact paragraph using only numbers from the reports.")
         return ("\nStrict: your draft stated the wrong move since the previous close. Use the reports' change since the previous "
                 "close exactly, or leave the comparison out.")
     STRICT_FOLLOW_UP = ("\nStrict: your answer must be one or two sentences with no more than two numbers. "
@@ -890,6 +941,7 @@ class TeamLeadOrchestrator:
             and not any((news_rep.raw_facts or {}).values())
         )
         if (data_rep is not None and news_absent and doc_rep is None
+                and routed.intent != "thesis_review"
                 and not previous and data_rep.faithful_numbers and self._same_narrator()
                 and not unsupported_risks(data_rep.summary, cues)
                 and self._all_tickers_mentioned(tickers, data_rep.summary, data_rep.raw_facts)
@@ -926,11 +978,13 @@ class TeamLeadOrchestrator:
                                      + [p.summary for p in (data_rep, news_rep, doc_rep) if p] + [c["text"] for c in cues])
         earlier = numbers_in(previous) if previous else []
 
+        multi_asset = len(tickers) > 1
+
         def narrate(prompt: str, max_tokens: int) -> str:
             try:
                 if not (data_rep or news_rep or doc_rep):
                     raw = ""
-                elif self.stop:
+                elif self.stop and not multi_asset:
                     try:
                         raw = self.lead_llm.complete(self.SYSTEM, prompt, max_tokens=max_tokens, stop=self.stop)
                     except TypeError as exc:
@@ -939,7 +993,7 @@ class TeamLeadOrchestrator:
                         raw = self.lead_llm.complete(self.SYSTEM, prompt, max_tokens=max_tokens)
                 else:
                     raw = self.lead_llm.complete(self.SYSTEM, prompt, max_tokens=max_tokens)
-                return clean_narration(final_answer(raw) or "")
+                return clean_narration(final_answer(raw) or "", single_paragraph=not multi_asset)
             except Exception:
                 return ""
 
@@ -973,6 +1027,12 @@ class TeamLeadOrchestrator:
                 val["unsupported_risks"] = invented
                 val["validation_reason"] = "unsupported_risk"
                 ok = False
+            if ok and data_rep is not None and not previous and multi_asset:
+                missing = missing_available_tickers(tickers, text, data_rep.raw_facts)
+                if missing:
+                    val["missing_tickers"] = missing
+                    val["validation_reason"] = "missing_tickers"
+                    ok = False
             if previous:
                 val["follow_up"] = True
                 val["restated_numbers"] = sum(1 for n in numbers_in(text) if any(abs(n - p) <= max(1e-9, abs(p) * 1e-9) for p in earlier))

@@ -110,11 +110,11 @@ class NewsReader:
 
 
 class LiveTrace(TraceRecorder):
-    def __init__(self,*args,progress=None,**kwargs):
+    def __init__(self,*args,progress=None,flush_interval_s=0.25,**kwargs):
         self.progress_fn=progress;self.last_progress=0
-        super().__init__(*args,**kwargs)
-    def flush(self):
-        saved=super().flush()
+        super().__init__(*args,flush_interval_s=flush_interval_s,**kwargs)
+    def flush(self,*,force=True):
+        saved=super().flush(force=force)
         now=time.monotonic()
         if self.progress_fn and now-self.last_progress>.15 and self.data.get('spans'):
             running=[s for s in self.data['spans'] if s['status']=='running']
@@ -171,6 +171,7 @@ class ChatService:
         # One router start at a time: the startup warm-up and a first chat must never launch two GLiNER processes.
         self.router_lock=threading.Lock();self.warm_thread=None;self.warm_cancel=threading.Event();self.warm={'state':'idle','seconds':None,'error':''}
         self.narrator_lock=threading.Lock();self.narrator_warm_thread=None;self.narrator_warm={'state':'idle','seconds':None,'error':''}
+        self.startup_warm_lock=threading.Lock()
         self.deleting=set()  # conversations being deleted: no run, note or forget may start in them
         self._clearing=False
         # One explicit Clock 1 collection at a time. No scheduler: a person starts every run.
@@ -274,7 +275,11 @@ class ChatService:
         def run():
             started=time.monotonic();self.warm['state']='loading'
             try:
-                self.local_extractor(_NoTrace(),self.warm_cancel)
+                with self.startup_warm_lock:
+                    if self.closed or self.warm_cancel.is_set():
+                        self.warm.update(state='skipped',seconds=round(time.monotonic()-started,1))
+                        return
+                    self.local_extractor(_NoTrace(),self.warm_cancel)
                 self.warm.update(state='loaded',seconds=round(time.monotonic()-started,1))
             except BaseException as error:  # a failed warm-up only means the first chat loads it, as before
                 self.warm.update(state='failed',error=type(error).__name__,seconds=round(time.monotonic()-started,1))
@@ -297,7 +302,16 @@ class ChatService:
         def run():
             started=time.monotonic();self.narrator_warm['state']='loading'
             try:
-                self._load_narrator_locked()
+                with self.startup_warm_lock:
+                    if self.closed or self.warm_cancel.is_set():
+                        self.narrator_warm.update(state='skipped',seconds=round(time.monotonic()-started,1))
+                        return
+                    self._load_narrator_locked()
+                    if not self.closed and self.models.is_loaded():
+                        try:
+                            self.models.complete('Reply with OK.', 'ok', max_tokens=1, think=False, temperature=0, allow_truncated=True)
+                        except Exception:
+                            pass
                 self.narrator_warm.update(state='loaded',seconds=round(time.monotonic()-started,1))
             except BaseException as error:
                 self.narrator_warm.update(state='failed',error=type(error).__name__,seconds=round(time.monotonic()-started,1))

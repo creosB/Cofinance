@@ -10,6 +10,7 @@ import argparse
 import hashlib
 import json
 import re
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
@@ -177,6 +178,7 @@ def _trace_category(run: dict) -> str:
     return "chat"
 
 
+_RUN_LIST_CACHE_LOCK = threading.Lock()
 _RUN_LIST_CACHE: dict[str, tuple[tuple[int, int, int], dict]] = {}
 
 
@@ -204,7 +206,8 @@ def list_runs(directory: Path) -> list[dict]:
             marker_mtime = marker.stat().st_mtime_ns if marker.is_file() else 0
             sig = (st.st_mtime_ns, st.st_size, marker_mtime)
             cache_key = str(path)
-            cached = _RUN_LIST_CACHE.get(cache_key)
+            with _RUN_LIST_CACHE_LOCK:
+                cached = _RUN_LIST_CACHE.get(cache_key)
             if cached and cached[0] == sig:
                 runs.append(dict(cached[1]))
                 continue
@@ -213,9 +216,10 @@ def list_runs(directory: Path) -> list[dict]:
             continue
         item = {key: run.get(key) for key in ("id", "title", "status", "mode", "started_at", "duration_ms", "revision")}
         item["category"] = _trace_category(run)
-        if len(_RUN_LIST_CACHE) > 256:
-            _RUN_LIST_CACHE.clear()
-        _RUN_LIST_CACHE[cache_key] = (sig, dict(item))
+        with _RUN_LIST_CACHE_LOCK:
+            if len(_RUN_LIST_CACHE) > 256:
+                _RUN_LIST_CACHE.clear()
+            _RUN_LIST_CACHE[cache_key] = (sig, dict(item))
         runs.append(item)
     return runs
 

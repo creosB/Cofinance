@@ -240,7 +240,7 @@ class TestSinglePassDataNarration(unittest.TestCase):
         )
         self.assertEqual(len(llm_doc.calls), 2)
 
-    def test_no_news_thesis_and_comparison_reuse_data_analyst_and_respect_vetoes(self):
+    def test_no_news_thesis_runs_team_lead_and_comparison_reuses_complete_data_analyst(self):
         tools = _Tools()
         llm_thesis = _CountingLLM("NVIDIA Corporation trades at 186.64 USD, up 2.78 percent from the previous session close.")
         orch_thesis = TeamLeadOrchestrator(
@@ -251,12 +251,11 @@ class TestSinglePassDataNarration(unittest.TestCase):
             tools,
         )
         res = orch_thesis.run("Give me the NVDA thesis")
-        self.assertEqual(len(llm_thesis.calls), 1)
+        self.assertEqual(len(llm_thesis.calls), 2)
         self.assertTrue(res.faithful_synthesis)
         self.assertIsNotNone(res.news_report)
-        self.assertIn("No accepted news is available in the local store", res.final_synthesis)
         gate = [e for e in res.events if e.event_type == "GATE_CHECK" and e.agent == TeamLeadOrchestrator.NAME][-1]
-        self.assertEqual(gate.payload["method"], TeamLeadOrchestrator.DATA_ONLY)
+        self.assertNotEqual(gate.payload.get("method"), TeamLeadOrchestrator.DATA_ONLY)
 
         class _TwoAssetTools:
             def get_snapshot(self, ticker):
@@ -275,8 +274,11 @@ class TestSinglePassDataNarration(unittest.TestCase):
             llm_cmp_missing,
             two_tools,
         )
-        orch_cmp_missing.run("Compare NVDA and MSFT")
+        res_missing = orch_cmp_missing.run("Compare NVDA and MSFT")
         self.assertGreaterEqual(len(llm_cmp_missing.calls), 2)
+        self.assertFalse(res_missing.faithful_synthesis)
+        self.assertIn("MSFT", res_missing.final_synthesis)
+        self.assertIn("NVDA", res_missing.final_synthesis)
 
         llm_cmp_ok = _CountingLLM("NVDA trades at 186.64 USD and MSFT trades at 186.64 USD.")
         orch_cmp_ok = TeamLeadOrchestrator(

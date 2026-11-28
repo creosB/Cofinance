@@ -430,6 +430,8 @@ def verify_cmd(full=False, browser=True):
                 'tests.test_gliner_onnx',
                 'tests.test_gliner_decide',
                 'tests.test_wave3_tracks',
+                'tests.test_audit_fixes',
+                'tests.test_resource_owner',
             ],
             ROOT,
             env(),
